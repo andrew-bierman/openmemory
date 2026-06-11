@@ -1,0 +1,4 @@
+{
+  "extends": "@openmemory/typescript-config/react-library",
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

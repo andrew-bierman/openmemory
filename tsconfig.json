@@ -1,0 +1,12 @@
+{
+  "extends": "./packages/typescript-config/base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@openmemory/api": ["apps/api/src/index.ts"],
+      "@openmemory/client": ["packages/client/src/index.ts"],
+      "@openmemory/core": ["packages/core/src/index.ts"],
+      "@openmemory/ui": ["packages/ui/src/index.ts"]
+    }
+  }
+}

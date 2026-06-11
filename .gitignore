@@ -1,0 +1,7 @@
+node_modules
+.turbo
+.wrangler
+.dev.vars
+dist
+coverage
+*.log

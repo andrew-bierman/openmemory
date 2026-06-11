@@ -1,0 +1,10 @@
+{
+  "name": "@openmemory/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./base": "./base.json",
+    "./react-library": "./react-library.json",
+    "./worker": "./worker.json"
+  }
+}

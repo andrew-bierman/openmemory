@@ -1,0 +1,24 @@
+{
+  "name": "@openmemory/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@elysia/eden": "^1.4.10",
+    "@openmemory/api": "workspace:*"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260601.0",
+    "@openmemory/typescript-config": "workspace:*",
+    "@types/bun": "^1.2.17",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.8"
+  }
+}

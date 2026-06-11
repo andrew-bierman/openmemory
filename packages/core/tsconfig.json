@@ -1,0 +1,7 @@
+{
+  "extends": "@openmemory/typescript-config/base",
+  "compilerOptions": {
+    "types": ["vitest"]
+  },
+  "include": ["src/**/*.ts"]
+}

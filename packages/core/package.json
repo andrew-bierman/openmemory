@@ -1,0 +1,22 @@
+{
+  "name": "@openmemory/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check-types": "tsc --noEmit",
+    "test": "vitest run src"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@openmemory/typescript-config": "workspace:*",
+    "@types/bun": "^1.2.17",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.8"
+  }
+}
