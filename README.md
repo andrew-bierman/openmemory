@@ -18,7 +18,8 @@ The current alpha is a multi-user memory API that stores each user's evolving me
 - Cloudflare AI Search is tracked as an optional managed-search layer, not the core graph/RAG substrate.
 - R2 for future graph exports and backups.
 - Queues and Workflows for future ingestion/extraction pipelines.
-- shadcn-style package layout with shared TypeScript config and `@openmemory/ui`; TanStack Start is the planned web app stack after the memory core stabilizes.
+- TanStack Start web app in `apps/web`.
+- shadcn-style package layout with shared TypeScript config and `@openmemory/ui`.
 
 ## Alpha Capabilities
 
@@ -38,7 +39,8 @@ The current alpha is a multi-user memory API that stores each user's evolving me
 
 ```sh
 bun install
-bun run dev
+bun run dev:api
+bun run dev:web
 ```
 
 Database helpers:
@@ -79,6 +81,7 @@ Content-Type: application/json
 
 ```sh
 bun run check
+bun run build
 ```
 
 The integration tests start Wrangler on randomized non-default ports with isolated local persistence so they do not collide with other agents or projects on the same machine.
@@ -107,3 +110,4 @@ Note: `kysely@0.28.17` remains installed only as a Better Auth bundling compatib
 - `docs/plans/testing-strategy.md`
 - `docs/brainstorms/openmemory-requirements.md`
 - `docs/plans/openmemory-plan.md`
+- `docs/roadmap.md`

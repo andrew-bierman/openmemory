@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "turbo dev",
     "dev:api": "bun run --cwd apps/api dev",
+    "dev:web": "bun run --cwd apps/web dev",
+    "build": "turbo run build",
     "deploy": "bun run --cwd apps/api deploy",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --local --config wrangler.jsonc",

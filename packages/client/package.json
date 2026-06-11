@@ -7,8 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@elysia/eden": "^1.4.10",
-    "@openmemory/api": "workspace:*"
+    "@elysia/eden": "^1.4.10"
   },
   "scripts": {
     "check-types": "tsc --noEmit",

@@ -303,17 +303,55 @@ export default {
   fetch(request: Request, requestEnv: Env, ctx: ExecutionContext) {
     const pathname = new URL(request.url).pathname;
 
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders(request) });
+    }
+
     if (isAuthRoute(pathname)) {
-      return handleOpenMemoryAuthRequest(requestEnv, request);
+      return withCors(
+        handleOpenMemoryAuthRequest(requestEnv, request),
+        request,
+      );
     }
 
     if (pathname === "/mcp") {
-      return mcpHandler(request, requestEnv, ctx);
+      return withCors(mcpHandler(request, requestEnv, ctx), request);
     }
 
-    return apiWorker.fetch(request);
+    return withCors(apiWorker.fetch(request), request);
   },
 } satisfies ExportedHandler<Env>;
+
+async function withCors(
+  response: Response | Promise<Response>,
+  request: Request,
+) {
+  const resolved = await response;
+  const headers = new Headers(resolved.headers);
+
+  for (const [key, value] of corsHeaders(request)) {
+    headers.set(key, value);
+  }
+
+  return new Response(resolved.body, {
+    status: resolved.status,
+    statusText: resolved.statusText,
+    headers,
+  });
+}
+
+function corsHeaders(request: Request) {
+  const origin = request.headers.get("origin") ?? "*";
+
+  return new Headers({
+    "access-control-allow-credentials": "true",
+    "access-control-allow-headers":
+      "authorization, content-type, x-openmemory-user-id",
+    "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "access-control-allow-origin": origin,
+    vary: "Origin",
+  });
+}
 
 async function indexMemory(env: Env, tenantId: string, memory: unknown) {
   if (!isMemoryForIndex(memory)) {
