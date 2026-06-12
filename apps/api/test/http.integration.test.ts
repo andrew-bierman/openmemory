@@ -302,7 +302,23 @@ test("worker API supports memory lifecycle, profile context, MCP, and dashboard"
   expect(await dashboard.text()).toContain("OpenMemory");
 }, 45_000);
 
-async function startWorker() {
+test("worker API disables header tenant mode when OAuth is required", async () => {
+  const worker = await startWorker({
+    OPENMEMORY_REQUIRE_OAUTH: "true",
+  });
+  workers.push(worker);
+
+  const blocked = await worker.fetch("/v1/memories", {
+    headers: tenantHeaders(`tenant-${crypto.randomUUID()}`),
+  });
+
+  expect(blocked.status).toBe(401);
+  expect(await blocked.json()).toMatchObject({
+    error: "header_tenant_disabled",
+  });
+}, 45_000);
+
+async function startWorker(env: Record<string, string> = {}) {
   const port = await getAvailablePort();
   const inspectorPort = await getAvailablePort();
   await mkdir(testTmpRoot, { recursive: true });
@@ -326,6 +342,10 @@ async function startWorker() {
       String(inspectorPort),
       "--persist-to",
       persistTo,
+      ...Object.entries(env).flatMap(([key, value]) => [
+        "--var",
+        `${key}:${value}`,
+      ]),
       "--log-level",
       "info",
       "--show-interactive-dev-session=false",

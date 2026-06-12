@@ -34,6 +34,7 @@ The current alpha is a multi-user memory API that stores each user's evolving me
 - Better Auth routes at `/api/auth/*`, plus root OAuth/OIDC discovery at `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
 - Optional bearer-token auth through `OPENMEMORY_API_TOKEN`; local development can still use only `x-openmemory-user-id`.
 - Optional OAuth enforcement for MCP through `OPENMEMORY_REQUIRE_OAUTH=true`; verified token subjects become the memory tenant.
+- When `OPENMEMORY_REQUIRE_OAUTH=true`, regular HTTP API routes reject tenant headers unless `OPENMEMORY_ALLOW_HEADER_TENANT=true` is explicitly set.
 
 ## Quick Start
 
@@ -42,6 +43,14 @@ bun install
 bun run dev:api
 bun run dev:web
 ```
+
+Cloudflare setup:
+
+```sh
+bun run setup:cloudflare
+```
+
+See `docs/deployment.md` for required Wrangler auth, resources, secrets, and the GitHub Actions deploy workflow.
 
 Database helpers:
 
@@ -97,6 +106,7 @@ The alpha now wires Better Auth's OAuth Provider into the Worker:
 - GitHub and Google login providers are enabled automatically when their client id/secret env vars are present.
 - Auth storage uses `AUTH_DB` D1 through Drizzle when that binding is configured, and falls back to an in-memory adapter for local tests and dev.
 - `/mcp` keeps the local header flow by default; set `OPENMEMORY_REQUIRE_OAUTH=true` to require Better Auth OAuth bearer tokens.
+- HTTP API routes stop trusting `x-openmemory-user-id` when `OPENMEMORY_REQUIRE_OAUTH=true`, unless `OPENMEMORY_ALLOW_HEADER_TENANT=true` is explicitly configured.
 
 Production deployment still needs a real D1 database bound as `AUTH_DB`, `BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL`. Local tests intentionally avoid requiring those external Cloudflare resources.
 
@@ -111,3 +121,4 @@ Note: `kysely@0.28.17` remains installed only as a Better Auth bundling compatib
 - `docs/brainstorms/openmemory-requirements.md`
 - `docs/plans/openmemory-plan.md`
 - `docs/roadmap.md`
+- `docs/deployment.md`

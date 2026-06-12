@@ -5,7 +5,18 @@ const USER_HEADER = "x-openmemory-user-id";
 
 export type HeaderSource = Headers | Record<string, string | undefined>;
 
-export function resolveTenant(headers: HeaderSource) {
+export function resolveTenant(
+  headers: HeaderSource,
+  options: { allowHeaderTenant?: boolean } = {},
+) {
+  if (options.allowHeaderTenant === false) {
+    return {
+      error: "header_tenant_disabled" as const,
+      message:
+        "Header tenant mode is disabled. Use OAuth-backed identity or explicitly enable OPENMEMORY_ALLOW_HEADER_TENANT=true.",
+    };
+  }
+
   const rawTenant =
     getHeader(headers, USER_HEADER) ?? getHeader(headers, "x-user-id");
 
@@ -45,6 +56,14 @@ export const getGraph = (env: Env, tenantId: string) => {
   const id = env.MEMORY_GRAPHS.idFromName(tenantId);
   return env.MEMORY_GRAPHS.get(id);
 };
+
+export function shouldAllowHeaderTenant(env: Env) {
+  if (env.OPENMEMORY_ALLOW_HEADER_TENANT === "true") {
+    return true;
+  }
+
+  return env.OPENMEMORY_REQUIRE_OAUTH !== "true";
+}
 
 function getHeader(headers: HeaderSource, name: string) {
   if (headers instanceof Headers) {

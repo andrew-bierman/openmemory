@@ -12,6 +12,8 @@
 - `packages/ui` contains shadcn-style shared UI primitives.
 - `bun run check` passes across Biome, Turbo, TypeScript, Vitest, and Wrangler-backed API integration tests.
 - `bun run --cwd apps/web build` produces a production TanStack Start build.
+- CI and manual deploy workflows are defined in `.github/workflows`.
+- `scripts/setup-cloudflare.sh` documents and automates resource creation once Wrangler is authenticated.
 
 ## Not Fully Solved Yet
 
@@ -20,9 +22,10 @@
   - Vectorize index
   - R2 bucket
   - secrets for `BETTER_AUTH_SECRET`, OAuth providers, and deployment URLs
+  - current local Wrangler auth cannot retrieve account IDs
 - Browser auth is not complete:
   - login and consent pages are not yet built
-  - deployed API routes still allow local header tenant mode unless hardened by env
+  - deployed API routes reject header tenant mode when `OPENMEMORY_REQUIRE_OAUTH=true`
   - web app currently uses tenant header mode for local development
 - MCP OAuth is wired but not end-to-end tested with a real external MCP client registration and token exchange.
 - RAG quality is still basic:
@@ -32,8 +35,8 @@
   - no reranker
   - no recall benchmarks
 - Graph performance has not been benchmarked against realistic memory volumes.
-- CI/CD is not configured.
-- Deployment is not wired to Cloudflare environments.
+- GitHub Actions are configured, but deploy needs GitHub Cloudflare secrets and provisioned Cloudflare resources.
+- Deployment config is not fully wired until `scripts/setup-cloudflare.sh` can update `wrangler.jsonc` with the created D1 database id.
 
 ## Next Implementation Tracks
 
@@ -63,5 +66,6 @@
    - Add browser tests for critical flows.
 
 6. CI and deployment
-   - Add GitHub Actions for `bun install`, `bun run check`, and build.
-   - Add Cloudflare deploy workflow after resource setup.
+   - Add Cloudflare account secrets to GitHub.
+   - Run `bun run setup:cloudflare` after Wrangler re-authentication.
+   - Run the manual deploy workflow after resource setup.

@@ -13,6 +13,7 @@ import {
   type HeaderSource,
   resolveAuth,
   resolveTenant,
+  shouldAllowHeaderTenant,
 } from "./auth";
 import { handleOpenMemoryAuthRequest, isAuthRoute } from "./better-auth";
 import type { Env } from "./env";
@@ -104,7 +105,9 @@ function withTenant(headers: HeaderSource) {
     };
   }
 
-  const tenant = resolveTenant(headers);
+  const tenant = resolveTenant(headers, {
+    allowHeaderTenant: shouldAllowHeaderTenant(env),
+  });
   if ("error" in tenant) {
     return {
       tenant,
@@ -119,7 +122,11 @@ function withTenant(headers: HeaderSource) {
 }
 
 function errorStatus(error: string) {
-  return error === "missing_tenant" || error === "unauthorized" ? 401 : 400;
+  return error === "missing_tenant" ||
+    error === "unauthorized" ||
+    error === "header_tenant_disabled"
+    ? 401
+    : 400;
 }
 
 function tenantError(tenant: ReturnType<typeof withTenant>["tenant"]): string {
