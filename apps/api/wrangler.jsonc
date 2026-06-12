@@ -5,6 +5,7 @@
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "preview_urls": false,
   "migrations": [
     {
       "tag": "v1",
@@ -36,5 +37,13 @@
   ],
   "vars": {
     "EMBEDDING_MODEL": "@cf/baai/bge-small-en-v1.5"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "AUTH_DB",
+      "database_name": "openmemory-auth",
+      "database_id": "c36373fd-bd51-4a56-9d8c-653a72d51fc9",
+      "migrations_dir": "drizzle"
+    }
+  ]
 }

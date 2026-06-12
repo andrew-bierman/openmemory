@@ -21,14 +21,10 @@ bun --cwd apps/api wrangler d1 create "${DB_NAME}" \
 echo "Creating Vectorize index ${VECTOR_INDEX}..."
 bun --cwd apps/api wrangler vectorize create "${VECTOR_INDEX}" \
   --preset "${VECTOR_PRESET}" \
-  --binding MEMORY_VECTORS \
-  --update-config \
   --config wrangler.jsonc
 
 echo "Creating R2 bucket ${R2_BUCKET}..."
 bun --cwd apps/api wrangler r2 bucket create "${R2_BUCKET}" \
-  --binding MEMORY_EXPORTS \
-  --update-config \
   --config wrangler.jsonc
 
 echo "Applying D1 migrations..."

@@ -1,8 +1,16 @@
 # OpenMemory Deployment
 
-## Current Blocker
+## Current Deployment
 
-This repository is ready for Cloudflare provisioning, but the local Wrangler session currently cannot retrieve Cloudflare account IDs. Re-authenticate before running setup:
+The API is deployed to Cloudflare Workers:
+
+- `https://openmemory-api.abbierman101.workers.dev`
+- D1 `openmemory-auth` is bound as `AUTH_DB`.
+- Vectorize `openmemory-vectors` is bound as `MEMORY_VECTORS`.
+- R2 `openmemory-exports` is bound as `MEMORY_EXPORTS`.
+- `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` are set as Worker secrets.
+
+If provisioning a new account, authenticate Wrangler first:
 
 ```sh
 bun --cwd apps/api wrangler login

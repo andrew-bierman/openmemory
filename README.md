@@ -52,6 +52,12 @@ bun run setup:cloudflare
 
 See `docs/deployment.md` for required Wrangler auth, resources, secrets, and the GitHub Actions deploy workflow.
 
+Current deployed API:
+
+```txt
+https://openmemory-api.abbierman101.workers.dev
+```
+
 Database helpers:
 
 ```sh
@@ -108,7 +114,7 @@ The alpha now wires Better Auth's OAuth Provider into the Worker:
 - `/mcp` keeps the tenant-header flow on localhost only; deployed MCP requests require Better Auth OAuth bearer tokens.
 - HTTP API routes trust `x-openmemory-user-id` only on localhost. Deployed routes must use OAuth-backed identity.
 
-Production deployment still needs a real D1 database bound as `AUTH_DB`, `BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL`. Local tests intentionally avoid requiring those external Cloudflare resources.
+The personal Cloudflare deployment has D1 `AUTH_DB`, Vectorize, R2, Workers AI, `BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL` configured. Local tests intentionally avoid requiring those external Cloudflare resources.
 
 Note: `kysely@0.28.17` remains installed only as a Better Auth bundling compatibility dependency. OpenMemory's ORM path is Drizzle.
 

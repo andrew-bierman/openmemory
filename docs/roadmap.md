@@ -13,16 +13,16 @@
 - `bun run check` passes across Biome, Turbo, TypeScript, Vitest, and Wrangler-backed API integration tests.
 - `bun run --cwd apps/web build` produces a production TanStack Start build.
 - CI and manual deploy workflows are defined in `.github/workflows`.
-- `scripts/setup-cloudflare.sh` documents and automates resource creation once Wrangler is authenticated.
+- Cloudflare production resources are provisioned in the personal account:
+  - D1 `openmemory-auth` bound as `AUTH_DB`
+  - Vectorize `openmemory-vectors` bound as `MEMORY_VECTORS`
+  - R2 `openmemory-exports` bound as `MEMORY_EXPORTS`
+  - Worker secrets for `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
+- The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
+- `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
 
-- Cloudflare resources are not provisioned in production:
-  - D1 `AUTH_DB`
-  - Vectorize index
-  - R2 bucket
-  - secrets for `BETTER_AUTH_SECRET`, OAuth providers, and deployment URLs
-  - current local Wrangler auth cannot retrieve account IDs
 - Browser auth is not complete:
   - login and consent pages are not yet built
   - deployed API routes reject header tenant mode
@@ -35,37 +35,31 @@
   - no reranker
   - no recall benchmarks
 - Graph performance has not been benchmarked against realistic memory volumes.
-- GitHub Actions are configured, but deploy needs GitHub Cloudflare secrets and provisioned Cloudflare resources.
-- Deployment config is not fully wired until `scripts/setup-cloudflare.sh` can update `wrangler.jsonc` with the created D1 database id.
+- GitHub Actions are configured, but deploy needs GitHub Cloudflare secrets.
+- Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
 
 ## Next Implementation Tracks
 
-1. Production Cloudflare bindings
-   - Create D1, Vectorize, R2, secrets, and Wrangler environments.
-   - Apply Drizzle migrations to D1.
-   - Document local, preview, and production setup.
-
-2. Auth hardening
+1. Auth hardening
    - Build Better Auth login, signup, and consent UI.
    - Move the web app from tenant-header mode to session/OAuth-backed identity.
    - Keep `x-openmemory-user-id` only for local development and tests.
 
-3. MCP production flow
+2. MCP production flow
    - Require OAuth for deployed MCP.
    - Test dynamic client registration, token exchange, JWKS verification, and scoped access.
 
-4. RAG pipeline
+3. RAG pipeline
    - Add ingestion jobs for messages/documents.
    - Extract entities and relationships into the graph.
    - Store embeddings in Vectorize.
    - Combine vector candidates, graph neighbors, profile state, and recency.
    - Add recall quality benchmarks.
 
-5. Web app expansion
+4. Web app expansion
    - Add authenticated navigation, memory detail, graph neighbors, profile editor, source ingestion, and MCP connection views.
    - Add browser tests for critical flows.
 
-6. CI and deployment
+5. CI and deployment
    - Add Cloudflare account secrets to GitHub.
-   - Run `bun run setup:cloudflare` after Wrangler re-authentication.
-   - Run the manual deploy workflow after resource setup.
+   - Run the manual deploy workflow against the provisioned Cloudflare resources.
