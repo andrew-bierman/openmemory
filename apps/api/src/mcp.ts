@@ -7,14 +7,19 @@ import {
 } from "@openmemory/core";
 import { createMcpHandler } from "agents/mcp";
 import { z } from "zod";
-import { getGraph, resolveAuth, resolveTenant } from "./auth";
-import { resolveAuthBaseUrl, shouldRequireOAuth } from "./better-auth";
+import {
+  getGraph,
+  isLocalDevelopmentRequest,
+  resolveAuth,
+  resolveTenant,
+} from "./auth";
+import { resolveAuthBaseUrl } from "./better-auth";
 import type { Env } from "./env";
 import type { MemoryGraph } from "./memory-graph";
 
 export function createOpenMemoryMcpHandler() {
   return async (request: Request, env: Env, ctx: ExecutionContext) => {
-    if (shouldRequireOAuth(env)) {
+    if (!isLocalDevelopmentRequest(request)) {
       const baseURL = resolveAuthBaseUrl(env, request);
       return betterAuthMcpHandler(
         {
@@ -46,7 +51,9 @@ export function createOpenMemoryMcpHandler() {
       )(request);
     }
 
-    return handleMcpRequest(request, env, ctx);
+    return handleMcpRequest(request, env, ctx, {
+      allowHeaderTenant: true,
+    });
   };
 }
 
@@ -54,13 +61,14 @@ async function handleMcpRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
+  options: { allowHeaderTenant: boolean } = { allowHeaderTenant: false },
 ) {
   const auth = resolveAuth(env, request.headers);
   if (!auth.ok) {
     return json({ error: auth.error, message: auth.message }, 401);
   }
 
-  const tenant = resolveTenant(request.headers);
+  const tenant = resolveTenant(request.headers, options);
   if ("error" in tenant) {
     return json(tenant, 401);
   }

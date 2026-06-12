@@ -40,15 +40,12 @@ Cloudflare resources are created. Set production secrets next:
 
   bun --cwd apps/api wrangler secret put BETTER_AUTH_SECRET
   bun --cwd apps/api wrangler secret put BETTER_AUTH_URL
-  bun --cwd apps/api wrangler secret put OPENMEMORY_API_TOKEN
   bun --cwd apps/api wrangler secret put GITHUB_CLIENT_ID
   bun --cwd apps/api wrangler secret put GITHUB_CLIENT_SECRET
   bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_ID
   bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_SECRET
 
-For production MCP OAuth enforcement:
+Optional machine-token fallback for trusted service-to-service local or preview environments:
 
-  bun --cwd apps/api wrangler secret put OPENMEMORY_REQUIRE_OAUTH
-
-Use value: true
+  bun --cwd apps/api wrangler secret put OPENMEMORY_API_TOKEN
 NEXT

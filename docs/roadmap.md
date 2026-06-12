@@ -25,7 +25,7 @@
   - current local Wrangler auth cannot retrieve account IDs
 - Browser auth is not complete:
   - login and consent pages are not yet built
-  - deployed API routes reject header tenant mode when `OPENMEMORY_REQUIRE_OAUTH=true`
+  - deployed API routes reject header tenant mode
   - web app currently uses tenant header mode for local development
 - MCP OAuth is wired but not end-to-end tested with a real external MCP client registration and token exchange.
 - RAG quality is still basic:

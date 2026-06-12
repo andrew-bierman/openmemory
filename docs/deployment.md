@@ -33,10 +33,9 @@ Set these before production deploy:
 ```sh
 bun --cwd apps/api wrangler secret put BETTER_AUTH_SECRET
 bun --cwd apps/api wrangler secret put BETTER_AUTH_URL
-bun --cwd apps/api wrangler secret put OPENMEMORY_REQUIRE_OAUTH
 ```
 
-Use `OPENMEMORY_REQUIRE_OAUTH=true` for production. With that value, regular HTTP API routes stop accepting `x-openmemory-user-id` tenant headers unless `OPENMEMORY_ALLOW_HEADER_TENANT=true` is explicitly set.
+Tenant headers are a localhost-only development mechanism. Deployed HTTP and MCP requests must use OAuth-backed identity.
 
 Optional OAuth login providers:
 

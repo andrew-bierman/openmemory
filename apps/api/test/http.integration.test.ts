@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, expect, test } from "vitest";
+import { isLocalDevelopmentRequest, resolveTenant } from "../src/auth";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
 const externalTmpRoot = "/Volumes/CrucialX10/tmp/openmemory-tests";
@@ -302,21 +303,27 @@ test("worker API supports memory lifecycle, profile context, MCP, and dashboard"
   expect(await dashboard.text()).toContain("OpenMemory");
 }, 45_000);
 
-test("worker API disables header tenant mode when OAuth is required", async () => {
-  const worker = await startWorker({
-    OPENMEMORY_REQUIRE_OAUTH: "true",
-  });
-  workers.push(worker);
+test("auth helpers keep tenant headers local-only", () => {
+  const local = new Request("http://127.0.0.1:54150/v1/memories");
+  const deployed = new Request("https://openmemory.example/v1/memories");
 
-  const blocked = await worker.fetch("/v1/memories", {
-    headers: tenantHeaders(`tenant-${crypto.randomUUID()}`),
-  });
+  expect(isLocalDevelopmentRequest(local)).toBe(true);
+  expect(isLocalDevelopmentRequest(deployed)).toBe(false);
 
-  expect(blocked.status).toBe(401);
-  expect(await blocked.json()).toMatchObject({
+  expect(
+    resolveTenant(tenantHeaders("local-user"), {
+      allowHeaderTenant: isLocalDevelopmentRequest(local),
+    }),
+  ).toEqual({ tenantId: "local-user" });
+
+  expect(
+    resolveTenant(tenantHeaders("deployed-user"), {
+      allowHeaderTenant: isLocalDevelopmentRequest(deployed),
+    }),
+  ).toMatchObject({
     error: "header_tenant_disabled",
   });
-}, 45_000);
+});
 
 async function startWorker(env: Record<string, string> = {}) {
   const port = await getAvailablePort();

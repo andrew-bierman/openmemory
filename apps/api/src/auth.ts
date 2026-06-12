@@ -13,7 +13,7 @@ export function resolveTenant(
     return {
       error: "header_tenant_disabled" as const,
       message:
-        "Header tenant mode is disabled. Use OAuth-backed identity or explicitly enable OPENMEMORY_ALLOW_HEADER_TENANT=true.",
+        "Header tenant mode is available only for local development. Use OAuth-backed identity outside localhost.",
     };
   }
 
@@ -57,12 +57,11 @@ export const getGraph = (env: Env, tenantId: string) => {
   return env.MEMORY_GRAPHS.get(id);
 };
 
-export function shouldAllowHeaderTenant(env: Env) {
-  if (env.OPENMEMORY_ALLOW_HEADER_TENANT === "true") {
-    return true;
-  }
-
-  return env.OPENMEMORY_REQUIRE_OAUTH !== "true";
+export function isLocalDevelopmentRequest(request: Request) {
+  const hostname = new URL(request.url).hostname;
+  return (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+  );
 }
 
 function getHeader(headers: HeaderSource, name: string) {

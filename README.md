@@ -32,9 +32,9 @@ The current alpha is a multi-user memory API that stores each user's evolving me
 - Native streamable HTTP MCP endpoint at `/mcp` with `remember`, `recall`, `forget`, and `profile` tools.
 - Minimal dashboard at `/` for local inspection and capture.
 - Better Auth routes at `/api/auth/*`, plus root OAuth/OIDC discovery at `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
-- Optional bearer-token auth through `OPENMEMORY_API_TOKEN`; local development can still use only `x-openmemory-user-id`.
-- Optional OAuth enforcement for MCP through `OPENMEMORY_REQUIRE_OAUTH=true`; verified token subjects become the memory tenant.
-- When `OPENMEMORY_REQUIRE_OAUTH=true`, regular HTTP API routes reject tenant headers unless `OPENMEMORY_ALLOW_HEADER_TENANT=true` is explicitly set.
+- Tenant headers are supported only for localhost development.
+- Deployed MCP requests use Better Auth OAuth bearer tokens; verified token subjects become the memory tenant.
+- Optional bearer-token auth through `OPENMEMORY_API_TOKEN` can be layered onto trusted service-to-service environments.
 
 ## Quick Start
 
@@ -105,8 +105,8 @@ The alpha now wires Better Auth's OAuth Provider into the Worker:
 - Dynamic client registration is enabled for MCP-compatible clients.
 - GitHub and Google login providers are enabled automatically when their client id/secret env vars are present.
 - Auth storage uses `AUTH_DB` D1 through Drizzle when that binding is configured, and falls back to an in-memory adapter for local tests and dev.
-- `/mcp` keeps the local header flow by default; set `OPENMEMORY_REQUIRE_OAUTH=true` to require Better Auth OAuth bearer tokens.
-- HTTP API routes stop trusting `x-openmemory-user-id` when `OPENMEMORY_REQUIRE_OAUTH=true`, unless `OPENMEMORY_ALLOW_HEADER_TENANT=true` is explicitly configured.
+- `/mcp` keeps the tenant-header flow on localhost only; deployed MCP requests require Better Auth OAuth bearer tokens.
+- HTTP API routes trust `x-openmemory-user-id` only on localhost. Deployed routes must use OAuth-backed identity.
 
 Production deployment still needs a real D1 database bound as `AUTH_DB`, `BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL`. Local tests intentionally avoid requiring those external Cloudflare resources.
 

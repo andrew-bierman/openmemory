@@ -1,4 +1,4 @@
 {
   "extends": "@openmemory/typescript-config/worker",
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "src/**/*.d.ts"]
 }

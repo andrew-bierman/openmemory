@@ -10,7 +10,7 @@
     "dev": "wrangler dev --local",
     "dev:remote": "wrangler dev --remote",
     "deploy": "wrangler deploy",
-    "check-types": "tsc --noEmit && tsc -p test/tsconfig.json --noEmit",
+    "check-types": "cd ../.. && node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit && node_modules/.bin/tsc -p apps/api/test/tsconfig.json --noEmit",
     "test": "vitest run test"
   },
   "dependencies": {

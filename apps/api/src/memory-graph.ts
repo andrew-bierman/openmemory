@@ -1,3 +1,5 @@
+// biome-ignore lint/suspicious/noTsIgnore: Cloudflare provides this runtime-only module inside workerd.
+// @ts-ignore
 import { DurableObject } from "cloudflare:workers";
 import {
   ContextSchema,
@@ -18,13 +20,35 @@ type SearchWithSemanticIds = Partial<SearchInput> & {
 };
 
 type MemoryGraphEnv = Record<string, unknown>;
+type SqlState = {
+  storage: {
+    sql: {
+      exec<T = Record<string, unknown>>(
+        query: string,
+        ...bindings: unknown[]
+      ): {
+        toArray(): T[];
+      };
+    };
+  };
+};
+type DurableObjectRuntimeState = ConstructorParameters<
+  typeof DurableObject
+>[0] &
+  SqlState;
 
-export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
-  constructor(ctx: DurableObjectState, env: MemoryGraphEnv) {
+export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
+  protected declare ctx: DurableObjectRuntimeState;
+
+  constructor(ctx: DurableObjectRuntimeState, env: MemoryGraphEnv) {
     super(ctx, env);
     this.ctx.blockConcurrencyWhile(async () => {
       this.migrate();
     });
+  }
+
+  private get sqlState(): SqlState {
+    return this.ctx as unknown as SqlState;
   }
 
   async createMemory(input: unknown) {
@@ -87,7 +111,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
     this.upsertEntities(next.id, next.entityIds);
 
     if (data.relationship === "updates") {
-      this.ctx.storage.sql.exec(
+      this.sqlState.storage.sql.exec(
         `update memories set status = 'superseded', is_latest = 0, updated_at = ? where id = ?`,
         now,
         current.id,
@@ -115,7 +139,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
     }
 
     const now = new Date().toISOString();
-    this.ctx.storage.sql.exec(
+    this.sqlState.storage.sql.exec(
       `update memories
        set status = 'forgotten', is_latest = 0, forgotten_at = ?, forget_reason = ?, updated_at = ?
        where id = ?`,
@@ -137,7 +161,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
     const where = includeHistorical
       ? `status != 'forgotten'`
       : `status = 'active' and is_latest = 1`;
-    const rows = this.ctx.storage.sql
+    const rows = this.sqlState.storage.sql
       .exec<MemoryRow>(
         `select * from memories where ${where} order by created_at desc limit ?`,
         safeLimit,
@@ -158,16 +182,16 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
       )
       .filter((memory): memory is SearchResult => Boolean(memory));
 
-    const keywordRows = this.ctx.storage.sql
+    const keywordRows: MemoryRow[] = this.sqlState.storage.sql
       .exec<MemoryRow>(
         `select * from memories order by created_at desc limit 1000`,
       )
       .toArray();
 
     const queryTerms = tokenize(data.q);
-    const byKeyword: SearchResult[] = keywordRows
-      .map(rowToMemory)
-      .map((memory) => {
+    const keywordScores: Array<{ memory: MemoryRecord; score: number }> =
+      keywordRows.map((row) => {
+        const memory = rowToMemory(row);
         const contentTerms = new Set(tokenize(memory.content));
         const tagTerms = new Set(memory.tags.flatMap(tokenize));
         const matches = queryTerms.filter(
@@ -178,7 +202,9 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
           score:
             queryTerms.length === 0 ? 0 : matches.length / queryTerms.length,
         };
-      })
+      });
+
+    const byKeyword: SearchResult[] = keywordScores
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score)
       .map(({ memory, score }) => ({
@@ -212,7 +238,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
   }
 
   async getProfile() {
-    const rows = this.ctx.storage.sql
+    const rows: MemoryRecord[] = this.sqlState.storage.sql
       .exec<MemoryRow>(
         `select * from memories
          where status = 'active' and is_latest = 1
@@ -260,7 +286,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
   async addEdge(input: unknown) {
     const edge = GraphEdgeSchema.parse(input);
     const now = new Date().toISOString();
-    this.ctx.storage.sql.exec(
+    this.sqlState.storage.sql.exec(
       `insert or replace into edges
        (source_id, target_id, relationship, weight, metadata_json, created_at, updated_at)
        values (?, ?, ?, ?, ?, coalesce((select created_at from edges where source_id = ? and relationship = ? and target_id = ?), ?), ?)`,
@@ -279,7 +305,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
   }
 
   async getNeighbors(id: string) {
-    const rows = this.ctx.storage.sql
+    const rows = this.sqlState.storage.sql
       .exec<EdgeRow>(
         `select * from edges where source_id = ? or target_id = ? order by updated_at desc limit 100`,
         id,
@@ -291,7 +317,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
   }
 
   private migrate() {
-    this.ctx.storage.sql.exec(`
+    this.sqlState.storage.sql.exec(`
       create table if not exists memories (
         id text primary key,
         content text not null,
@@ -321,24 +347,49 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
       create index if not exists edges_target_id_idx on edges(target_id);
     `);
 
-    addColumn(this.ctx, "memories", "type", "text not null default 'fact'");
-    addColumn(this.ctx, "memories", "status", "text not null default 'active'");
-    addColumn(this.ctx, "memories", "is_latest", "integer not null default 1");
-    addColumn(this.ctx, "memories", "confidence", "real not null default 0.8");
-    addColumn(this.ctx, "memories", "importance", "real not null default 0.5");
-    addColumn(this.ctx, "memories", "valid_from", "text");
-    addColumn(this.ctx, "memories", "valid_until", "text");
-    addColumn(this.ctx, "memories", "supersedes_id", "text");
     addColumn(
-      this.ctx,
+      this.sqlState,
+      "memories",
+      "type",
+      "text not null default 'fact'",
+    );
+    addColumn(
+      this.sqlState,
+      "memories",
+      "status",
+      "text not null default 'active'",
+    );
+    addColumn(
+      this.sqlState,
+      "memories",
+      "is_latest",
+      "integer not null default 1",
+    );
+    addColumn(
+      this.sqlState,
+      "memories",
+      "confidence",
+      "real not null default 0.8",
+    );
+    addColumn(
+      this.sqlState,
+      "memories",
+      "importance",
+      "real not null default 0.5",
+    );
+    addColumn(this.sqlState, "memories", "valid_from", "text");
+    addColumn(this.sqlState, "memories", "valid_until", "text");
+    addColumn(this.sqlState, "memories", "supersedes_id", "text");
+    addColumn(
+      this.sqlState,
       "memories",
       "entity_ids_json",
       "text not null default '[]'",
     );
-    addColumn(this.ctx, "memories", "forgotten_at", "text");
-    addColumn(this.ctx, "memories", "forget_reason", "text");
+    addColumn(this.sqlState, "memories", "forgotten_at", "text");
+    addColumn(this.sqlState, "memories", "forget_reason", "text");
 
-    this.ctx.storage.sql.exec(`
+    this.sqlState.storage.sql.exec(`
       create index if not exists memories_status_latest_idx on memories(status, is_latest);
       create index if not exists memories_type_idx on memories(type);
       create index if not exists memories_valid_until_idx on memories(valid_until);
@@ -362,7 +413,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
   }
 
   private insertMemory(memory: MemoryRecord) {
-    this.ctx.storage.sql.exec(
+    this.sqlState.storage.sql.exec(
       `insert into memories (
         id, content, source, conversation_id, tags_json, metadata_json, type, status,
         is_latest, confidence, importance, valid_from, valid_until, supersedes_id,
@@ -391,12 +442,12 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
   }
 
   private upsertTags(memoryId: string, tags: string[]) {
-    this.ctx.storage.sql.exec(
+    this.sqlState.storage.sql.exec(
       `delete from memory_tags where memory_id = ?`,
       memoryId,
     );
     for (const tag of tags) {
-      this.ctx.storage.sql.exec(
+      this.sqlState.storage.sql.exec(
         `insert or ignore into memory_tags (memory_id, tag) values (?, ?)`,
         memoryId,
         tag,
@@ -405,12 +456,12 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
   }
 
   private upsertEntities(memoryId: string, entityIds: string[]) {
-    this.ctx.storage.sql.exec(
+    this.sqlState.storage.sql.exec(
       `delete from memory_entities where memory_id = ?`,
       memoryId,
     );
     for (const entityId of entityIds) {
-      this.ctx.storage.sql.exec(
+      this.sqlState.storage.sql.exec(
         `insert or ignore into memory_entities (memory_id, entity_id) values (?, ?)`,
         memoryId,
         entityId,
@@ -419,7 +470,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv> {
   }
 
   private getMemoryById(id: string, score = 1): SearchResult | undefined {
-    const row = this.ctx.storage.sql
+    const row = this.sqlState.storage.sql
       .exec<MemoryRow>(`select * from memories where id = ? limit 1`, id)
       .toArray()[0];
     if (!row) {
@@ -590,7 +641,7 @@ function parseJson<T>(value: string, fallback: T): T {
 }
 
 function addColumn(
-  ctx: DurableObjectState,
+  ctx: SqlState,
   table: string,
   column: string,
   definition: string,

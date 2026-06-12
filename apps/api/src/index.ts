@@ -11,9 +11,9 @@ import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
 import {
   getGraph,
   type HeaderSource,
+  isLocalDevelopmentRequest,
   resolveAuth,
   resolveTenant,
-  shouldAllowHeaderTenant,
 } from "./auth";
 import { handleOpenMemoryAuthRequest, isAuthRoute } from "./better-auth";
 import type { Env } from "./env";
@@ -96,7 +96,7 @@ const contextBody = t.Object({
   includeHistorical: t.Optional(t.Boolean()),
 });
 
-function withTenant(headers: HeaderSource) {
+function withTenant(request: Request, headers: HeaderSource) {
   const auth = resolveAuth(env, headers);
   if (!auth.ok) {
     return {
@@ -106,7 +106,7 @@ function withTenant(headers: HeaderSource) {
   }
 
   const tenant = resolveTenant(headers, {
-    allowHeaderTenant: shouldAllowHeaderTenant(env),
+    allowHeaderTenant: isLocalDevelopmentRequest(request),
   });
   if ("error" in tenant) {
     return {
@@ -148,8 +148,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   }))
   .post(
     "/v1/memories",
-    async ({ body, headers, status }) => {
-      const { tenant, graph } = withTenant(headers);
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -168,8 +168,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     },
     { body: memoryBody },
   )
-  .get("/v1/memories", async ({ headers, query, status }) => {
-    const { tenant, graph } = withTenant(headers);
+  .get("/v1/memories", async ({ headers, query, request, status }) => {
+    const { tenant, graph } = withTenant(request, headers);
     if (!graph) {
       return status(errorStatus(tenantError(tenant)), tenant);
     }
@@ -181,8 +181,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       includeHistorical,
     );
   })
-  .get("/v1/memories/:id", async ({ headers, params, status }) => {
-    const { tenant, graph } = withTenant(headers);
+  .get("/v1/memories/:id", async ({ headers, params, request, status }) => {
+    const { tenant, graph } = withTenant(request, headers);
     if (!graph) {
       return status(errorStatus(tenantError(tenant)), tenant);
     }
@@ -196,8 +196,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   })
   .patch(
     "/v1/memories/:id",
-    async ({ body, headers, params, status }) => {
-      const { tenant, graph } = withTenant(headers);
+    async ({ body, headers, params, request, status }) => {
+      const { tenant, graph } = withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -217,8 +217,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   )
   .delete(
     "/v1/memories/:id",
-    async ({ body, headers, params, status }) => {
-      const { tenant, graph } = withTenant(headers);
+    async ({ body, headers, params, request, status }) => {
+      const { tenant, graph } = withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -236,8 +236,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   )
   .post(
     "/v1/search",
-    async ({ body, headers, status }) => {
-      const { tenant, graph } = withTenant(headers);
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -259,8 +259,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   )
   .post(
     "/v1/context",
-    async ({ body, headers, status }) => {
-      const { tenant, graph } = withTenant(headers);
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -269,8 +269,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     },
     { body: contextBody },
   )
-  .get("/v1/profile", async ({ headers, status }) => {
-    const { tenant, graph } = withTenant(headers);
+  .get("/v1/profile", async ({ headers, request, status }) => {
+    const { tenant, graph } = withTenant(request, headers);
     if (!graph) {
       return status(errorStatus(tenantError(tenant)), tenant);
     }
@@ -279,8 +279,8 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   })
   .post(
     "/v1/graph/edges",
-    async ({ body, headers, status }) => {
-      const { tenant, graph } = withTenant(headers);
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -292,14 +292,17 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     },
     { body: edgeBody },
   )
-  .get("/v1/graph/:id/neighbors", async ({ headers, params, status }) => {
-    const { tenant, graph } = withTenant(headers);
-    if (!graph) {
-      return status(errorStatus(tenantError(tenant)), tenant);
-    }
+  .get(
+    "/v1/graph/:id/neighbors",
+    async ({ headers, params, request, status }) => {
+      const { tenant, graph } = withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
 
-    return graph.getNeighbors(params.id);
-  });
+      return graph.getNeighbors(params.id);
+    },
+  );
 
 export type App = typeof app;
 

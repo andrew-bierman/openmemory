@@ -82,10 +82,6 @@ export function handleOpenMemoryAuthRequest(env: Env, request: Request) {
   return auth.handler(request);
 }
 
-export function shouldRequireOAuth(env: Env) {
-  return env.OPENMEMORY_REQUIRE_OAUTH === "true";
-}
-
 export function resolveAuthBaseUrl(env: Env, request: Request) {
   if (env.BETTER_AUTH_URL) {
     return trimTrailingSlash(env.BETTER_AUTH_URL);
