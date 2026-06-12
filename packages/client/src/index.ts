@@ -32,9 +32,10 @@ export type CreateMemoryInput = {
 };
 
 export type OpenMemoryClientOptions = {
-  tenantId: string;
+  tenantId?: string;
   token?: string;
   fetch?: typeof fetch;
+  credentials?: RequestCredentials;
 };
 
 export class OpenMemoryApiError extends Error {
@@ -50,12 +51,26 @@ export function createOpenMemoryClient(
   baseUrl: string,
   options: OpenMemoryClientOptions,
 ) {
-  const client = treaty(baseUrl, {
-    fetcher: options.fetch,
-    headers: {
-      "x-openmemory-user-id": options.tenantId,
-      ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+  const requestHeaders = {
+    ...(options.tenantId ? { "x-openmemory-user-id": options.tenantId } : {}),
+    ...(options.token ? { authorization: `Bearer ${options.token}` } : {}),
+  };
+  const credentialedFetch = Object.assign(
+    (
+      input: Parameters<typeof fetch>[0],
+      init?: Parameters<typeof fetch>[1],
+    ) => {
+      const fetcher = options.fetch ?? fetch;
+      return fetcher(input, {
+        ...init,
+        credentials: options.credentials ?? "include",
+      });
     },
+    { preconnect: fetch.preconnect },
+  );
+  const client = treaty(baseUrl, {
+    fetcher: credentialedFetch,
+    headers: requestHeaders,
   }) as unknown as EdenClient;
 
   return {

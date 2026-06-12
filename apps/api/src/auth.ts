@@ -1,4 +1,5 @@
 import { normalizeTenantId } from "@openmemory/core";
+import { resolveOpenMemorySession } from "./better-auth";
 import type { Env } from "./env";
 
 const USER_HEADER = "x-openmemory-user-id";
@@ -56,6 +57,19 @@ export const getGraph = (env: Env, tenantId: string) => {
   const id = env.MEMORY_GRAPHS.idFromName(tenantId);
   return env.MEMORY_GRAPHS.get(id);
 };
+
+export async function resolveSessionTenant(env: Env, request: Request) {
+  try {
+    const session = await resolveOpenMemorySession(env, request);
+    const rawTenant = session?.user?.id;
+    const tenantId =
+      typeof rawTenant === "string" ? normalizeTenantId(rawTenant) : undefined;
+
+    return tenantId ? { tenantId } : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export function isLocalDevelopmentRequest(request: Request) {
   const hostname = new URL(request.url).hostname;

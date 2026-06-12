@@ -65,9 +65,9 @@ bun --cwd apps/api wrangler secret put OPENMEMORY_API_TOKEN
 For the manual deploy workflow, configure:
 
 - `CLOUDFLARE_API_TOKEN`
-- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_ACCOUNT_ID` is already set for `andrew-bierman/openmemory`.
 
-The API token needs permission to deploy Workers and operate D1 migrations for this account.
+The API token needs permission to deploy Workers and operate D1 migrations for the personal Cloudflare account.
 
 ## Deploy
 

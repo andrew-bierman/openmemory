@@ -45,6 +45,23 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(oauthMetadata.scopes_supported).toContain("memory:read");
 
+  const oauthClient = await getJson<OAuthClientResponse>(
+    await worker.fetch("/api/auth/oauth2/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        client_name: "OpenMemory MCP Smoke",
+        redirect_uris: ["http://127.0.0.1/callback"],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        scope: "openid profile memory:read memory:write",
+      }),
+    }),
+  );
+  expect(oauthClient.client_id).toBeTruthy();
+  expect(oauthClient.token_endpoint_auth_method).toBe("none");
+
   const unauthorized = await worker.fetch("/v1/memories");
   expect(unauthorized.status).toBe(401);
   expect(await unauthorized.json()).toMatchObject({
@@ -303,6 +320,57 @@ test("worker API supports memory lifecycle, profile context, MCP, and dashboard"
   expect(await dashboard.text()).toContain("OpenMemory");
 }, 45_000);
 
+test("worker API uses Better Auth session cookies as deployed tenant identity", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+
+  const email = `session-${crypto.randomUUID()}@example.com`;
+  const signUp = await worker.fetch("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Session User",
+      email,
+      password: "password1234",
+    }),
+  });
+  await expectOk(signUp);
+
+  const cookie = getCookieHeader(signUp);
+  expect(cookie).toContain("better-auth");
+
+  const session = await getJson<SessionResponse>(
+    await worker.fetch("/api/auth/get-session", {
+      headers: { cookie },
+    }),
+  );
+  expect(session.user.email).toBe(email);
+
+  const memory = await getJson<MemoryResponse>(
+    await worker.fetch("/v1/memories", {
+      method: "POST",
+      headers: {
+        cookie,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        content: "Cookie sessions identify the OpenMemory tenant.",
+        tags: ["auth"],
+      }),
+    }),
+  );
+  expect(memory.content).toContain("Cookie sessions");
+
+  const memories = await getJson<MemoryResponse[]>(
+    await worker.fetch("/v1/memories", {
+      headers: { cookie },
+    }),
+  );
+  expect(memories.map((item) => item.id)).toContain(memory.id);
+}, 45_000);
+
 test("auth helpers keep tenant headers local-only", () => {
   const local = new Request("http://127.0.0.1:54150/v1/memories");
   const deployed = new Request("https://openmemory.example/v1/memories");
@@ -331,6 +399,7 @@ async function startWorker(env: Record<string, string> = {}) {
   await mkdir(testTmpRoot, { recursive: true });
   const persistTo = await mkdtemp(join(testTmpRoot, "wrangler-state-"));
   const output: string[] = [];
+  await applyLocalMigrations(persistTo);
 
   const proc = spawn(
     "bun",
@@ -380,8 +449,18 @@ async function startWorker(env: Record<string, string> = {}) {
   await waitForHealth(baseUrl, proc, output);
 
   return {
-    fetch: (path: string, init?: RequestInit) =>
-      fetch(`${baseUrl}${path}`, withTimeout(init, 10_000)),
+    fetch: async (path: string, init?: RequestInit) => {
+      const response = await fetch(
+        `${baseUrl}${path}`,
+        withTimeout(init, 10_000),
+      );
+      if (response.status >= 500) {
+        console.error(
+          `Worker returned ${response.status} for ${path}:\n${output.join("")}`,
+        );
+      }
+      return response;
+    },
     stop: async () => {
       proc.kill("SIGTERM");
       await Promise.race([waitForExit(proc), sleep(3_000)]);
@@ -452,9 +531,16 @@ function tenantHeaders(tenantId: string) {
 }
 
 async function getJson<T>(response: Response) {
-  expect(response.status).toBeGreaterThanOrEqual(200);
-  expect(response.status).toBeLessThan(300);
+  await expectOk(response.clone());
   return (await response.json()) as T;
+}
+
+async function expectOk(response: Response) {
+  if (response.status < 200 || response.status >= 300) {
+    throw new Error(
+      `Expected 2xx response, got ${response.status}:\n${await response.text()}`,
+    );
+  }
 }
 
 async function waitForHealth(
@@ -510,6 +596,67 @@ async function collectOutput(
   }
 
   stream.on("data", (chunk) => output.push(String(chunk)));
+}
+
+async function applyLocalMigrations(persistTo: string) {
+  const output: string[] = [];
+  const proc = spawn(
+    "bun",
+    [
+      "run",
+      "--cwd",
+      "apps/api",
+      "wrangler",
+      "d1",
+      "migrations",
+      "apply",
+      "openmemory-auth",
+      "--local",
+      "--persist-to",
+      persistTo,
+      "--config",
+      "wrangler.jsonc",
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        NO_COLOR: "1",
+        WRANGLER_SEND_METRICS: "false",
+      },
+    },
+  );
+  collectOutput(proc.stdout, output);
+  collectOutput(proc.stderr, output);
+  await waitForExit(proc);
+
+  if (proc.exitCode !== 0) {
+    throw new Error(`Could not apply local D1 migrations:\n${output.join("")}`);
+  }
+}
+
+function getCookieHeader(response: Response) {
+  const headers = response.headers as Headers & {
+    getSetCookie?: () => string[];
+  };
+  const setCookie = headers.getSetCookie?.() ?? [];
+  const cookieParts = (
+    setCookie.length > 0
+      ? setCookie
+      : splitSetCookieHeader(response.headers.get("set-cookie") ?? "")
+  )
+    .map((cookie) => cookie.split(";")[0])
+    .filter(Boolean);
+
+  return cookieParts.join("; ");
+}
+
+function splitSetCookieHeader(value: string) {
+  if (!value) {
+    return [];
+  }
+
+  return value.split(/,(?=\s*[^;,]+=)/);
 }
 
 function sleep(ms: number) {
@@ -577,4 +724,16 @@ type OAuthMetadataResponse = {
   authorization_endpoint: string;
   registration_endpoint: string;
   scopes_supported: string[];
+};
+
+type OAuthClientResponse = {
+  client_id: string;
+  token_endpoint_auth_method: string;
+};
+
+type SessionResponse = {
+  user: {
+    id: string;
+    email: string;
+  };
 };

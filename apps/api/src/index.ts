@@ -13,6 +13,7 @@ import {
   type HeaderSource,
   isLocalDevelopmentRequest,
   resolveAuth,
+  resolveSessionTenant,
   resolveTenant,
 } from "./auth";
 import { handleOpenMemoryAuthRequest, isAuthRoute } from "./better-auth";
@@ -96,12 +97,20 @@ const contextBody = t.Object({
   includeHistorical: t.Optional(t.Boolean()),
 });
 
-function withTenant(request: Request, headers: HeaderSource) {
+async function withTenant(request: Request, headers: HeaderSource) {
   const auth = resolveAuth(env, headers);
   if (!auth.ok) {
     return {
       tenant: auth,
       graph: undefined,
+    };
+  }
+
+  const sessionTenant = await resolveSessionTenant(env, request);
+  if (sessionTenant) {
+    return {
+      tenant: sessionTenant,
+      graph: getGraph(env, sessionTenant.tenantId),
     };
   }
 
@@ -129,11 +138,27 @@ function errorStatus(error: string) {
     : 400;
 }
 
-function tenantError(tenant: ReturnType<typeof withTenant>["tenant"]): string {
+function tenantError(
+  tenant: Awaited<ReturnType<typeof withTenant>>["tenant"],
+): string {
   return "error" in tenant && tenant.error ? tenant.error : "unauthorized";
 }
 
 export const app = new Elysia({ adapter: CloudflareAdapter })
+  .get(
+    "/login",
+    () =>
+      new Response(LOGIN_HTML, {
+        headers: { "content-type": "text/html" },
+      }),
+  )
+  .get(
+    "/consent",
+    () =>
+      new Response(CONSENT_HTML, {
+        headers: { "content-type": "text/html" },
+      }),
+  )
   .get(
     "/",
     () =>
@@ -149,7 +174,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   .post(
     "/v1/memories",
     async ({ body, headers, request, status }) => {
-      const { tenant, graph } = withTenant(request, headers);
+      const { tenant, graph } = await withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -169,7 +194,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     { body: memoryBody },
   )
   .get("/v1/memories", async ({ headers, query, request, status }) => {
-    const { tenant, graph } = withTenant(request, headers);
+    const { tenant, graph } = await withTenant(request, headers);
     if (!graph) {
       return status(errorStatus(tenantError(tenant)), tenant);
     }
@@ -182,7 +207,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     );
   })
   .get("/v1/memories/:id", async ({ headers, params, request, status }) => {
-    const { tenant, graph } = withTenant(request, headers);
+    const { tenant, graph } = await withTenant(request, headers);
     if (!graph) {
       return status(errorStatus(tenantError(tenant)), tenant);
     }
@@ -197,7 +222,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   .patch(
     "/v1/memories/:id",
     async ({ body, headers, params, request, status }) => {
-      const { tenant, graph } = withTenant(request, headers);
+      const { tenant, graph } = await withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -218,7 +243,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   .delete(
     "/v1/memories/:id",
     async ({ body, headers, params, request, status }) => {
-      const { tenant, graph } = withTenant(request, headers);
+      const { tenant, graph } = await withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -237,7 +262,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   .post(
     "/v1/search",
     async ({ body, headers, request, status }) => {
-      const { tenant, graph } = withTenant(request, headers);
+      const { tenant, graph } = await withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -260,7 +285,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   .post(
     "/v1/context",
     async ({ body, headers, request, status }) => {
-      const { tenant, graph } = withTenant(request, headers);
+      const { tenant, graph } = await withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -270,7 +295,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     { body: contextBody },
   )
   .get("/v1/profile", async ({ headers, request, status }) => {
-    const { tenant, graph } = withTenant(request, headers);
+    const { tenant, graph } = await withTenant(request, headers);
     if (!graph) {
       return status(errorStatus(tenantError(tenant)), tenant);
     }
@@ -280,7 +305,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   .post(
     "/v1/graph/edges",
     async ({ body, headers, request, status }) => {
-      const { tenant, graph } = withTenant(request, headers);
+      const { tenant, graph } = await withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -295,7 +320,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
   .get(
     "/v1/graph/:id/neighbors",
     async ({ headers, params, request, status }) => {
-      const { tenant, graph } = withTenant(request, headers);
+      const { tenant, graph } = await withTenant(request, headers);
       if (!graph) {
         return status(errorStatus(tenantError(tenant)), tenant);
       }
@@ -451,45 +476,61 @@ function isMemoryForIndex(value: unknown): value is {
   );
 }
 
+const PAGE_STYLE = `
+  :root { color-scheme: light; --bg:#f6f7f9; --panel:#ffffff; --ink:#18212f; --muted:#627085; --line:#dfe5ee; --accent:#0f766e; --danger:#991b1b; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
+  button, input, select, textarea { font: inherit; }
+  header { min-height:64px; display:flex; align-items:center; justify-content:space-between; gap:16px; padding:0 24px; border-bottom:1px solid var(--line); background:var(--panel); }
+  h1 { font-size:20px; line-height:1.2; margin:0; }
+  h2 { font-size:16px; margin:0 0 12px; }
+  main { min-height:calc(100vh - 64px); }
+  .app-shell { display:grid; grid-template-columns: 340px minmax(0, 1fr); }
+  aside { border-right:1px solid var(--line); background:var(--panel); padding:20px; display:flex; flex-direction:column; gap:16px; }
+  section { padding:20px; display:grid; grid-template-columns:minmax(0, 1fr) 380px; gap:18px; align-items:start; }
+  label { display:block; font-size:12px; font-weight:700; color:#445166; margin-bottom:6px; }
+  input, textarea, select { width:100%; border:1px solid #d8e0ea; border-radius:6px; padding:9px 10px; background:#fff; color:var(--ink); }
+  textarea { min-height:140px; resize:vertical; }
+  button { border:0; border-radius:6px; background:var(--accent); color:white; font-weight:700; padding:10px 12px; cursor:pointer; }
+  button.secondary { background:#283443; }
+  button.ghost { color:#283443; background:#eef2f7; }
+  button:disabled { cursor:not-allowed; opacity:.55; }
+  .stack { display:flex; flex-direction:column; gap:12px; }
+  .row { display:flex; gap:8px; align-items:center; }
+  .panel, .memory { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
+  .memory { display:flex; flex-direction:column; gap:8px; }
+  .meta { color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; gap:8px; }
+  .pill { border:1px solid #d8e0ea; border-radius:999px; padding:2px 8px; background:#fff; }
+  .list { display:flex; flex-direction:column; gap:10px; }
+  .auth-card { width:min(420px, calc(100vw - 32px)); margin:8vh auto; }
+  .error { border:1px solid #fecaca; border-radius:6px; background:#fff1f2; color:var(--danger); padding:10px; font-size:13px; }
+  .hidden { display:none !important; }
+  pre { white-space:pre-wrap; margin:0; color:#273444; line-height:1.5; }
+  @media (max-width: 900px) { header { align-items:flex-start; flex-direction:column; padding:16px; } .app-shell, section { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } }
+`;
+
 const DASHBOARD_HTML = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>OpenMemory</title>
-  <style>
-    :root { color-scheme: light; --bg:#f7f8fa; --panel:#ffffff; --ink:#17202a; --muted:#637083; --line:#dce2ea; --accent:#0f766e; --accent-2:#7c3aed; }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--ink); }
-    header { height:64px; display:flex; align-items:center; justify-content:space-between; padding:0 24px; border-bottom:1px solid var(--line); background:var(--panel); }
-    main { display:grid; grid-template-columns: 360px 1fr; min-height:calc(100vh - 64px); }
-    aside { border-right:1px solid var(--line); background:var(--panel); padding:20px; display:flex; flex-direction:column; gap:16px; }
-    section { padding:20px; display:grid; grid-template-columns: minmax(0, 1fr) 360px; gap:20px; align-items:start; }
-    label { display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:6px; }
-    input, textarea, select { width:100%; border:1px solid var(--line); border-radius:6px; padding:10px 12px; font:inherit; background:#fff; }
-    textarea { min-height:120px; resize:vertical; }
-    button { border:0; border-radius:6px; background:var(--accent); color:white; font-weight:700; padding:10px 12px; cursor:pointer; }
-    button.secondary { background:#283443; }
-    .stack { display:flex; flex-direction:column; gap:12px; }
-    .row { display:flex; gap:8px; align-items:center; }
-    .panel, .memory { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px; }
-    .memory { display:flex; flex-direction:column; gap:8px; }
-    .meta { color:var(--muted); font-size:12px; display:flex; flex-wrap:wrap; gap:8px; }
-    .pill { border:1px solid var(--line); border-radius:999px; padding:2px 8px; background:#fff; }
-    .list { display:flex; flex-direction:column; gap:10px; }
-    pre { white-space:pre-wrap; margin:0; color:#273444; }
-    h1 { font-size:20px; margin:0; }
-    h2 { font-size:16px; margin:0 0 10px; }
-    @media (max-width: 900px) { main, section { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } }
-  </style>
+  <style>${PAGE_STYLE}</style>
 </head>
 <body>
   <header>
     <h1>OpenMemory</h1>
-    <div class="row"><input id="tenant" value="local-user" aria-label="Tenant" /><button id="refresh" class="secondary">Refresh</button></div>
+    <div class="row"><span class="meta" id="session"></span><a href="/login"><button class="ghost">Account</button></a><button id="signOut" class="secondary">Sign out</button></div>
   </header>
-  <main>
+  <main class="app-shell">
     <aside>
+      <div id="authNotice" class="panel hidden">
+        <div class="stack">
+          <strong>Sign in required</strong>
+          <span class="meta">The deployed dashboard uses Better Auth session cookies.</span>
+          <a href="/login"><button type="button">Sign in</button></a>
+        </div>
+      </div>
       <form id="remember" class="stack">
         <div><label for="content">Memory</label><textarea id="content" placeholder="Save a fact, preference, decision, episode, or insight"></textarea></div>
         <div class="row"><select id="type"><option>fact</option><option>preference</option><option>decision</option><option>episode</option><option>insight</option></select><input id="tags" placeholder="tags, comma separated" /></div>
@@ -511,13 +552,21 @@ const DASHBOARD_HTML = `<!doctype html>
     </section>
   </main>
   <script>
-    const tenant = document.querySelector("#tenant");
-    const headers = () => ({ "content-type": "application/json", "x-openmemory-user-id": tenant.value || "local-user" });
-    async function api(path, init = {}) { const response = await fetch(path, { ...init, headers: { ...headers(), ...(init.headers || {}) } }); if (!response.ok) throw new Error(await response.text()); return response.json(); }
+    const localHeaders = location.hostname === "localhost" || location.hostname === "127.0.0.1" ? { "x-openmemory-user-id": "local-user" } : {};
+    async function api(path, init = {}) { const response = await fetch(path, { ...init, credentials: "include", headers: { "content-type": "application/json", ...localHeaders, ...(init.headers || {}) } }); if (!response.ok) throw new Error(await response.text()); return response.json(); }
+    async function loadSession() {
+      const response = await fetch("/api/auth/get-session", { credentials: "include" });
+      const data = response.ok ? await response.json() : null;
+      const user = data && data.user ? data.user : null;
+      document.querySelector("#session").textContent = user ? user.email : "Not signed in";
+      document.querySelector("#authNotice").classList.toggle("hidden", Boolean(user) || Boolean(localHeaders["x-openmemory-user-id"]));
+      return user;
+    }
     function renderMemory(memory) {
       return '<article class="memory"><div>' + escapeHtml(memory.content) + '</div><div class="meta"><span class="pill">' + memory.type + '</span><span class="pill">' + memory.status + '</span><span>' + memory.tags.join(", ") + '</span></div><div class="row"><button class="secondary" data-forget="' + memory.id + '">Forget</button></div></article>';
     }
     async function refresh() {
+      await loadSession();
       const memories = await api('/v1/memories?includeHistorical=true');
       document.querySelector("#memories").innerHTML = memories.map(renderMemory).join("") || '<div class="meta">No memories yet.</div>';
       const profile = await api('/v1/profile');
@@ -527,8 +576,88 @@ const DASHBOARD_HTML = `<!doctype html>
     document.querySelector("#remember").onsubmit = async (event) => { event.preventDefault(); await api('/v1/memories', { method:'POST', body: JSON.stringify({ content: content.value, type: type.value, tags: tags.value.split(',').map(t => t.trim()).filter(Boolean) }) }); content.value=''; await refresh(); };
     document.querySelector("#searchForm").onsubmit = async (event) => { event.preventDefault(); const data = await api('/v1/context', { method:'POST', body: JSON.stringify({ q: query.value, limit: 8 }) }); document.querySelector("#context").textContent = data.context; };
     document.querySelector("#refresh").onclick = refresh;
+    document.querySelector("#signOut").onclick = async () => { await fetch("/api/auth/sign-out", { method: "POST", credentials: "include" }); location.href = "/login"; };
     function escapeHtml(value) { return value.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
     refresh().catch(error => document.querySelector("#memories").textContent = error.message);
+  </script>
+</body>
+</html>`;
+
+const LOGIN_HTML = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenMemory Login</title>
+  <style>${PAGE_STYLE}</style>
+</head>
+<body>
+  <header><h1>OpenMemory</h1><a href="/"><button class="ghost">Dashboard</button></a></header>
+  <main>
+    <div class="panel auth-card">
+      <form id="authForm" class="stack">
+        <h2>Account</h2>
+        <div id="error" class="error hidden"></div>
+        <div><label for="name">Name</label><input id="name" autocomplete="name" value="OpenMemory User" /></div>
+        <div><label for="email">Email</label><input id="email" autocomplete="email" required type="email" /></div>
+        <div><label for="password">Password</label><input id="password" autocomplete="current-password" minlength="8" required type="password" /></div>
+        <div class="row"><button id="signIn" type="submit">Sign in</button><button id="signUp" class="secondary" type="button">Create account</button></div>
+      </form>
+    </div>
+  </main>
+  <script>
+    const form = document.querySelector("#authForm");
+    const error = document.querySelector("#error");
+    function showError(message) { error.textContent = message; error.classList.remove("hidden"); }
+    async function auth(path) {
+      error.classList.add("hidden");
+      const body = { email: email.value, password: password.value, name: name.value || email.value };
+      const response = await fetch(path, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error(await response.text());
+      const next = new URLSearchParams(location.search).get("redirect") || "/";
+      location.href = next;
+    }
+    form.onsubmit = (event) => { event.preventDefault(); auth("/api/auth/sign-in/email").catch((caught) => showError(caught.message)); };
+    signUp.onclick = () => auth("/api/auth/sign-up/email").catch((caught) => showError(caught.message));
+  </script>
+</body>
+</html>`;
+
+const CONSENT_HTML = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OpenMemory Consent</title>
+  <style>${PAGE_STYLE}</style>
+</head>
+<body>
+  <header><h1>OpenMemory</h1></header>
+  <main>
+    <div class="panel auth-card">
+      <div class="stack">
+        <h2>Authorize client</h2>
+        <p class="meta" id="details"></p>
+        <div id="error" class="error hidden"></div>
+        <div class="row"><button id="approve">Allow</button><button id="deny" class="secondary">Deny</button></div>
+      </div>
+    </div>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const scope = params.get("scope") || "";
+    details.textContent = (params.get("client_id") || "This client") + " is requesting: " + (scope || "default OpenMemory access");
+    function showError(message) { error.textContent = message; error.classList.remove("hidden"); }
+    async function consent(accept) {
+      const response = await fetch("/api/auth/oauth2/consent", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ accept, scope }) });
+      if (!response.ok) throw new Error(await response.text());
+      const data = await response.json().catch(() => ({}));
+      if (data && data.url) location.href = data.url;
+      else if (data && data.redirectURL) location.href = data.redirectURL;
+      else location.href = "/";
+    }
+    approve.onclick = () => consent(true).catch((caught) => showError(caught.message));
+    deny.onclick = () => consent(false).catch((caught) => showError(caught.message));
   </script>
 </body>
 </html>`;

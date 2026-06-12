@@ -91,6 +91,25 @@ textarea {
   gap: 12px;
 }
 
+.auth-box {
+  border-top: 1px solid #dfe5ee;
+  padding-top: 16px;
+}
+
+.session-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 32px;
+}
+
+.session-row strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
 .row {
   display: flex;
   align-items: center;

@@ -7,7 +7,18 @@ import {
 } from "@better-auth/oauth-provider";
 import { type BetterAuthOptions, betterAuth } from "better-auth/minimal";
 import { jwt } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
+import {
+  authAccount,
+  authSession,
+  authUser,
+  authVerification,
+  oauthAccessToken,
+  oauthClient,
+  oauthConsent,
+  oauthRefreshToken,
+} from "./db/schema";
 import type { Env } from "./env";
 
 const AUTH_BASE_PATH = "/api/auth";
@@ -71,6 +82,10 @@ export function handleOpenMemoryAuthRequest(env: Env, request: Request) {
   const auth = createOpenMemoryAuth(env, request);
   const pathname = new URL(request.url).pathname;
 
+  if (pathname === `${AUTH_BASE_PATH}/get-session`) {
+    return handleOpenMemorySessionRequest(env, request);
+  }
+
   if (pathname.startsWith("/.well-known/oauth-authorization-server")) {
     return oauthProviderAuthServerMetadata(auth)(request);
   }
@@ -80,6 +95,31 @@ export function handleOpenMemoryAuthRequest(env: Env, request: Request) {
   }
 
   return auth.handler(request);
+}
+
+export async function resolveOpenMemorySession(env: Env, request: Request) {
+  const token = getSessionToken(request.headers);
+  if (!token || !env.AUTH_DB) {
+    return undefined;
+  }
+
+  const db = drizzle(env.AUTH_DB);
+  const rows = await db
+    .select({
+      session: authSession,
+      user: authUser,
+    })
+    .from(authSession)
+    .innerJoin(authUser, eq(authSession.userId, authUser.id))
+    .where(eq(authSession.token, token))
+    .limit(1);
+  const row = rows[0];
+
+  if (!row || toTime(row.session.expiresAt) <= Date.now()) {
+    return undefined;
+  }
+
+  return row;
 }
 
 export function resolveAuthBaseUrl(env: Env, request: Request) {
@@ -106,6 +146,16 @@ function createAuthDatabase(env: Env): BetterAuthOptions["database"] {
 
   return drizzleAdapter(drizzle(env.AUTH_DB), {
     provider: "sqlite",
+    schema: {
+      user: authUser,
+      session: authSession,
+      account: authAccount,
+      verification: authVerification,
+      oauthClient,
+      oauthAccessToken,
+      oauthRefreshToken,
+      oauthConsent,
+    },
     transaction: false,
   });
 }
@@ -133,4 +183,43 @@ function createSocialProviders(env: Env) {
 
 function trimTrailingSlash(value: string) {
   return value.replace(/\/+$/, "");
+}
+
+async function handleOpenMemorySessionRequest(env: Env, request: Request) {
+  const session = await resolveOpenMemorySession(env, request);
+  return new Response(JSON.stringify(session ?? null), {
+    headers: { "content-type": "application/json" },
+  });
+}
+
+function getSessionToken(headers: Headers) {
+  const cookie = headers.get("cookie");
+  if (!cookie) {
+    return undefined;
+  }
+
+  for (const part of cookie.split(";")) {
+    const [rawName, ...rawValue] = part.trim().split("=");
+    if (
+      rawName === "better-auth.session_token" ||
+      rawName === "__Secure-better-auth.session_token"
+    ) {
+      const value = decodeURIComponent(rawValue.join("="));
+      return value.split(".")[0];
+    }
+  }
+
+  return undefined;
+}
+
+function toTime(value: Date | number | string) {
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+
+  if (typeof value === "number") {
+    return value < 10_000_000_000 ? value * 1000 : value;
+  }
+
+  return new Date(value).getTime();
 }

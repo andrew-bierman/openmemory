@@ -33,6 +33,9 @@ function Home() {
     "local-user",
   );
   const [token, setToken] = useLocalStorage("openmemory:token", "");
+  const [email, setEmail] = useLocalStorage("openmemory:email", "");
+  const [name, setName] = useLocalStorage("openmemory:name", "");
+  const [password, setPassword] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
   const [type, setType] = useState("fact");
@@ -40,16 +43,19 @@ function Home() {
   const [context, setContext] = useState<ContextResult | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
   const [profile, setProfile] = useState("");
+  const [sessionUser, setSessionUser] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const usesLocalTenant = isLocalApiUrl(apiUrl);
 
   const api = useMemo(
     () =>
       createOpenMemoryClient(apiUrl.replace(/\/+$/, ""), {
-        tenantId,
+        tenantId: usesLocalTenant ? tenantId : undefined,
         token: token || undefined,
+        credentials: "include",
       }),
-    [apiUrl, tenantId, token],
+    [apiUrl, tenantId, token, usesLocalTenant],
   );
 
   const run = useCallback(async (action: () => Promise<void>) => {
@@ -66,14 +72,16 @@ function Home() {
 
   const refresh = useCallback(async () => {
     await run(async () => {
-      const [nextMemories, nextProfile] = await Promise.all([
+      const [nextSession, nextMemories, nextProfile] = await Promise.all([
+        getSession(apiUrl),
         api.listMemories(),
         api.getProfile(),
       ]);
+      setSessionUser(nextSession);
       setMemories(nextMemories);
       setProfile(nextProfile.summary);
     });
-  }, [api, run]);
+  }, [api, apiUrl, run]);
 
   useEffect(() => {
     void refresh();
@@ -110,6 +118,41 @@ function Home() {
     });
   }
 
+  async function signIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run(async () => {
+      await authRequest(apiUrl, "/api/auth/sign-in/email", {
+        email,
+        password,
+        rememberMe: true,
+      });
+      setPassword("");
+      await refresh();
+    });
+  }
+
+  async function signUp() {
+    await run(async () => {
+      await authRequest(apiUrl, "/api/auth/sign-up/email", {
+        email,
+        password,
+        name: name || email,
+      });
+      setPassword("");
+      await refresh();
+    });
+  }
+
+  async function signOut() {
+    await run(async () => {
+      await authRequest(apiUrl, "/api/auth/sign-out", {});
+      setSessionUser(null);
+      setMemories([]);
+      setProfile("");
+      setContext(null);
+    });
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -130,6 +173,7 @@ function Home() {
           <div className="field">
             <label htmlFor="tenant">Tenant</label>
             <input
+              disabled={!usesLocalTenant}
               id="tenant"
               onChange={(event) => setTenantId(event.target.value)}
               value={tenantId}
@@ -146,6 +190,57 @@ function Home() {
             />
           </div>
         </div>
+
+        <form className="stack auth-box" onSubmit={signIn}>
+          <div className="session-row">
+            <strong>{sessionUser ? sessionUser.email : "Not signed in"}</strong>
+            {sessionUser ? (
+              <Button onClick={() => void signOut()} size="sm" type="button">
+                Sign out
+              </Button>
+            ) : null}
+          </div>
+          <div className="field">
+            <label htmlFor="name">Name</label>
+            <input
+              id="name"
+              onChange={(event) => setName(event.target.value)}
+              value={name}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              onChange={(event) => setEmail(event.target.value)}
+              type="email"
+              value={email}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              minLength={8}
+              onChange={(event) => setPassword(event.target.value)}
+              type="password"
+              value={password}
+            />
+          </div>
+          <div className="row">
+            <Button disabled={isLoading || !email || !password} type="submit">
+              Sign in
+            </Button>
+            <Button
+              disabled={isLoading || !email || !password}
+              onClick={() => void signUp()}
+              type="button"
+              variant="outline"
+            >
+              Create account
+            </Button>
+          </div>
+        </form>
 
         <form className="stack" onSubmit={remember}>
           <div className="field">
@@ -281,3 +376,54 @@ function formatError(error: unknown) {
 
   return error instanceof Error ? error.message : "Unexpected error";
 }
+
+async function getSession(apiUrl: string) {
+  const response = await fetch(`${cleanBaseUrl(apiUrl)}/api/auth/get-session`, {
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = (await response.json()) as { user?: AuthUser } | null;
+  return data?.user ?? null;
+}
+
+async function authRequest(
+  apiUrl: string,
+  path: string,
+  body: Record<string, unknown>,
+) {
+  const response = await fetch(`${cleanBaseUrl(apiUrl)}${path}`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(await response.text());
+  }
+}
+
+function cleanBaseUrl(apiUrl: string) {
+  return apiUrl.replace(/\/+$/, "");
+}
+
+function isLocalApiUrl(apiUrl: string) {
+  try {
+    const hostname = new URL(apiUrl).hostname;
+    return (
+      hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+    );
+  } catch {
+    return false;
+  }
+}
+
+type AuthUser = {
+  id: string;
+  email: string;
+  name?: string;
+};

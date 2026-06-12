@@ -19,14 +19,15 @@
   - R2 `openmemory-exports` bound as `MEMORY_EXPORTS`
   - Worker secrets for `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
 - The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
+- Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
 
-- Browser auth is not complete:
-  - login and consent pages are not yet built
+- Browser auth needs deeper product polish:
   - deployed API routes reject header tenant mode
-  - web app currently uses tenant header mode for local development
+  - local development still supports tenant headers for tests and fast iteration
+  - the TanStack app has session controls but still needs richer authenticated navigation
 - MCP OAuth is wired but not end-to-end tested with a real external MCP client registration and token exchange.
 - RAG quality is still basic:
   - no async ingestion pipeline
@@ -35,14 +36,13 @@
   - no reranker
   - no recall benchmarks
 - Graph performance has not been benchmarked against realistic memory volumes.
-- GitHub Actions are configured, but deploy needs GitHub Cloudflare secrets.
+- GitHub Actions are configured, and `CLOUDFLARE_ACCOUNT_ID` is set. Manual deploy still needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
 - Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
 
 ## Next Implementation Tracks
 
 1. Auth hardening
-   - Build Better Auth login, signup, and consent UI.
-   - Move the web app from tenant-header mode to session/OAuth-backed identity.
+   - Expand authenticated navigation and account settings.
    - Keep `x-openmemory-user-id` only for local development and tests.
 
 2. MCP production flow
@@ -61,5 +61,5 @@
    - Add browser tests for critical flows.
 
 5. CI and deployment
-   - Add Cloudflare account secrets to GitHub.
+   - Add a scoped `CLOUDFLARE_API_TOKEN` repository secret.
    - Run the manual deploy workflow against the provisioned Cloudflare resources.
