@@ -348,6 +348,66 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   );
   expect(session.user.email).toBe(email);
 
+  const oauthClient = await getJson<OAuthClientResponse>(
+    await worker.fetch("/api/auth/oauth2/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        client_name: "OpenMemory OAuth Token Flow",
+        redirect_uris: ["http://127.0.0.1/callback"],
+        token_endpoint_auth_method: "none",
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        scope: "openid profile memory:read memory:write",
+      }),
+    }),
+  );
+  const codeVerifier = `openmemory-${crypto.randomUUID()}-${crypto.randomUUID()}`;
+  const codeChallenge = await pkceChallenge(codeVerifier);
+  const authorization = await getRedirectUrl(
+    await worker.fetch(
+      `/api/auth/oauth2/authorize?${new URLSearchParams({
+        response_type: "code",
+        client_id: oauthClient.client_id,
+        redirect_uri: "http://127.0.0.1/callback",
+        scope: "openid profile memory:read memory:write",
+        state: "oauth-smoke",
+        prompt: "consent",
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+      })}`,
+      {
+        headers: { cookie, accept: "application/json" },
+        redirect: "manual",
+      },
+    ),
+  );
+  const callback =
+    authorization.pathname === "/consent"
+      ? new URL(
+          (
+            await getJson<OAuthRedirectResponse>(
+              await worker.fetch("/api/auth/oauth2/consent", {
+                method: "POST",
+                headers: {
+                  cookie,
+                  "content-type": "application/json",
+                  accept: "application/json",
+                },
+                body: JSON.stringify({
+                  accept: true,
+                  scope: "openid profile memory:read memory:write",
+                  oauth_query: authorization.search.slice(1),
+                }),
+              }),
+            )
+          ).url,
+        )
+      : authorization;
+  expect(callback.searchParams.get("state")).toBe("oauth-smoke");
+  const code = callback.searchParams.get("code");
+  expect(code, callback.toString()).toBeTruthy();
+
   const memory = await getJson<MemoryResponse>(
     await worker.fetch("/v1/memories", {
       method: "POST",
@@ -369,6 +429,116 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     }),
   );
   expect(memories.map((item) => item.id)).toContain(memory.id);
+}, 45_000);
+
+test("ingestion extracts entities, links graph neighbors, and improves recall", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-rag-${crypto.randomUUID()}`;
+  const anchor = await createMemory(worker, tenant, {
+    content: "Boris maintains Graph Indexing for OpenMemory retrieval.",
+    tags: ["architecture"],
+  });
+
+  const ingested = await getJson<IngestResponse>(
+    await worker.fetch("/v1/ingest", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenant),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        content:
+          "Graph Indexing improves recall quality by expanding related memories.",
+        source: "conversation",
+      }),
+    }),
+  );
+  expect(ingested.memory.entityIds).toContain("graph-indexing");
+  expect(ingested.edges).toContainEqual(
+    expect.objectContaining({
+      sourceId: ingested.memory.id,
+      targetId: anchor.id,
+      relationship: "shares_entity",
+    }),
+  );
+
+  const results = await search(worker, tenant, {
+    q: "Boris",
+    limit: 5,
+  });
+  expect(results).toContainEqual(
+    expect.objectContaining({
+      id: ingested.memory.id,
+      reason: "graph",
+    }),
+  );
+}, 45_000);
+
+test("recall benchmark preserves ranking quality across direct and graph retrieval", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-benchmark-${crypto.randomUUID()}`;
+  const targets = [
+    await createMemory(worker, tenant, {
+      content: "Maya prefers concise TypeScript code reviews.",
+      tags: ["people", "reviews"],
+      importance: 0.9,
+    }),
+    await createMemory(worker, tenant, {
+      content: "The Atlas launch decision was moved to Tuesday.",
+      tags: ["projects", "launch"],
+      importance: 0.85,
+    }),
+    await createMemory(worker, tenant, {
+      content: "Boris maintains Graph Indexing for OpenMemory retrieval.",
+      tags: ["architecture"],
+      importance: 0.8,
+    }),
+  ];
+
+  await getJson<IngestResponse>(
+    await worker.fetch("/v1/ingest", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenant),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        content:
+          "Graph Indexing expands related OpenMemory memories during recall.",
+        source: "benchmark",
+      }),
+    }),
+  );
+
+  await createMemory(worker, tenant, {
+    content: "The coffee machine requires descaling every Friday.",
+    tags: ["ops"],
+  });
+
+  const cases = [
+    { query: "Maya TypeScript review preference", targetId: targets[0].id },
+    { query: "Atlas launch moved day", targetId: targets[1].id },
+    { query: "Boris retrieval", targetId: targets[2].id },
+  ];
+
+  const reciprocalRanks = await Promise.all(
+    cases.map(async (benchmarkCase) => {
+      const results = await search(worker, tenant, {
+        q: benchmarkCase.query,
+        limit: 5,
+      });
+      return reciprocalRank(results, benchmarkCase.targetId);
+    }),
+  );
+  const meanReciprocalRank =
+    reciprocalRanks.reduce((total, rank) => total + rank, 0) /
+    reciprocalRanks.length;
+
+  expect(meanReciprocalRank).toBeGreaterThanOrEqual(0.8);
 }, 45_000);
 
 test("auth helpers keep tenant headers local-only", () => {
@@ -449,6 +619,7 @@ async function startWorker(env: Record<string, string> = {}) {
   await waitForHealth(baseUrl, proc, output);
 
   return {
+    baseUrl,
     fetch: async (path: string, init?: RequestInit) => {
       const response = await fetch(
         `${baseUrl}${path}`,
@@ -533,6 +704,16 @@ function tenantHeaders(tenantId: string) {
 async function getJson<T>(response: Response) {
   await expectOk(response.clone());
   return (await response.json()) as T;
+}
+
+async function getRedirectUrl(response: Response) {
+  const location = response.headers.get("location");
+  if (location) {
+    return new URL(location, "http://127.0.0.1");
+  }
+
+  const body = await getJson<OAuthRedirectResponse>(response);
+  return new URL(body.url, "http://127.0.0.1");
 }
 
 async function expectOk(response: Response) {
@@ -659,6 +840,27 @@ function splitSetCookieHeader(value: string) {
   return value.split(/,(?=\s*[^;,]+=)/);
 }
 
+function reciprocalRank(results: SearchResponse[], targetId: string) {
+  const index = results.findIndex((result) => result.id === targetId);
+  return index === -1 ? 0 : 1 / (index + 1);
+}
+
+async function pkceChallenge(verifier: string) {
+  const hash = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(verifier),
+  );
+  return base64Url(hash);
+}
+
+function base64Url(buffer: ArrayBuffer) {
+  return Buffer.from(buffer)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -692,11 +894,12 @@ type MemoryResponse = {
   type: string;
   status: string;
   isLatest: boolean;
+  entityIds: string[];
   supersedesId?: string;
 };
 
 type SearchResponse = MemoryResponse & {
-  reason: "semantic" | "keyword";
+  reason: "semantic" | "keyword" | "graph";
   score: number;
 };
 
@@ -731,9 +934,18 @@ type OAuthClientResponse = {
   token_endpoint_auth_method: string;
 };
 
+type OAuthRedirectResponse = {
+  url: string;
+};
+
 type SessionResponse = {
   user: {
     id: string;
     email: string;
   };
+};
+
+type IngestResponse = {
+  memory: MemoryResponse;
+  edges: EdgeResponse[];
 };

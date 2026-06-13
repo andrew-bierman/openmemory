@@ -215,7 +215,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
 
     const now = data.now ?? new Date().toISOString();
     const seen = new Set<string>();
-    return [...bySemantic, ...byKeyword]
+    const baseResults = [...bySemantic, ...byKeyword]
       .filter((memory) => {
         if (seen.has(memory.id)) {
           return false;
@@ -231,6 +231,24 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
             data.tags.some((tag) => memory.tags.includes(tag)))
         );
       })
+      .sort(
+        (a, b) => b.score + b.importance * 0.2 - (a.score + a.importance * 0.2),
+      );
+
+    const graphResults = this.expandGraphResults(baseResults, now, {
+      includeHistorical: data.includeHistorical,
+      includeForgotten: data.includeForgotten,
+    });
+
+    const bestById = new Map<string, SearchResult>();
+    for (const result of [...baseResults, ...graphResults]) {
+      const existing = bestById.get(result.id);
+      if (!existing || scoreResult(result) > scoreResult(existing)) {
+        bestById.set(result.id, result);
+      }
+    }
+
+    return [...bestById.values()]
       .sort(
         (a, b) => b.score + b.importance * 0.2 - (a.score + a.importance * 0.2),
       )
@@ -314,6 +332,53 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       .toArray();
 
     return rows.map(rowToEdge);
+  }
+
+  async linkRelatedMemories(id: string) {
+    const memory = this.getMemoryById(id);
+    if (!memory || memory.entityIds.length === 0) {
+      return [];
+    }
+
+    const rows = this.sqlState.storage.sql
+      .exec<MemoryRow>(
+        `select distinct m.* from memories m
+         join memory_entities e on e.memory_id = m.id
+         where e.entity_id in (${memory.entityIds.map(() => "?").join(",")})
+           and m.id != ?
+           and m.status = 'active'
+           and m.is_latest = 1
+         order by m.updated_at desc
+         limit 12`,
+        ...memory.entityIds,
+        id,
+      )
+      .toArray();
+
+    const edges = [];
+    for (const related of rows.map(rowToMemory)) {
+      const sharedEntities = memory.entityIds.filter((entityId) =>
+        related.entityIds.includes(entityId),
+      );
+      if (sharedEntities.length === 0) {
+        continue;
+      }
+
+      edges.push(
+        await this.addEdge({
+          sourceId: id,
+          targetId: related.id,
+          relationship: "shares_entity",
+          weight: Math.min(1, 0.35 + sharedEntities.length * 0.15),
+          metadata: {
+            createdBy: "linkRelatedMemories",
+            entityIds: sharedEntities,
+          },
+        }),
+      );
+    }
+
+    return edges;
   }
 
   private migrate() {
@@ -478,6 +543,40 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     }
     return { ...rowToMemory(row), score, reason: "semantic" };
   }
+
+  private expandGraphResults(
+    baseResults: SearchResult[],
+    now: string,
+    options: {
+      includeHistorical: boolean;
+      includeForgotten: boolean;
+    },
+  ) {
+    const graphResults: SearchResult[] = [];
+    for (const result of baseResults.slice(0, 10)) {
+      const edges = this.sqlState.storage.sql
+        .exec<EdgeRow>(
+          `select * from edges where source_id = ? or target_id = ? order by weight desc, updated_at desc limit 12`,
+          result.id,
+          result.id,
+        )
+        .toArray();
+
+      for (const edge of edges) {
+        const otherId =
+          edge.source_id === result.id ? edge.target_id : edge.source_id;
+        const neighbor = this.getMemoryById(
+          otherId,
+          Math.max(0.05, result.score * edge.weight * 0.65),
+        );
+        if (neighbor && isVisibleForRecall(neighbor, { ...options, now })) {
+          graphResults.push({ ...neighbor, reason: "graph" });
+        }
+      }
+    }
+
+    return graphResults;
+  }
 }
 
 type MemoryRow = {
@@ -604,6 +703,10 @@ function assembleContext(
     );
   }
   return sections.join("\n\n");
+}
+
+function scoreResult(result: SearchResult) {
+  return result.score + result.importance * 0.2;
 }
 
 function parseMemoryType(value: string): MemoryRecord["type"] {

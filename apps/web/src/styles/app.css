@@ -119,8 +119,14 @@ textarea {
 .content {
   padding: 22px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   gap: 18px;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .toolbar {
@@ -173,6 +179,10 @@ textarea {
 .memory p {
   margin: 0;
   line-height: 1.45;
+}
+
+.memory.compact {
+  gap: 6px;
 }
 
 .meta {

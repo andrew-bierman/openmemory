@@ -1,6 +1,7 @@
 import {
   type ContextResult,
   createOpenMemoryClient,
+  type GraphEdge,
   type Memory,
   OpenMemoryApiError,
 } from "@openmemory/client";
@@ -37,12 +38,19 @@ function Home() {
   const [name, setName] = useLocalStorage("openmemory:name", "");
   const [password, setPassword] = useState("");
   const [content, setContent] = useState("");
+  const [ingestContent, setIngestContent] = useState("");
+  const [ingestSource, setIngestSource] = useState("conversation");
   const [tags, setTags] = useState("");
   const [type, setType] = useState("fact");
   const [query, setQuery] = useState("recent project context");
   const [context, setContext] = useState<ContextResult | null>(null);
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
+  const [neighbors, setNeighbors] = useState<GraphEdge[]>([]);
   const [profile, setProfile] = useState("");
+  const [view, setView] = useState<"recall" | "ingest" | "graph" | "mcp">(
+    "recall",
+  );
   const [sessionUser, setSessionUser] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -108,6 +116,37 @@ function Home() {
     event?.preventDefault();
     await run(async () => {
       setContext(await api.getContext(query));
+    });
+  }
+
+  async function ingest(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await run(async () => {
+      const result = await api.ingest({
+        content: ingestContent,
+        source: ingestSource,
+        tags: tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
+      });
+      setIngestContent("");
+      setSelectedMemory(result.memory);
+      setNeighbors(result.edges);
+      setView("graph");
+      await refresh();
+    });
+  }
+
+  async function inspectMemory(id: string) {
+    await run(async () => {
+      const [memory, nextNeighbors] = await Promise.all([
+        api.getMemory(id),
+        api.getNeighbors(id),
+      ]);
+      setSelectedMemory(memory);
+      setNeighbors(nextNeighbors);
+      setView("graph");
     });
   }
 
@@ -286,6 +325,19 @@ function Home() {
       </aside>
 
       <section className="content">
+        <div className="tabs">
+          {(["recall", "ingest", "graph", "mcp"] as const).map((item) => (
+            <Button
+              key={item}
+              onClick={() => setView(item)}
+              type="button"
+              variant={view === item ? "default" : "outline"}
+            >
+              {item}
+            </Button>
+          ))}
+        </div>
+
         <form className="toolbar" onSubmit={recall}>
           <input
             aria-label="Recall query"
@@ -302,37 +354,51 @@ function Home() {
 
         <div className="workspace">
           <div className="panel">
-            <h2>Memories</h2>
-            <div className="memory-list">
-              {memories.length === 0 ? (
-                <p className="muted">No memories yet.</p>
-              ) : (
-                memories.map((memory) => (
-                  <article className="memory" key={memory.id}>
-                    <p>{memory.content}</p>
-                    <div className="meta">
-                      <span className="pill">{memory.type}</span>
-                      <span className="pill">{memory.status}</span>
-                      {memory.tags.map((tag) => (
-                        <span className="pill" key={tag}>
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <div>
-                      <Button
-                        onClick={() => void forget(memory.id)}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        Forget
-                      </Button>
-                    </div>
-                  </article>
-                ))
-              )}
-            </div>
+            {view === "ingest" ? (
+              <form className="stack" onSubmit={ingest}>
+                <h2>Ingest Source</h2>
+                <div className="field">
+                  <label htmlFor="ingestSource">Source</label>
+                  <input
+                    id="ingestSource"
+                    onChange={(event) => setIngestSource(event.target.value)}
+                    value={ingestSource}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="ingestContent">Content</label>
+                  <textarea
+                    id="ingestContent"
+                    onChange={(event) => setIngestContent(event.target.value)}
+                    required
+                    value={ingestContent}
+                  />
+                </div>
+                <Button
+                  disabled={isLoading || !ingestContent.trim()}
+                  type="submit"
+                >
+                  Ingest
+                </Button>
+              </form>
+            ) : view === "graph" ? (
+              <MemoryDetail
+                memory={selectedMemory}
+                neighbors={neighbors}
+                onForget={forget}
+              />
+            ) : view === "mcp" ? (
+              <McpSetup apiUrl={apiUrl} />
+            ) : (
+              <>
+                <h2>Memories</h2>
+                <MemoryList
+                  memories={memories}
+                  onForget={forget}
+                  onInspect={inspectMemory}
+                />
+              </>
+            )}
           </div>
 
           <div className="stack">
@@ -350,6 +416,150 @@ function Home() {
         </div>
       </section>
     </main>
+  );
+}
+
+function MemoryList({
+  memories,
+  onForget,
+  onInspect,
+}: Readonly<{
+  memories: Memory[];
+  onForget: (id: string) => Promise<void>;
+  onInspect: (id: string) => Promise<void>;
+}>) {
+  if (memories.length === 0) {
+    return <p className="muted">No memories yet.</p>;
+  }
+
+  return (
+    <div className="memory-list">
+      {memories.map((memory) => (
+        <article className="memory" key={memory.id}>
+          <p>{memory.content}</p>
+          <MemoryMeta memory={memory} />
+          <div className="row">
+            <Button
+              onClick={() => void onInspect(memory.id)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Inspect
+            </Button>
+            <Button
+              onClick={() => void onForget(memory.id)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Forget
+            </Button>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function MemoryDetail({
+  memory,
+  neighbors,
+  onForget,
+}: Readonly<{
+  memory: Memory | null;
+  neighbors: GraphEdge[];
+  onForget: (id: string) => Promise<void>;
+}>) {
+  if (!memory) {
+    return <p className="muted">Select a memory to inspect its graph.</p>;
+  }
+
+  return (
+    <div className="stack">
+      <h2>Memory Detail</h2>
+      <article className="memory">
+        <p>{memory.content}</p>
+        <MemoryMeta memory={memory} />
+        <Button
+          onClick={() => void onForget(memory.id)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          Forget
+        </Button>
+      </article>
+      <h2>Neighbors</h2>
+      {neighbors.length === 0 ? (
+        <p className="muted">No graph neighbors yet.</p>
+      ) : (
+        <div className="memory-list">
+          {neighbors.map((edge) => (
+            <article
+              className="memory compact"
+              key={`${edge.sourceId}:${edge.relationship}:${edge.targetId}`}
+            >
+              <div className="meta">
+                <span className="pill">{edge.relationship}</span>
+                <span>{edge.weight.toFixed(2)}</span>
+              </div>
+              <pre className="context">
+                {`${edge.sourceId} -> ${edge.targetId}`}
+              </pre>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MemoryMeta({ memory }: Readonly<{ memory: Memory }>) {
+  return (
+    <div className="meta">
+      <span className="pill">{memory.type}</span>
+      <span className="pill">{memory.status}</span>
+      {memory.tags.map((tag) => (
+        <span className="pill" key={tag}>
+          {tag}
+        </span>
+      ))}
+      {memory.entityIds.map((entityId) => (
+        <span className="pill" key={entityId}>
+          {entityId}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function McpSetup({ apiUrl }: Readonly<{ apiUrl: string }>) {
+  const baseUrl = cleanBaseUrl(apiUrl);
+  return (
+    <div className="stack">
+      <h2>MCP</h2>
+      <div className="field">
+        <label htmlFor="mcpUrl">Server URL</label>
+        <input id="mcpUrl" readOnly value={`${baseUrl}/mcp`} />
+      </div>
+      <div className="field">
+        <label htmlFor="issuer">OAuth issuer</label>
+        <input id="issuer" readOnly value={`${baseUrl}/api/auth`} />
+      </div>
+      <pre className="context">
+        {JSON.stringify(
+          {
+            transport: "streamable-http",
+            url: `${baseUrl}/mcp`,
+            authorizationServer: `${baseUrl}/.well-known/oauth-authorization-server`,
+            scopes: ["openid", "profile", "memory:read", "memory:write"],
+          },
+          null,
+          2,
+        )}
+      </pre>
+    </div>
   );
 }
 

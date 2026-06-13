@@ -1,4 +1,3 @@
-import { mcpHandler as betterAuthMcpHandler } from "@better-auth/oauth-provider";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   ContextSchema,
@@ -6,6 +5,8 @@ import {
   ForgetMemorySchema,
 } from "@openmemory/core";
 import { createMcpHandler } from "agents/mcp";
+import { verifyJwsAccessToken } from "better-auth/oauth2";
+import type { JSONWebKeySet } from "jose";
 import { z } from "zod";
 import {
   getGraph,
@@ -17,38 +18,42 @@ import { resolveAuthBaseUrl } from "./better-auth";
 import type { Env } from "./env";
 import type { MemoryGraph } from "./memory-graph";
 
-export function createOpenMemoryMcpHandler() {
+export function createOpenMemoryMcpHandler(): (
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+) => Promise<Response> {
   return async (request: Request, env: Env, ctx: ExecutionContext) => {
     if (!isLocalDevelopmentRequest(request)) {
-      const baseURL = resolveAuthBaseUrl(env, request);
-      return betterAuthMcpHandler(
-        {
-          verifyOptions: {
-            issuer: `${baseURL}/api/auth`,
-            audience: `${baseURL}/mcp`,
-          },
-          jwksUrl: `${baseURL}/api/auth/jwks`,
-          scopes: ["memory:read"],
-        },
-        async (authedRequest, jwt) => {
-          const tenantId = getTenantFromJwt(jwt);
-          if (!tenantId) {
-            return json(
-              {
-                error: "missing_oauth_subject",
-                message: "OAuth token did not include a subject tenant.",
-              },
-              401,
-            );
-          }
+      const authBaseURL = resolveAuthBaseUrl(env, request);
+      const resourceBaseURL = resolveResourceBaseUrl(authBaseURL);
+      const jwt = await verifyMcpBearerToken(
+        request,
+        env,
+        authBaseURL,
+        resourceBaseURL,
+      );
+      if ("response" in jwt) {
+        return (
+          jwt.response ??
+          mcpUnauthorized(resourceBaseURL, "invalid access token")
+        );
+      }
 
-          return handleMcpRequest(
-            withTenantHeader(authedRequest, tenantId),
-            env,
-            ctx,
-          );
-        },
-      )(request);
+      const tenantId = getTenantFromJwt(jwt.payload);
+      if (!tenantId) {
+        return json(
+          {
+            error: "missing_oauth_subject",
+            message: "OAuth token did not include a subject tenant.",
+          },
+          401,
+        );
+      }
+
+      return handleMcpRequest(withTenantHeader(request, tenantId), env, ctx, {
+        allowHeaderTenant: true,
+      });
     }
 
     return handleMcpRequest(request, env, ctx, {
@@ -62,7 +67,7 @@ async function handleMcpRequest(
   env: Env,
   ctx: ExecutionContext,
   options: { allowHeaderTenant: boolean } = { allowHeaderTenant: false },
-) {
+): Promise<Response> {
   const auth = resolveAuth(env, request.headers);
   if (!auth.ok) {
     return json({ error: auth.error, message: auth.message }, 401);
@@ -164,10 +169,102 @@ async function handleMcpRequest(
     },
   );
 
-  return createMcpHandler(server, {
+  const response = await createMcpHandler(server, {
     route: "/mcp",
     enableJsonResponse: true,
   })(request, env, ctx);
+  return response ?? json({ error: "mcp_no_response" }, 500);
+}
+
+async function verifyMcpBearerToken(
+  request: Request,
+  env: Env,
+  authBaseURL: string,
+  resourceBaseURL: string,
+) {
+  const issuer = resolveIssuer(authBaseURL);
+  const authorization = request.headers.get("authorization") ?? "";
+  const accessToken = authorization.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length)
+    : authorization;
+  if (!accessToken) {
+    return {
+      response: mcpUnauthorized(
+        resourceBaseURL,
+        "missing authorization header",
+      ),
+    };
+  }
+
+  try {
+    const payload = await verifyJwsAccessToken(accessToken, {
+      jwksFetch: () => readJwks(env, issuer),
+      verifyOptions: {
+        issuer,
+        audience: `${resourceBaseURL}/mcp`,
+      },
+    });
+    const scopes = new Set(String(payload.scope ?? "").split(" "));
+    if (!scopes.has("memory:read")) {
+      return { response: json({ error: "invalid_scope" }, 403) };
+    }
+    return { payload };
+  } catch (error) {
+    return {
+      response: mcpUnauthorized(
+        resourceBaseURL,
+        error instanceof Error ? error.message : "invalid access token",
+      ),
+    };
+  }
+}
+
+async function readJwks(env: Env, issuer: string): Promise<JSONWebKeySet> {
+  if (!env.AUTH_DB) {
+    const response = await fetch(`${issuer}/jwks`, {
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error(`JWKS fetch failed with ${response.status}`);
+    }
+    return (await response.json()) as JSONWebKeySet;
+  }
+
+  const { results } = await env.AUTH_DB.prepare(
+    "select id, public_key from jwks",
+  ).all<{
+    id: string;
+    public_key: string;
+  }>();
+
+  return {
+    keys: results.map((row) => ({
+      ...JSON.parse(row.public_key),
+      alg: "EdDSA",
+      kid: row.id,
+    })),
+  };
+}
+
+function mcpUnauthorized(resourceBaseURL: string, message: string) {
+  return new Response(message, {
+    status: 401,
+    headers: {
+      "www-authenticate": `Bearer resource_metadata="${resourceBaseURL}/.well-known/oauth-protected-resource/mcp"`,
+    },
+  });
+}
+
+function resolveIssuer(authBaseURL: string) {
+  return authBaseURL.endsWith("/api/auth")
+    ? authBaseURL
+    : `${authBaseURL}/api/auth`;
+}
+
+function resolveResourceBaseUrl(authBaseURL: string) {
+  return authBaseURL.endsWith("/api/auth")
+    ? authBaseURL.slice(0, -"/api/auth".length)
+    : authBaseURL;
 }
 
 function textTool(text: string) {

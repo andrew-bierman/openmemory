@@ -105,7 +105,7 @@ export type MemoryRecord = {
 
 export type SearchResult = MemoryRecord & {
   score: number;
-  reason: "semantic" | "keyword";
+  reason: "semantic" | "keyword" | "graph";
 };
 
 export const createMemoryId = () => `mem_${crypto.randomUUID()}`;

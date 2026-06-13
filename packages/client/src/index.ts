@@ -4,6 +4,7 @@ export type Memory = {
   id: string;
   content: string;
   tags: string[];
+  entityIds: string[];
   type: string;
   status: string;
   isLatest: boolean;
@@ -21,14 +22,28 @@ export type ContextResult = {
 };
 
 export type SearchResult = Memory & {
-  reason: "semantic" | "keyword";
+  reason: "semantic" | "keyword" | "graph";
   score: number;
+};
+
+export type GraphEdge = {
+  sourceId: string;
+  targetId: string;
+  relationship: string;
+  weight: number;
+  metadata: Record<string, unknown>;
 };
 
 export type CreateMemoryInput = {
   content: string;
   tags?: string[];
   type?: string;
+  source?: string;
+};
+
+export type IngestResult = {
+  memory: Memory;
+  edges: GraphEdge[];
 };
 
 export type OpenMemoryClientOptions = {
@@ -79,6 +94,11 @@ export function createOpenMemoryClient(
       unwrap<Memory>(client.v1.memories.post(input)),
     forgetMemory: (id: string) =>
       unwrap<Memory>(client.v1.memories({ id }).delete({ reason: "web" })),
+    getMemory: (id: string) => unwrap<Memory>(client.v1.memories({ id }).get()),
+    getNeighbors: (id: string) =>
+      unwrap<GraphEdge[]>(client.v1.graph({ id }).neighbors.get()),
+    ingest: (input: CreateMemoryInput) =>
+      unwrap<IngestResult>(client.v1.ingest.post(input)),
     getContext: (q: string) =>
       unwrap<ContextResult>(
         client.v1.context.post({ q, limit: 8, includeProfile: true }),
@@ -106,8 +126,12 @@ type EdenClient = {
       get(input?: { query?: Record<string, string> }): EdenResult;
       post(input: CreateMemoryInput): EdenResult;
     } & ((params: { id: string }) => {
+      get(): EdenResult;
       delete(input?: { reason?: string }): EdenResult;
     });
+    ingest: {
+      post(input: CreateMemoryInput): EdenResult;
+    };
     context: {
       post(input: {
         q: string;
@@ -120,6 +144,15 @@ type EdenClient = {
     };
     search: {
       post(input: { q: string; limit?: number }): EdenResult;
+    };
+    graph: ((params: { id: string }) => {
+      neighbors: {
+        get(): EdenResult;
+      };
+    }) & {
+      edges: {
+        post(input: GraphEdge): EdenResult;
+      };
     };
   };
 };

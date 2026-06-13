@@ -180,16 +180,44 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       }
 
       const memory = await graph.createMemory(
-        CreateMemorySchema.parse({
-          source: "api",
-          tags: [],
-          metadata: {},
-          ...body,
-        }),
+        CreateMemorySchema.parse(
+          enrichMemoryInput({
+            source: "api",
+            tags: [],
+            metadata: {},
+            ...body,
+          }),
+        ),
       );
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
       await indexMemory(env, tenantId, memory);
+      await graph.linkRelatedMemories(memory.id);
       return status(201, memory);
+    },
+    { body: memoryBody },
+  )
+  .post(
+    "/v1/ingest",
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+
+      const memory = await graph.createMemory(
+        CreateMemorySchema.parse(
+          enrichMemoryInput({
+            source: "ingest",
+            tags: [],
+            metadata: {},
+            ...body,
+          }),
+        ),
+      );
+      const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+      await indexMemory(env, tenantId, memory);
+      const edges = await graph.linkRelatedMemories(memory.id);
+      return status(201, { memory, edges });
     },
     { body: memoryBody },
   )
@@ -229,13 +257,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
 
       const memory = await graph.updateMemory(
         params.id,
-        UpdateMemorySchema.parse({ metadata: {}, ...body }),
+        UpdateMemorySchema.parse(enrichMemoryInput({ metadata: {}, ...body })),
       );
       if (!memory) {
         return status(404, { error: "not_found" as const });
       }
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
       await indexMemory(env, tenantId, memory);
+      await graph.linkRelatedMemories(memory.id);
       return memory;
     },
     { body: updateBody },
@@ -387,6 +416,112 @@ function corsHeaders(request: Request) {
     vary: "Origin",
   });
 }
+
+function enrichMemoryInput<
+  T extends {
+    content?: string;
+    tags?: string[];
+    metadata?: Record<string, unknown>;
+    entityIds?: string[];
+  },
+>(input: T) {
+  if (!input.content) {
+    return input;
+  }
+
+  const extracted = extractMemorySignals(input.content);
+  return {
+    ...input,
+    tags: mergeUnique([...(input.tags ?? []), ...extracted.tags]),
+    entityIds: mergeUnique([
+      ...(input.entityIds ?? []),
+      ...extracted.entityIds,
+    ]),
+    metadata: {
+      ...(input.metadata ?? {}),
+      extraction: {
+        strategy: "deterministic-v1",
+        entityIds: extracted.entityIds,
+        tags: extracted.tags,
+      },
+    },
+  };
+}
+
+function extractMemorySignals(content: string) {
+  const entityIds = new Set<string>();
+  const tags = new Set<string>();
+
+  for (const match of content.matchAll(
+    /\b[A-Z][a-z0-9]+(?:\s+[A-Z][a-z0-9]+){0,3}\b/g,
+  )) {
+    const value = match[0].trim();
+    if (value.length >= 3 && !COMMON_TITLE_WORDS.has(value)) {
+      entityIds.add(entityId(value));
+    }
+  }
+
+  for (const match of content.matchAll(/\b[A-Z]{2,}\b/g)) {
+    entityIds.add(entityId(match[0]));
+  }
+
+  for (const match of content.matchAll(/#([a-zA-Z0-9_-]{2,40})/g)) {
+    tags.add(match[1].toLowerCase());
+  }
+
+  for (const term of tokenizeContent(content)) {
+    if (DOMAIN_TAGS.has(term)) {
+      tags.add(term);
+    }
+  }
+
+  return {
+    entityIds: [...entityIds].slice(0, 30),
+    tags: [...tags].slice(0, 20),
+  };
+}
+
+function mergeUnique(values: string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function entityId(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 160);
+}
+
+function tokenizeContent(content: string) {
+  return content
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+const COMMON_TITLE_WORDS = new Set([
+  "The",
+  "This",
+  "That",
+  "When",
+  "Where",
+  "OpenMemory",
+]);
+
+const DOMAIN_TAGS = new Set([
+  "api",
+  "auth",
+  "cloudflare",
+  "durable",
+  "graph",
+  "mcp",
+  "memory",
+  "oauth",
+  "rag",
+  "vectorize",
+]);
 
 async function indexMemory(env: Env, tenantId: string, memory: unknown) {
   if (!isMemoryForIndex(memory)) {
@@ -649,7 +784,7 @@ const CONSENT_HTML = `<!doctype html>
     details.textContent = (params.get("client_id") || "This client") + " is requesting: " + (scope || "default OpenMemory access");
     function showError(message) { error.textContent = message; error.classList.remove("hidden"); }
     async function consent(accept) {
-      const response = await fetch("/api/auth/oauth2/consent", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ accept, scope }) });
+      const response = await fetch("/api/auth/oauth2/consent", { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify({ accept, scope, oauth_query: location.search.slice(1) }) });
       if (!response.ok) throw new Error(await response.text());
       const data = await response.json().catch(() => ({}));
       if (data && data.url) location.href = data.url;
