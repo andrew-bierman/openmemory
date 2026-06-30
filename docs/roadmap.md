@@ -24,6 +24,7 @@
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh, recall, and forget.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
 - `/v1/graph/stats` exposes graph size counters, and local Wrangler integration includes a moderate graph-scale recall smoke.
+- Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
@@ -37,7 +38,7 @@
   - source/document ingestion is synchronous rather than Queue/Workflow-backed
   - no entity extraction worker
   - no relationship extraction worker
-  - no reranker
+  - no LLM/ML reranker
 - recall benchmark coverage exists, but not enough golden cases for shipping confidence at realistic scale
 - Graph performance has a first moderate local smoke, but still needs larger volume benchmarks and production telemetry.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the preferred deploy path; the manual GitHub deploy workflow remains a fallback and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
@@ -58,7 +59,7 @@
    - Move source/document ingestion onto Queues and Workflows.
    - Extract richer entities and relationships into the graph.
    - Store embeddings in Vectorize for every chunk and repair stale indexes.
-   - Combine vector candidates, graph neighbors, profile state, and recency.
+   - Tune deterministic reranking and evaluate an optional LLM/ML reranker.
    - Expand recall quality benchmarks with MemoryBench-style fixtures.
    - Add larger graph performance benchmarks and production telemetry.
 

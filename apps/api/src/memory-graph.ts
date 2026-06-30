@@ -231,9 +231,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
             data.tags.some((tag) => memory.tags.includes(tag)))
         );
       })
-      .sort(
-        (a, b) => b.score + b.importance * 0.2 - (a.score + a.importance * 0.2),
-      );
+      .sort((a, b) => rankResult(b, now) - rankResult(a, now));
 
     const graphResults = this.expandGraphResults(baseResults, now, {
       includeHistorical: data.includeHistorical,
@@ -243,15 +241,13 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     const bestById = new Map<string, SearchResult>();
     for (const result of [...baseResults, ...graphResults]) {
       const existing = bestById.get(result.id);
-      if (!existing || scoreResult(result) > scoreResult(existing)) {
+      if (!existing || rankResult(result, now) > rankResult(existing, now)) {
         bestById.set(result.id, result);
       }
     }
 
     return [...bestById.values()]
-      .sort(
-        (a, b) => b.score + b.importance * 0.2 - (a.score + a.importance * 0.2),
-      )
+      .sort((a, b) => rankResult(b, now) - rankResult(a, now))
       .slice(0, data.limit);
   }
 
@@ -753,8 +749,45 @@ function assembleContext(
   return sections.join("\n\n");
 }
 
-function scoreResult(result: SearchResult) {
-  return result.score + result.importance * 0.2;
+function rankResult(result: SearchResult, now: string) {
+  return (
+    result.score * 0.62 +
+    reasonBoost(result.reason) +
+    result.importance * 0.16 +
+    result.confidence * 0.12 +
+    recencyBoost(result.updatedAt, now) +
+    currentnessBoost(result)
+  );
+}
+
+function reasonBoost(reason: SearchResult["reason"]) {
+  if (reason === "semantic") {
+    return 0.08;
+  }
+  if (reason === "keyword") {
+    return 0.05;
+  }
+  return 0.03;
+}
+
+function recencyBoost(updatedAt: string, now: string) {
+  const ageMs = Date.parse(now) - Date.parse(updatedAt);
+  if (!Number.isFinite(ageMs) || ageMs <= 0) {
+    return 0.05;
+  }
+
+  const ageDays = ageMs / 86_400_000;
+  return Math.max(0, 0.05 * (1 - ageDays / 30));
+}
+
+function currentnessBoost(result: SearchResult) {
+  if (result.status === "active" && result.isLatest) {
+    return 0.04;
+  }
+  if (result.status === "forgotten") {
+    return -0.3;
+  }
+  return -0.08;
 }
 
 function parseMemoryType(value: string): MemoryRecord["type"] {

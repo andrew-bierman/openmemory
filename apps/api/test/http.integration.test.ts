@@ -619,6 +619,35 @@ test("recall benchmark preserves ranking quality across direct and graph retriev
   expect(meanReciprocalRank).toBeGreaterThanOrEqual(0.8);
 }, 45_000);
 
+test("deterministic reranker prefers important and confident current memories", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-rerank-${crypto.randomUUID()}`;
+  const lowSignal = await createMemory(worker, tenant, {
+    content: "Atlas launch owner is Riley.",
+    tags: ["atlas"],
+    confidence: 0.2,
+    importance: 0.1,
+  });
+  const highSignal = await createMemory(worker, tenant, {
+    content: "Atlas launch owner is Morgan.",
+    tags: ["atlas"],
+    confidence: 0.95,
+    importance: 0.95,
+  });
+
+  const results = await search(worker, tenant, {
+    q: "Atlas launch owner",
+    limit: 2,
+  });
+
+  expect(results.map((result) => result.id)).toEqual([
+    highSignal.id,
+    lowSignal.id,
+  ]);
+}, 45_000);
+
 test("graph stats and recall stay bounded on a moderate local graph", async () => {
   const worker = await startWorker();
   workers.push(worker);
