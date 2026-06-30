@@ -73,7 +73,8 @@
    - Evolve the hosted TanStack Start UI into the primary OpenMemory product surface.
    - Keep the visual direction closer to a native Apple/SwiftUI utility: calm translucent surfaces, dense controls, strong hierarchy, and premium motion.
    - Expand charts for recall quality, memory growth, stale/superseded memories, indexing health, and MCP usage.
-   - Replace the first-pass SVG knowledge map with an interactive graph canvas when graph size and layout requirements justify it.
+   - Replace the first-pass SVG knowledge map with a proven graph visualization library when graph size and layout requirements justify it.
+   - Evaluate Sigma.js + Graphology, `react-force-graph`, Reagraph, and React Flow before writing any custom graph layout code.
    - Expand browser tests for graph inspection, MCP connection revocation, and account settings.
 
 5. CI and deployment
