@@ -146,6 +146,7 @@ Note: `kysely@0.28.17` remains installed only as a Better Auth bundling compatib
 - `docs/research/cloudflare-rag-bottlenecks.md`
 - `docs/research/supermemory-feature-evaluation.md`
 - `docs/plans/testing-strategy.md`
+- `docs/mcp.md`
 - `docs/brainstorms/openmemory-requirements.md`
 - `docs/plans/openmemory-plan.md`
 - `docs/roadmap.md`

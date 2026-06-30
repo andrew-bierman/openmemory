@@ -26,6 +26,7 @@
 - `/v1/graph/stats` exposes graph size counters, and local Wrangler integration includes a moderate graph-scale recall smoke.
 - Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.
 - Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
+- `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
@@ -52,7 +53,6 @@
    - Keep `x-openmemory-user-id` only for local development and tests.
 
 2. MCP production flow
-   - Add MCP client documentation and config snippets.
    - Add external MCP client smoke with a real client once chosen.
    - Expand OAuth lifecycle UI from connection revocation into full client registration/management if we need first-party clients.
 
