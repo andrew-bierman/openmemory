@@ -34,6 +34,18 @@ export type GraphEdge = {
   metadata: Record<string, unknown>;
 };
 
+export type GraphStats = {
+  totalMemories: number;
+  activeMemories: number;
+  historicalMemories: number;
+  forgottenMemories: number;
+  totalEdges: number;
+  relationshipCount: number;
+  entityCount: number;
+  tagCount: number;
+  generatedAt: string;
+};
+
 export type CreateMemoryInput = {
   content: string;
   tags?: string[];
@@ -111,6 +123,7 @@ export function createOpenMemoryClient(
     getMemory: (id: string) => unwrap<Memory>(client.v1.memories({ id }).get()),
     getNeighbors: (id: string) =>
       unwrap<GraphEdge[]>(client.v1.graph({ id }).neighbors.get()),
+    getGraphStats: () => unwrap<GraphStats>(client.v1.graph.stats.get()),
     ingest: (input: CreateMemoryInput) =>
       unwrap<IngestResult>(client.v1.ingest.post(input)),
     ingestSource: (input: SourceIngestInput) =>
@@ -169,6 +182,9 @@ type EdenClient = {
         get(): EdenResult;
       };
     }) & {
+      stats: {
+        get(): EdenResult;
+      };
       edges: {
         post(input: GraphEdge): EdenResult;
       };

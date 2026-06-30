@@ -30,6 +30,7 @@ The current alpha is a multi-user memory API that stores each user's evolving me
 - Keyword recall with optional semantic candidate IDs from Vectorize when Workers AI and Vectorize are available.
 - Profile and context assembly through `/v1/profile` and `/v1/context`.
 - Chunked source ingestion through `/v1/sources`, with source/chunk provenance metadata and graph edges between adjacent chunks.
+- Graph stats through `/v1/graph/stats` for local scale checks and UI inspection.
 - Native streamable HTTP MCP endpoint at `/mcp` with `remember`, `recall`, `forget`, and `profile` tools.
 - Minimal dashboard at `/` for local inspection and capture.
 - Better Auth routes at `/api/auth/*`, plus root OAuth/OIDC discovery at `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
@@ -80,6 +81,7 @@ Useful endpoints:
 - `POST /v1/ingest`
 - `POST /v1/sources`
 - `GET /v1/profile`
+- `GET /v1/graph/stats`
 - `GET /v1/graph/:id/neighbors`
 - `POST /mcp`
 - `GET /.well-known/oauth-authorization-server`

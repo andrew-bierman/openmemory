@@ -334,6 +334,54 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     return rows.map(rowToEdge);
   }
 
+  async getStats() {
+    const [memoryStats] = this.sqlState.storage.sql
+      .exec<{
+        total_memories: number;
+        active_memories: number;
+        historical_memories: number;
+        forgotten_memories: number;
+      }>(
+        `select
+          count(*) as total_memories,
+          sum(case when status = 'active' and is_latest = 1 then 1 else 0 end) as active_memories,
+          sum(case when status != 'active' or is_latest = 0 then 1 else 0 end) as historical_memories,
+          sum(case when status = 'forgotten' then 1 else 0 end) as forgotten_memories
+        from memories`,
+      )
+      .toArray();
+    const [edgeStats] = this.sqlState.storage.sql
+      .exec<{ total_edges: number; relationship_count: number }>(
+        `select
+          count(*) as total_edges,
+          count(distinct relationship) as relationship_count
+        from edges`,
+      )
+      .toArray();
+    const [entityStats] = this.sqlState.storage.sql
+      .exec<{ entity_count: number }>(
+        `select count(distinct entity_id) as entity_count from memory_entities`,
+      )
+      .toArray();
+    const [tagStats] = this.sqlState.storage.sql
+      .exec<{ tag_count: number }>(
+        `select count(distinct tag) as tag_count from memory_tags`,
+      )
+      .toArray();
+
+    return {
+      totalMemories: memoryStats?.total_memories ?? 0,
+      activeMemories: memoryStats?.active_memories ?? 0,
+      historicalMemories: memoryStats?.historical_memories ?? 0,
+      forgottenMemories: memoryStats?.forgotten_memories ?? 0,
+      totalEdges: edgeStats?.total_edges ?? 0,
+      relationshipCount: edgeStats?.relationship_count ?? 0,
+      entityCount: entityStats?.entity_count ?? 0,
+      tagCount: tagStats?.tag_count ?? 0,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
   async linkRelatedMemories(id: string) {
     const memory = this.getMemoryById(id);
     if (!memory || memory.entityIds.length === 0) {

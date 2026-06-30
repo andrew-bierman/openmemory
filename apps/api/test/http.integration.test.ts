@@ -536,6 +536,14 @@ test("source ingestion chunks documents, preserves provenance, and links chunk g
       relationship: "shares_entity",
     }),
   );
+  const stats = await getJson<GraphStatsResponse>(
+    await worker.fetch("/v1/graph/stats", {
+      headers: tenantHeaders(tenant),
+    }),
+  );
+  expect(stats.activeMemories).toBe(source.chunkCount + 1);
+  expect(stats.totalEdges).toBeGreaterThanOrEqual(source.chunkCount);
+  expect(stats.entityCount).toBeGreaterThan(0);
 
   const results = await search(worker, tenant, {
     q: "Workers AI Vectorize source chunks",
@@ -609,6 +617,42 @@ test("recall benchmark preserves ranking quality across direct and graph retriev
     reciprocalRanks.length;
 
   expect(meanReciprocalRank).toBeGreaterThanOrEqual(0.8);
+}, 45_000);
+
+test("graph stats and recall stay bounded on a moderate local graph", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-scale-${crypto.randomUUID()}`;
+  const topics = ["Atlas", "Borealis", "Cosmos", "Delta"];
+  for (let index = 0; index < 60; index += 1) {
+    const topic = topics[index % topics.length];
+    await createMemory(worker, tenant, {
+      content: `${topic} project memory ${index}: Graph Indexing connects source chunks, decisions, and retrieval notes.`,
+      tags: ["scale", topic.toLowerCase()],
+      importance: index % 10 === 0 ? 0.9 : 0.5,
+    });
+  }
+
+  const stats = await getJson<GraphStatsResponse>(
+    await worker.fetch("/v1/graph/stats", {
+      headers: tenantHeaders(tenant),
+    }),
+  );
+  expect(stats.activeMemories).toBe(60);
+  expect(stats.totalMemories).toBe(60);
+  expect(stats.tagCount).toBeGreaterThanOrEqual(5);
+
+  const startedAt = performance.now();
+  const results = await search(worker, tenant, {
+    q: "Atlas Graph Indexing retrieval notes",
+    limit: 10,
+  });
+  const elapsedMs = performance.now() - startedAt;
+
+  expect(results).toHaveLength(10);
+  expect(results[0]?.content).toContain("Atlas");
+  expect(elapsedMs).toBeLessThan(5_000);
 }, 45_000);
 
 test("auth helpers keep tenant headers local-only", () => {
@@ -1025,4 +1069,16 @@ type SourceIngestResponse = {
   chunkCount: number;
   memories: MemoryResponse[];
   edges: EdgeResponse[];
+};
+
+type GraphStatsResponse = {
+  totalMemories: number;
+  activeMemories: number;
+  historicalMemories: number;
+  forgottenMemories: number;
+  totalEdges: number;
+  relationshipCount: number;
+  entityCount: number;
+  tagCount: number;
+  generatedAt: string;
 };

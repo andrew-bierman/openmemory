@@ -2,6 +2,7 @@ import {
   type ContextResult,
   createOpenMemoryClient,
   type GraphEdge,
+  type GraphStats,
   type Memory,
   OpenMemoryApiError,
 } from "@openmemory/client";
@@ -47,6 +48,7 @@ function Home() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [neighbors, setNeighbors] = useState<GraphEdge[]>([]);
+  const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
   const [profile, setProfile] = useState("");
   const [view, setView] = useState<"recall" | "ingest" | "graph" | "mcp">(
     "recall",
@@ -80,14 +82,17 @@ function Home() {
 
   const refresh = useCallback(async () => {
     await run(async () => {
-      const [nextSession, nextMemories, nextProfile] = await Promise.all([
-        getSession(apiUrl),
-        api.listMemories(),
-        api.getProfile(),
-      ]);
+      const [nextSession, nextMemories, nextProfile, nextGraphStats] =
+        await Promise.all([
+          getSession(apiUrl),
+          api.listMemories(),
+          api.getProfile(),
+          api.getGraphStats(),
+        ]);
       setSessionUser(nextSession);
       setMemories(nextMemories);
       setProfile(nextProfile.summary);
+      setGraphStats(nextGraphStats);
     });
   }, [api, apiUrl, run]);
 
@@ -382,11 +387,14 @@ function Home() {
                 </Button>
               </form>
             ) : view === "graph" ? (
-              <MemoryDetail
-                memory={selectedMemory}
-                neighbors={neighbors}
-                onForget={forget}
-              />
+              <div className="stack">
+                <GraphStatsPanel stats={graphStats} />
+                <MemoryDetail
+                  memory={selectedMemory}
+                  neighbors={neighbors}
+                  onForget={forget}
+                />
+              </div>
             ) : view === "mcp" ? (
               <McpSetup apiUrl={apiUrl} />
             ) : (
@@ -511,6 +519,30 @@ function MemoryDetail({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function GraphStatsPanel({ stats }: Readonly<{ stats: GraphStats | null }>) {
+  if (!stats) {
+    return <p className="muted">Graph stats unavailable.</p>;
+  }
+
+  return (
+    <div className="stats-grid">
+      <Stat label="Active" value={stats.activeMemories} />
+      <Stat label="Historical" value={stats.historicalMemories} />
+      <Stat label="Edges" value={stats.totalEdges} />
+      <Stat label="Entities" value={stats.entityCount} />
+    </div>
+  );
+}
+
+function Stat({ label, value }: Readonly<{ label: string; value: number }>) {
+  return (
+    <div className="stat">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }

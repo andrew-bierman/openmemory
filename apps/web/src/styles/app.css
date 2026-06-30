@@ -185,6 +185,35 @@ textarea {
   gap: 6px;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat {
+  border: 1px solid #dfe5ee;
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+  min-width: 0;
+}
+
+.stat span {
+  display: block;
+  color: #627085;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stat strong {
+  display: block;
+  margin-top: 4px;
+  color: #18212f;
+  font-size: 20px;
+  line-height: 1.1;
+}
+
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -219,6 +248,10 @@ textarea {
   .app-shell,
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sidebar {
