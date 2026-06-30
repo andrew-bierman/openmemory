@@ -169,6 +169,17 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(matchingEdges).toHaveLength(1);
   expect(matchingEdges[0]?.weight).toBe(0.8);
+
+  const exported = await getJson<GraphExportResponse>(
+    await worker.fetch("/v1/exports", {
+      method: "POST",
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(exported.key).toContain(`${tenantA}/exports/`);
+  expect(exported.memoryCount).toBe(2);
+  expect(exported.edgeCount).toBeGreaterThanOrEqual(1);
+  expect(exported.bytes).toBeGreaterThan(500);
 }, 45_000);
 
 test("worker API supports memory lifecycle, profile context, MCP, and dashboard", async () => {
@@ -1153,4 +1164,12 @@ type GraphStatsResponse = {
   entityCount: number;
   tagCount: number;
   generatedAt: string;
+};
+
+type GraphExportResponse = {
+  key: string;
+  bytes: number;
+  memoryCount: number;
+  edgeCount: number;
+  writtenToR2: boolean;
 };

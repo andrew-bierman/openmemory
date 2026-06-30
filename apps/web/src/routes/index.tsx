@@ -2,6 +2,7 @@ import {
   type ContextResult,
   createOpenMemoryClient,
   type GraphEdge,
+  type GraphExportResult,
   type GraphStats,
   type Memory,
   type OAuthConnection,
@@ -50,6 +51,7 @@ function Home() {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [neighbors, setNeighbors] = useState<GraphEdge[]>([]);
   const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
+  const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
   const [oauthConnections, setOauthConnections] = useState<OAuthConnection[]>(
     [],
   );
@@ -213,6 +215,12 @@ function Home() {
     await run(async () => {
       await api.revokeOAuthConnection(clientId);
       setOauthConnections(await api.listOAuthConnections().catch(() => []));
+    });
+  }
+
+  async function exportGraph() {
+    await run(async () => {
+      setLastExport(await api.exportGraph());
     });
   }
 
@@ -408,6 +416,21 @@ function Home() {
             ) : view === "graph" ? (
               <div className="stack">
                 <GraphStatsPanel stats={graphStats} />
+                <div className="row">
+                  <Button
+                    disabled={isLoading}
+                    onClick={() => void exportGraph()}
+                    type="button"
+                    variant="outline"
+                  >
+                    Export
+                  </Button>
+                  {lastExport ? (
+                    <span className="muted">
+                      {lastExport.memoryCount} memories exported
+                    </span>
+                  ) : null}
+                </div>
                 <MemoryDetail
                   memory={selectedMemory}
                   neighbors={neighbors}

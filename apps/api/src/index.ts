@@ -452,6 +452,36 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       return status(result.status, result.body);
     },
   )
+  .post("/v1/exports", async ({ headers, request, status }) => {
+    const { tenant, graph } = await withTenant(request, headers);
+    if (!graph) {
+      return status(errorStatus(tenantError(tenant)), tenant);
+    }
+
+    const tenantId = "tenantId" in tenant ? tenant.tenantId : "unknown";
+    const graphExport = await graph.exportGraph();
+    const body = JSON.stringify(graphExport);
+    const key = `${tenantId}/exports/${graphExport.exportedAt.replace(/[:.]/g, "-")}.json`;
+
+    if (env.MEMORY_EXPORTS) {
+      await env.MEMORY_EXPORTS.put(key, body, {
+        httpMetadata: { contentType: "application/json" },
+        customMetadata: {
+          tenantId,
+          exportedAt: graphExport.exportedAt,
+          version: String(graphExport.version),
+        },
+      });
+    }
+
+    return status(201, {
+      key,
+      bytes: new TextEncoder().encode(body).byteLength,
+      memoryCount: graphExport.memories.length,
+      edgeCount: graphExport.edges.length,
+      writtenToR2: Boolean(env.MEMORY_EXPORTS),
+    });
+  })
   .post(
     "/v1/graph/edges",
     async ({ body, headers, request, status }) => {

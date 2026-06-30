@@ -56,6 +56,14 @@ export type OAuthConnection = {
   updatedAt?: string;
 };
 
+export type GraphExportResult = {
+  key: string;
+  bytes: number;
+  memoryCount: number;
+  edgeCount: number;
+  writtenToR2: boolean;
+};
+
 export type CreateMemoryInput = {
   content: string;
   tags?: string[];
@@ -140,6 +148,7 @@ export function createOpenMemoryClient(
       unwrap<{ clientId: string; revoked: boolean }>(
         client.v1.oauth.connections({ clientId }).delete(),
       ),
+    exportGraph: () => unwrap<GraphExportResult>(client.v1.exports.post()),
     ingest: (input: CreateMemoryInput) =>
       unwrap<IngestResult>(client.v1.ingest.post(input)),
     ingestSource: (input: SourceIngestInput) =>
@@ -196,6 +205,9 @@ type EdenClient = {
       } & ((params: { clientId: string }) => {
         delete(): EdenResult;
       });
+    };
+    exports: {
+      post(): EdenResult;
     };
     search: {
       post(input: { q: string; limit?: number }): EdenResult;

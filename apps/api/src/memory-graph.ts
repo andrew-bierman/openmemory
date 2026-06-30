@@ -378,6 +378,27 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     };
   }
 
+  async exportGraph() {
+    const memories = this.sqlState.storage.sql
+      .exec<MemoryRow>(`select * from memories order by created_at asc`)
+      .toArray()
+      .map(rowToMemory);
+    const edges = this.sqlState.storage.sql
+      .exec<EdgeRow>(
+        `select * from edges order by created_at asc, source_id asc, relationship asc`,
+      )
+      .toArray()
+      .map(rowToEdge);
+
+    return {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      stats: await this.getStats(),
+      memories,
+      edges,
+    };
+  }
+
   async linkRelatedMemories(id: string) {
     const memory = this.getMemoryById(id);
     if (!memory || memory.entityIds.length === 0) {

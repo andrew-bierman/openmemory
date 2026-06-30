@@ -31,6 +31,7 @@ The current alpha is a multi-user memory API that stores each user's evolving me
 - Profile and context assembly through `/v1/profile` and `/v1/context`.
 - Chunked source ingestion through `/v1/sources`, with source/chunk provenance metadata and graph edges between adjacent chunks.
 - Graph stats through `/v1/graph/stats` for local scale checks and UI inspection.
+- Tenant graph export through `/v1/exports`, writing JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - Native streamable HTTP MCP endpoint at `/mcp` with `remember`, `recall`, `forget`, and `profile` tools.
 - Authenticated OAuth connection listing and revocation for MCP clients through `/v1/oauth/connections`.
 - Minimal dashboard at `/` for local inspection and capture.
@@ -84,6 +85,7 @@ Useful endpoints:
 - `GET /v1/profile`
 - `GET /v1/graph/stats`
 - `GET /v1/graph/:id/neighbors`
+- `POST /v1/exports`
 - `GET /v1/oauth/connections`
 - `DELETE /v1/oauth/connections/:clientId`
 - `POST /mcp`
