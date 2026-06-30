@@ -156,30 +156,78 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
     expect(token.access_token).toBeTruthy();
     expect(token.token_type).toBe("Bearer");
 
-    const remember = await mcpCall(token.access_token, {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "tools/call",
-      params: {
-        name: "remember",
-        arguments: {
-          content: "Live E2E can write through MCP.",
-          tags: ["e2e"],
+    const rememberText = mcpText(
+      await mcpCall(token.access_token, {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: {
+          name: "remember",
+          arguments: {
+            content: "Live E2E can write through MCP.",
+            tags: ["e2e"],
+          },
         },
-      },
-    });
-    expect(JSON.stringify(remember)).toContain("Stored");
+      }),
+    );
+    expect(rememberText).toContain("Stored");
+    const rememberedId = rememberText.match(/Stored (mem_[^:]+):/)?.[1];
+    expect(rememberedId).toBeTruthy();
 
-    const recall = await mcpCall(token.access_token, {
-      jsonrpc: "2.0",
-      id: 2,
-      method: "tools/call",
-      params: {
-        name: "recall",
-        arguments: { query: "Live E2E MCP" },
-      },
-    });
-    expect(JSON.stringify(recall)).toContain("Live E2E");
+    const recallText = mcpText(
+      await mcpCall(token.access_token, {
+        jsonrpc: "2.0",
+        id: 2,
+        method: "tools/call",
+        params: {
+          name: "recall",
+          arguments: { query: "Live E2E MCP" },
+        },
+      }),
+    );
+    expect(recallText).toContain("Live E2E");
+
+    const profileText = mcpText(
+      await mcpCall(token.access_token, {
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: {
+          name: "profile",
+          arguments: {},
+        },
+      }),
+    );
+    expect(profileText).toContain("Live E2E can write through MCP.");
+
+    const forgetText = mcpText(
+      await mcpCall(token.access_token, {
+        jsonrpc: "2.0",
+        id: 4,
+        method: "tools/call",
+        params: {
+          name: "forget",
+          arguments: {
+            id: rememberedId,
+            reason: "live e2e cleanup",
+          },
+        },
+      }),
+    );
+    expect(forgetText).toContain(`Forgot ${rememberedId}`);
+
+    const afterForgetText = mcpText(
+      await mcpCall(token.access_token, {
+        jsonrpc: "2.0",
+        id: 5,
+        method: "tools/call",
+        params: {
+          name: "recall",
+          arguments: { query: "Live E2E MCP" },
+        },
+      }),
+    );
+    expect(afterForgetText).not.toContain("Live E2E can write through MCP.");
   }, 60_000);
 });
 
@@ -188,6 +236,13 @@ describe.skipIf(runLiveE2E)("live production e2e", () => {
     expect(runLiveE2E).toBe(false);
   });
 });
+
+function mcpText(response: unknown) {
+  const result = (response as { result?: unknown }).result;
+  const content = (result as { content?: Array<{ text?: string }> } | undefined)
+    ?.content;
+  return content?.map((item) => item.text ?? "").join("\n") ?? "";
+}
 
 function fetchLive(path: string, init?: RequestInit) {
   return fetch(`${baseUrl}${path}`, init);

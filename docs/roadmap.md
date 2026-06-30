@@ -12,7 +12,7 @@
 - `packages/ui` contains shadcn-style shared UI primitives.
 - `bun run check` passes across Biome, Turbo, TypeScript, Vitest, and Wrangler-backed API integration tests.
 - `bun run --cwd apps/web build` produces a production TanStack Start build.
-- CI and manual deploy workflows are defined in `.github/workflows`.
+- CI, manual deploy, and manual live-smoke workflows are defined in `.github/workflows`.
 - Cloudflare production resources are provisioned in the personal account:
   - D1 `openmemory-auth` bound as `AUTH_DB`
   - Vectorize `openmemory-vectors` bound as `MEMORY_VECTORS`
@@ -20,23 +20,25 @@
   - Worker secrets for `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
 - The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
 - Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
+- Opt-in production API E2E covers hosted UI response, Better Auth session, graph recall, OAuth PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
+- Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh, recall, and forget.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
 
-- Browser auth needs deeper product polish:
-  - deployed API routes reject header tenant mode
+- Browser auth and dashboard need deeper product polish:
+  - deployed API routes reject header tenant mode by design
   - local development still supports tenant headers for tests and fast iteration
-  - the TanStack app has session controls but still needs richer authenticated navigation
-- MCP OAuth is wired but not end-to-end tested with a real external MCP client registration and token exchange.
+  - the Worker-hosted dashboard is functional but minimal
+  - the TanStack app still needs richer authenticated navigation and deployment wiring
 - RAG quality is still basic:
   - no async ingestion pipeline
   - no entity extraction worker
   - no relationship extraction worker
   - no reranker
-  - no recall benchmarks
+- recall benchmark coverage exists, but not enough golden cases for shipping confidence at realistic scale
 - Graph performance has not been benchmarked against realistic memory volumes.
-- GitHub Actions are configured, and `CLOUDFLARE_ACCOUNT_ID` is set. Manual deploy still needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
+- GitHub Actions are configured. Cloudflare Git/Workers Builds should be the preferred deploy path; the manual GitHub deploy workflow remains a fallback and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
 - Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
 
 ## Next Implementation Tracks
@@ -46,20 +48,23 @@
    - Keep `x-openmemory-user-id` only for local development and tests.
 
 2. MCP production flow
-   - Require OAuth for deployed MCP.
-   - Test dynamic client registration, token exchange, JWKS verification, and scoped access.
+   - Add MCP client documentation and config snippets.
+   - Add external MCP client smoke with a real client once chosen.
+   - Add admin UI for OAuth client lifecycle.
 
 3. RAG pipeline
    - Add ingestion jobs for messages/documents.
    - Extract entities and relationships into the graph.
    - Store embeddings in Vectorize.
    - Combine vector candidates, graph neighbors, profile state, and recency.
-   - Add recall quality benchmarks.
+   - Expand recall quality benchmarks with MemoryBench-style fixtures.
 
 4. Web app expansion
    - Add authenticated navigation, memory detail, graph neighbors, profile editor, source ingestion, and MCP connection views.
-   - Add browser tests for critical flows.
+   - Expand browser tests for graph inspection, MCP setup, and account settings.
 
 5. CI and deployment
-   - Add a scoped `CLOUDFLARE_API_TOKEN` repository secret.
-   - Run the manual deploy workflow against the provisioned Cloudflare resources.
+   - Connect Cloudflare Git/Workers Builds to `main`.
+   - Keep GitHub CI as quality gate.
+   - Use the manual live-smoke workflow after deploys.
+   - Add a scoped `CLOUDFLARE_API_TOKEN` repository secret only if we keep the GitHub manual deploy fallback.

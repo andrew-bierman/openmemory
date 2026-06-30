@@ -1,0 +1,47 @@
+name: Live Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Deployed Worker URL to test
+        required: false
+        default: https://openmemory-api.abbierman101.workers.dev
+
+jobs:
+  live-smoke:
+    name: Production API and UI smoke
+    runs-on: ubuntu-latest
+    env:
+      OPENMEMORY_LIVE_BASE_URL: ${{ inputs.base_url }}
+      OPENMEMORY_LIVE_E2E: "true"
+      HAS_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      HAS_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+
+      - name: API live E2E
+        run: bun run --cwd apps/api test:live
+
+      - name: Hosted UI browser E2E
+        run: bun run test:e2e:ui
+
+      - name: Cleanup live smoke auth rows
+        if: always() && env.HAS_CLOUDFLARE_API_TOKEN == 'true' && env.HAS_CLOUDFLARE_ACCOUNT_ID == 'true'
+        run: |
+          bun --cwd apps/api wrangler d1 execute openmemory-auth --remote --config wrangler.jsonc --command "delete from oauth_client where name in ('OpenMemory Live E2E', 'OpenMemory Live Full Smoke'); delete from user where email like 'live-e2e-%@example.com' or email like 'live-full-%@example.com' or email like 'ui-e2e-%@example.com';"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

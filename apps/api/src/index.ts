@@ -510,7 +510,7 @@ const DASHBOARD_HTML = `<!doctype html>
     }
     async function refresh() {
       await loadSession();
-      const memories = await api('/v1/memories?includeHistorical=true');
+      const memories = await api('/v1/memories');
       document.querySelector("#memories").innerHTML = memories.map(renderMemory).join("") || '<div class="meta">No memories yet.</div>';
       const profile = await api('/v1/profile');
       document.querySelector("#profile").textContent = profile.summary;
