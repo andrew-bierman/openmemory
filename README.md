@@ -1,47 +1,86 @@
 # OpenMemory
 
-Open-source memory infrastructure for AI tools, built entirely on Cloudflare.
+OpenMemory is open-source memory infrastructure for AI tools and MCP clients.
+It gives each user a portable, graph-aware memory layer that can be shared
+across assistants, agents, apps, and chat surfaces.
 
-The current alpha is a multi-user memory API that stores each user's evolving memory graph in a SQLite-backed Durable Object, enriches recall with Vectorize and Workers AI when bindings are configured, exposes HTTP and Cloudflare-native MCP surfaces, and serves a small Worker-hosted dashboard.
+The project is intentionally Cloudflare-native: Workers for the API, Durable
+Objects with SQLite for per-user graph state, D1 for auth/control-plane data,
+Vectorize and Workers AI for semantic recall, R2 for exports, and Cloudflare's
+MCP runtime for tool access.
 
-## Stack
+> Status: alpha. The core memory API, graph store, OAuth-backed MCP endpoint,
+> recall flow, exports, repair path, dashboard, and local integration suite are
+> working. The product UI, async extraction pipeline, larger recall benchmarks,
+> and production telemetry are still active roadmap items.
 
-- Bun workspaces + Turborepo for the monorepo.
-- Cloudflare Workers + Elysia for the API, with Eden Treaty planned for typed clients.
-- `@openmemory/client` wraps Eden Treaty for typed API calls.
-- Durable Objects with SQLite for isolated per-user graph databases.
-- Drizzle ORM + Drizzle Kit for D1 auth/control-plane schema and migrations.
-- Vectorize + Workers AI for semantic recall.
-- Better Auth OAuth Provider for OAuth 2.1/OIDC discovery, dynamic client registration, and JWT/JWKS-backed resource tokens.
-- Cloudflare Agents `createMcpHandler` for streamable HTTP MCP.
-- Vitest for package and Wrangler-backed integration tests.
-- Cloudflare AI Search is tracked as an optional managed-search layer, not the core graph/RAG substrate.
-- R2 for future graph exports and backups.
-- Queues and Workflows for future ingestion/extraction pipelines.
-- TanStack Start web app in `apps/web`.
-- shadcn-style package layout with shared TypeScript config and `@openmemory/ui`.
+## Why OpenMemory
 
-## Alpha Capabilities
+AI memory should not be trapped inside one closed chat product. OpenMemory aims
+to provide the infrastructure layer behind a more portable experience:
 
-- Per-tenant memory graph isolation through Durable Object names.
-- Memory lifecycle fields: type, status, currentness, confidence, importance, validity window, supersession, tags, entities, and metadata.
-- Versioned updates through `PATCH /v1/memories/:id`; `updates` supersedes the old memory and creates a graph edge.
-- Soft forgetting through `DELETE /v1/memories/:id`.
-- Keyword recall with optional semantic candidate IDs from Vectorize when Workers AI and Vectorize are available.
-- Profile and context assembly through `/v1/profile` and `/v1/context`.
-- Chunked source ingestion through `/v1/sources`, with source/chunk provenance metadata and graph edges between adjacent chunks.
-- Graph stats through `/v1/graph/stats` for local scale checks and UI inspection.
-- Tenant graph export through `/v1/exports`, writing JSON backups to R2 when `MEMORY_EXPORTS` is configured.
-- Tenant Vectorize repair through `/v1/index/repair`, re-upserting active memories through the embedding/indexing path.
-- Native streamable HTTP MCP endpoint at `/mcp` with `remember`, `recall`, `forget`, and `profile` tools.
-- Authenticated OAuth connection listing and revocation for MCP clients through `/v1/oauth/connections`.
-- Minimal dashboard at `/` for local inspection and capture.
-- Better Auth routes at `/api/auth/*`, plus root OAuth/OIDC discovery at `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
-- Tenant headers are supported only for localhost development.
-- Deployed MCP requests use Better Auth OAuth bearer tokens; verified token subjects become the memory tenant.
-- Optional bearer-token auth through `OPENMEMORY_API_TOKEN` can be layered onto trusted service-to-service environments.
+- Store facts, preferences, decisions, profile details, source chunks, and
+  evolving context in a user-owned memory graph.
+- Recall useful context through keyword, graph, and semantic retrieval.
+- Let MCP-compatible tools read and write memory through OAuth-backed identity.
+- Keep the operational footprint small by using Cloudflare services end to end.
+- Make the implementation inspectable, testable, and self-hostable.
+
+## What Works Today
+
+- Multi-user memory isolation through Durable Object names.
+- SQLite-backed memory graph per tenant with nodes, edges, entities, metadata,
+  tags, confidence, importance, currentness, validity windows, and supersession.
+- Memory create, read, update, soft-forget, search, profile, context, graph
+  neighbors, graph stats, source ingestion, R2 export, and Vectorize repair APIs.
+- Chunked source/document ingestion with source and chunk provenance.
+- Deterministic recall reranking that combines retrieval score, reason,
+  confidence, importance, recency, and currentness.
+- Optional semantic candidate retrieval through Workers AI embeddings and
+  Cloudflare Vectorize.
+- Better Auth routes, OAuth 2.1/OIDC discovery, dynamic client registration,
+  JWT/JWKS-backed resource tokens, and optional GitHub/Google login providers.
+- Streamable HTTP MCP endpoint with `remember`, `recall`, `profile`, and
+  `forget` tools.
+- Authenticated OAuth/MCP connection listing and revocation.
+- Worker-hosted dashboard for capture, recall, forgetting, and local inspection.
+- TanStack Start web app scaffold with shared shadcn-style UI package.
+- Wrangler-backed integration tests and optional Docker reproduction.
+
+## Architecture
+
+```txt
+apps/web        TanStack Start app and richer product UI
+apps/api        Cloudflare Worker API, dashboard, Better Auth, MCP endpoint
+packages/client Eden Treaty client for typed API access
+packages/core   Shared memory, graph, recall, and auth domain logic
+packages/ui     shadcn-style shared UI primitives
+```
+
+Runtime services:
+
+- **Cloudflare Workers + Elysia**: HTTP API, dashboard, auth routes, and MCP
+  transport.
+- **Durable Objects + SQLite**: isolated per-user memory graph databases.
+- **D1 + Drizzle**: Better Auth and control-plane schema.
+- **Vectorize + Workers AI**: embedding generation and semantic retrieval.
+- **R2**: tenant graph exports and backup artifacts.
+- **Cloudflare Agents MCP**: streamable HTTP MCP surface.
+- **Queues/Workflows**: planned async ingestion and extraction pipeline.
+
+Cloudflare AI Search is tracked as an optional managed-search layer, not the
+core graph/RAG substrate.
 
 ## Quick Start
+
+Requirements:
+
+- Bun `>=1.3.14`
+- Node-compatible shell tooling
+- Wrangler auth for Cloudflare resource provisioning or deploys
+- Docker only if you want the clean container integration runner
+
+Install and run local development:
 
 ```sh
 bun install
@@ -49,18 +88,10 @@ bun run dev:api
 bun run dev:web
 ```
 
-Cloudflare setup:
+Set up Cloudflare resources in a fresh account:
 
 ```sh
 bun run setup:cloudflare
-```
-
-See `docs/deployment.md` for required Wrangler auth, resources, secrets, and the GitHub Actions deploy workflow.
-
-Current deployed API:
-
-```txt
-https://openmemory-api.abbierman101.workers.dev
 ```
 
 Database helpers:
@@ -70,6 +101,16 @@ bun run db:generate
 bun run db:migrate:local
 bun run db:migrate:remote
 ```
+
+Current deployed API:
+
+```txt
+https://openmemory-api.abbierman101.workers.dev
+```
+
+Deployment details live in [docs/deployment.md](docs/deployment.md).
+
+## API Surface
 
 Useful endpoints:
 
@@ -95,29 +136,66 @@ Useful endpoints:
 - `GET /.well-known/openid-configuration`
 - `/api/auth/*`
 
-During local development, pass `x-openmemory-user-id: local-user`. If `OPENMEMORY_API_TOKEN` is configured, also pass `Authorization: Bearer <token>`.
+During local development, pass `x-openmemory-user-id: local-user`. If
+`OPENMEMORY_API_TOKEN` is configured, also pass `Authorization: Bearer <token>`.
+Production rejects tenant headers by design and uses OAuth-backed identity.
 
-MCP requests should include:
+## MCP
+
+OpenMemory exposes a streamable HTTP MCP endpoint at:
+
+```txt
+https://openmemory-api.abbierman101.workers.dev/mcp
+```
+
+Requests should include:
 
 ```txt
 Accept: application/json, text/event-stream
 Content-Type: application/json
 ```
 
-## Verification
+See [docs/mcp.md](docs/mcp.md) for OAuth discovery, generic client
+configuration, local development, tools, and connection revocation.
+
+## Auth
+
+The Worker serves Better Auth at `/api/auth/*` and exposes OAuth/OIDC discovery
+from root well-known URLs. Production MCP and API access use OAuth bearer tokens;
+verified token subjects become memory tenants.
+
+Optional provider secrets enable social login:
+
+```sh
+bun --cwd apps/api wrangler secret put GITHUB_CLIENT_ID
+bun --cwd apps/api wrangler secret put GITHUB_CLIENT_SECRET
+bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_ID
+bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_SECRET
+```
+
+Auth storage uses `AUTH_DB` D1 through Drizzle when configured and falls back to
+an in-memory adapter for local tests and development.
+
+Note: `kysely@0.28.17` remains installed only as a Better Auth bundling
+compatibility dependency. OpenMemory's ORM path is Drizzle.
+
+## Testing
+
+OpenMemory follows the testing trophy: targeted unit coverage, heavier
+integration coverage around runtime boundaries, and end-to-end browser/API smoke
+for the deployed product.
 
 ```sh
 bun run check
 bun run build
-```
-
-Local integration tests:
-
-```sh
 bun run test:integration:local
 ```
 
-The integration tests start real local Wrangler Workers on randomized non-default ports, apply D1 migrations into isolated local persistence, and exercise Durable Objects, D1 auth storage, Better Auth sessions, OAuth metadata, MCP, graph edges, recall, and the dashboard. This keeps the high-value testing trophy layer local and credential-free while avoiding collisions with other agents or projects on the same machine.
+The local integration suite starts real Wrangler Workers on randomized
+non-default ports, applies D1 migrations into isolated local persistence, and
+exercises Durable Objects, D1 auth storage, Better Auth sessions, OAuth
+metadata, MCP, graph edges, recall, source ingestion, exports, index repair, and
+the dashboard.
 
 Optional clean container reproduction:
 
@@ -125,33 +203,41 @@ Optional clean container reproduction:
 bun run test:integration:docker
 ```
 
-The Docker path uses the pinned Bun image and runs the same local Wrangler integration suite in a clean Linux container. Docker is not required for normal CI because Wrangler/Miniflare already provides the local Cloudflare runtime.
+Optional live checks:
 
-## Auth Status
+```sh
+bun run --cwd apps/api test:live
+bun run test:e2e:ui
+```
 
-The alpha now wires Better Auth's OAuth Provider into the Worker:
+The live checks require a reachable deployment and any environment required by
+the target workflow.
 
-- `/api/auth/*` is served by Better Auth.
-- OAuth authorization-server metadata and OpenID discovery are exposed at the root well-known URLs.
-- The provider includes the required Better Auth JWT plugin, so resource-scoped access tokens can be verified through JWKS.
-- Dynamic client registration is enabled for MCP-compatible clients.
-- GitHub and Google login providers are enabled automatically when their client id/secret env vars are present.
-- Auth storage uses `AUTH_DB` D1 through Drizzle when that binding is configured, and falls back to an in-memory adapter for local tests and dev.
-- `/mcp` keeps the tenant-header flow on localhost only; deployed MCP requests require Better Auth OAuth bearer tokens.
-- HTTP API routes trust `x-openmemory-user-id` only on localhost. Deployed routes must use OAuth-backed identity.
+## Roadmap
 
-The personal Cloudflare deployment has D1 `AUTH_DB`, Vectorize, R2, Workers AI, `BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL` configured. Local tests intentionally avoid requiring those external Cloudflare resources.
+Current priorities:
 
-Note: `kysely@0.28.17` remains installed only as a Better Auth bundling compatibility dependency. OpenMemory's ORM path is Drizzle.
+- Polish authenticated product UI and account flows.
+- Move source/document ingestion to Queues and Workflows.
+- Add entity and relationship extraction workers.
+- Expand recall quality benchmarks with larger MemoryBench-style fixtures.
+- Add larger graph performance benchmarks and production telemetry.
+- Deepen MCP client compatibility testing with real external clients.
+- Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
 
-## Research And Planning
+See [docs/roadmap.md](docs/roadmap.md) for the current working baseline and
+remaining implementation tracks.
 
-- `docs/research/cloudflare-memory-stack.md`
-- `docs/research/cloudflare-rag-bottlenecks.md`
-- `docs/research/supermemory-feature-evaluation.md`
-- `docs/plans/testing-strategy.md`
-- `docs/mcp.md`
-- `docs/brainstorms/openmemory-requirements.md`
-- `docs/plans/openmemory-plan.md`
-- `docs/roadmap.md`
-- `docs/deployment.md`
+## Docs
+
+- [Deployment](docs/deployment.md)
+- [MCP setup](docs/mcp.md)
+- [Roadmap](docs/roadmap.md)
+- [Testing strategy](docs/plans/testing-strategy.md)
+- [Cloudflare memory stack research](docs/research/cloudflare-memory-stack.md)
+- [Cloudflare RAG bottlenecks](docs/research/cloudflare-rag-bottlenecks.md)
+- [Graph memory architecture](docs/research/graph-memory-architecture.md)
+- [Supermemory feature evaluation](docs/research/supermemory-feature-evaluation.md)
+- [Requirements brainstorm](docs/brainstorms/openmemory-requirements.md)
+- [Implementation plan](docs/plans/openmemory-plan.md)
+
