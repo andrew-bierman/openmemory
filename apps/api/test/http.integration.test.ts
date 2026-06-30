@@ -629,6 +629,24 @@ test("recall benchmark preserves ranking quality across direct and graph retriev
       tags: ["architecture"],
       importance: 0.8,
     }),
+    await createMemory(worker, tenant, {
+      content: "Nina prefers morning standups with written agendas.",
+      tags: ["people", "meetings"],
+      type: "preference",
+      importance: 0.82,
+    }),
+    await createMemory(worker, tenant, {
+      content: "The Hermes ingestion workflow exports graph backups to R2.",
+      tags: ["projects", "ingestion"],
+      type: "decision",
+      importance: 0.88,
+    }),
+    await createMemory(worker, tenant, {
+      content:
+        "OpenMemory source chunks preserve title and chunk index metadata.",
+      tags: ["docs", "sources"],
+      importance: 0.78,
+    }),
   ];
 
   await getJson<IngestResponse>(
@@ -650,11 +668,22 @@ test("recall benchmark preserves ranking quality across direct and graph retriev
     content: "The coffee machine requires descaling every Friday.",
     tags: ["ops"],
   });
+  await createMemory(worker, tenant, {
+    content: "Atlas coffee chat moved to Thursday.",
+    tags: ["distractor"],
+  });
+  await createMemory(worker, tenant, {
+    content: "Hermes courier schedule is unrelated to graph exports.",
+    tags: ["distractor"],
+  });
 
   const cases = [
     { query: "Maya TypeScript review preference", targetId: targets[0].id },
     { query: "Atlas launch moved day", targetId: targets[1].id },
     { query: "Boris retrieval", targetId: targets[2].id },
+    { query: "Nina standup agenda preference", targetId: targets[3].id },
+    { query: "Hermes graph backup export target", targetId: targets[4].id },
+    { query: "source chunk title index metadata", targetId: targets[5].id },
   ];
 
   const reciprocalRanks = await Promise.all(

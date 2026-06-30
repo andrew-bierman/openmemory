@@ -29,6 +29,7 @@
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
+- Local recall benchmark coverage includes multiple golden cases across people, decisions, preferences, source chunks, graph expansion, and distractors.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
@@ -43,7 +44,7 @@
   - no entity extraction worker
   - no relationship extraction worker
   - no LLM/ML reranker
-- recall benchmark coverage exists, but not enough golden cases for shipping confidence at realistic scale
+- recall benchmark coverage has useful golden cases, but still needs larger MemoryBench-style fixtures before public release confidence
 - Graph performance has a first moderate local smoke, but still needs larger volume benchmarks and production telemetry.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the preferred deploy path; the manual GitHub deploy workflow remains a fallback and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
 - Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
