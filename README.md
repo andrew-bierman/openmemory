@@ -99,7 +99,21 @@ bun run check
 bun run build
 ```
 
-The integration tests start Wrangler on randomized non-default ports with isolated local persistence so they do not collide with other agents or projects on the same machine.
+Local integration tests:
+
+```sh
+bun run test:integration:local
+```
+
+The integration tests start real local Wrangler Workers on randomized non-default ports, apply D1 migrations into isolated local persistence, and exercise Durable Objects, D1 auth storage, Better Auth sessions, OAuth metadata, MCP, graph edges, recall, and the dashboard. This keeps the high-value testing trophy layer local and credential-free while avoiding collisions with other agents or projects on the same machine.
+
+Optional clean container reproduction:
+
+```sh
+bun run test:integration:docker
+```
+
+The Docker path uses the pinned Bun image and runs the same local Wrangler integration suite in a clean Linux container. Docker is not required for normal CI because Wrangler/Miniflare already provides the local Cloudflare runtime.
 
 ## Auth Status
 

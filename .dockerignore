@@ -1,0 +1,9 @@
+.git
+.turbo
+.wrangler
+coverage
+dist
+node_modules
+playwright-report
+test-results
+*.log

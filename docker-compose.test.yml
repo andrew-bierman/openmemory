@@ -1,0 +1,10 @@
+services:
+  local-wrangler-integration:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    environment:
+      CI: "true"
+      NO_COLOR: "1"
+      WRANGLER_SEND_METRICS: "false"
+    command: bun run test:integration:local

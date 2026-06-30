@@ -84,6 +84,14 @@ bun run check
 bun run build
 ```
 
+CI also has an explicit local Wrangler integration job:
+
+```sh
+bun run test:integration:local
+```
+
+That job is credential-free. It starts Wrangler locally on randomized ports, applies D1 migrations to isolated local state, and exercises the Worker through HTTP against local Durable Object and D1 bindings.
+
 The manual `Live Smoke` workflow runs:
 
 ```sh
@@ -99,6 +107,16 @@ For optional live-smoke cleanup and the fallback manual deploy workflow, configu
 - `CLOUDFLARE_ACCOUNT_ID`
 
 The API token needs permission to operate D1 migrations and, for the fallback deploy workflow, deploy Workers for the target Cloudflare account.
+
+## Docker Test Runner
+
+For a clean Linux reproduction of the local Wrangler integration suite:
+
+```sh
+bun run test:integration:docker
+```
+
+This builds `Dockerfile.test` through `docker-compose.test.yml` and runs `bun run test:integration:local` inside the container. It is optional for developer machines and CI; use it when investigating host-specific failures or validating a clean environment.
 
 ## Deploy
 
