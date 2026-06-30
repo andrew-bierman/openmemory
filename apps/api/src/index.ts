@@ -747,10 +747,10 @@ const DASHBOARD_HTML = `<!doctype html>
       document.querySelector("#memories").innerHTML = memories.map(renderMemory).join("") || '<div class="meta">No memories yet.</div>';
       const profile = await api('/v1/profile');
       document.querySelector("#profile").textContent = profile.summary;
-      document.querySelectorAll("[data-forget]").forEach(button => button.onclick = async () => { await api('/v1/memories/' + button.dataset.forget, { method:'DELETE', body: JSON.stringify({ reason:'dashboard' }) }); await refresh(); });
     }
     document.querySelector("#remember").onsubmit = async (event) => { event.preventDefault(); await api('/v1/memories', { method:'POST', body: JSON.stringify({ content: content.value, type: type.value, tags: tags.value.split(',').map(t => t.trim()).filter(Boolean) }) }); content.value=''; await refresh(); };
     document.querySelector("#searchForm").onsubmit = async (event) => { event.preventDefault(); const data = await api('/v1/context', { method:'POST', body: JSON.stringify({ q: query.value, limit: 8 }) }); document.querySelector("#context").textContent = data.context; };
+    document.addEventListener("click", async (event) => { const button = event.target.closest("[data-forget]"); if (!button) return; await api('/v1/memories/' + button.dataset.forget, { method:'DELETE', body: JSON.stringify({ reason:'dashboard' }) }); await refresh(); });
     document.querySelector("#refresh").onclick = refresh;
     document.querySelector("#signOut").onclick = async () => { await fetch("/api/auth/sign-out", { method: "POST", credentials: "include" }); location.href = "/login"; };
     function escapeHtml(value) { return value.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }

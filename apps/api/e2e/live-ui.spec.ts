@@ -42,11 +42,19 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
   await page.getByRole("button", { name: "Search" }).click();
   await expect(page.locator("#context")).toContainText("Graph Indexing");
 
-  await page
-    .locator("#memories")
-    .getByRole("button", { name: "Forget" })
-    .first()
-    .click();
+  const [deleteResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/v1/memories/") &&
+        response.request().method() === "DELETE",
+    ),
+    page
+      .locator("#memories")
+      .getByRole("button", { name: "Forget" })
+      .first()
+      .click(),
+  ]);
+  expect(deleteResponse.ok()).toBe(true);
   await expect(page.locator("#memories")).not.toContainText(memory);
 
   expect(errors).toEqual([]);
