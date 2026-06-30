@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "wrangler dev --local",
+    "dev": "wrangler dev --local --port 54150",
     "dev:remote": "wrangler dev --remote",
     "deploy": "wrangler deploy",
     "check-types": "cd ../.. && node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit && node_modules/.bin/tsc -p apps/api/test/tsconfig.json --noEmit",

@@ -28,6 +28,13 @@ export const Route = createRoute({
   component: Home,
 });
 
+const VIEW_LABELS = {
+  recall: "Recall",
+  ingest: "Ingest",
+  graph: "Knowledge Map",
+  mcp: "MCP",
+} as const;
+
 function Home() {
   const [apiUrl, setApiUrl] = useLocalStorage(
     "openmemory:apiUrl",
@@ -75,6 +82,15 @@ function Home() {
         credentials: "include",
       }),
     [apiUrl, tenantId, token, usesLocalTenant],
+  );
+  const dashboardMetrics = useMemo(
+    () => getDashboardMetrics(memories, graphStats, oauthConnections),
+    [memories, graphStats, oauthConnections],
+  );
+  const recentActivity = useMemo(() => getRecentActivity(memories), [memories]);
+  const typeDistribution = useMemo(
+    () => getTypeDistribution(memories),
+    [memories],
   );
 
   const run = useCallback(async (action: () => Promise<void>) => {
@@ -237,8 +253,13 @@ function Home() {
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand">
-          <h1>OpenMemory</h1>
-          <p>Cloudflare-native graph memory for AI tools.</p>
+          <div className="brand-mark" aria-hidden="true">
+            OM
+          </div>
+          <div>
+            <h1>OpenMemory</h1>
+            <p>Hosted graph memory for AI tools.</p>
+          </div>
         </div>
 
         <div className="stack">
@@ -366,7 +387,31 @@ function Home() {
       </aside>
 
       <section className="content">
-        <div className="tabs">
+        <header className="hero-panel">
+          <div>
+            <p className="eyebrow">Cloudflare-native memory OS</p>
+            <h2>Graph-aware recall across every AI surface.</h2>
+            <p>
+              Capture durable context, inspect how memories connect, and expose
+              the same user-owned graph to MCP clients.
+            </p>
+          </div>
+          <div className="status-card">
+            <span>Runtime</span>
+            <strong>
+              {usesLocalTenant ? "Local worker" : "Hosted worker"}
+            </strong>
+            <small>{sessionUser ? sessionUser.email : tenantId}</small>
+          </div>
+        </header>
+
+        <DashboardOverview
+          metrics={dashboardMetrics}
+          recentActivity={recentActivity}
+          typeDistribution={typeDistribution}
+        />
+
+        <nav aria-label="Workspace views" className="tabs">
           {(["recall", "ingest", "graph", "mcp"] as const).map((item) => (
             <Button
               key={item}
@@ -374,10 +419,10 @@ function Home() {
               type="button"
               variant={view === item ? "default" : "outline"}
             >
-              {item}
+              {VIEW_LABELS[item]}
             </Button>
           ))}
-        </div>
+        </nav>
 
         <form className="toolbar" onSubmit={recall}>
           <input
@@ -425,6 +470,12 @@ function Home() {
             ) : view === "graph" ? (
               <div className="stack">
                 <GraphStatsPanel stats={graphStats} />
+                <KnowledgeMap
+                  memories={memories}
+                  neighbors={neighbors}
+                  onInspect={inspectMemory}
+                  selectedMemoryId={selectedMemory?.id ?? null}
+                />
                 <div className="row">
                   <Button
                     disabled={isLoading}
@@ -495,6 +546,87 @@ function Home() {
   );
 }
 
+function DashboardOverview({
+  metrics,
+  recentActivity,
+  typeDistribution,
+}: Readonly<{
+  metrics: DashboardMetrics;
+  recentActivity: ActivityPoint[];
+  typeDistribution: DistributionPoint[];
+}>) {
+  return (
+    <section className="overview-grid" aria-label="Memory overview">
+      <div className="metric-tile featured">
+        <span>Active memories</span>
+        <strong>{metrics.activeMemories}</strong>
+        <small>{metrics.totalMemories} total graph nodes</small>
+      </div>
+      <div className="metric-tile">
+        <span>Edges</span>
+        <strong>{metrics.totalEdges}</strong>
+        <small>{metrics.relationshipCount} relationship types</small>
+      </div>
+      <div className="metric-tile">
+        <span>Entities</span>
+        <strong>{metrics.entityCount}</strong>
+        <small>{metrics.tagCount} tags indexed</small>
+      </div>
+      <div className="metric-tile">
+        <span>MCP clients</span>
+        <strong>{metrics.oauthConnections}</strong>
+        <small>{metrics.recalledMemories} recalled in context</small>
+      </div>
+      <div className="chart-panel activity-panel">
+        <div className="panel-heading">
+          <span>Capture cadence</span>
+          <strong>Last 7 days</strong>
+        </div>
+        <div
+          aria-label="Memory capture activity"
+          className="bar-chart"
+          role="img"
+        >
+          {recentActivity.map((point) => (
+            <div className="bar-column" key={point.label}>
+              <div
+                className="bar-fill"
+                style={{ height: `${Math.max(8, point.percent)}%` }}
+                title={`${point.label}: ${point.count}`}
+              />
+              <span>{point.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="chart-panel type-panel">
+        <div className="panel-heading">
+          <span>Memory mix</span>
+          <strong>{typeDistribution.length} types</strong>
+        </div>
+        <div className="type-bars">
+          {typeDistribution.length === 0 ? (
+            <p className="muted">No typed memories yet.</p>
+          ) : (
+            typeDistribution.map((point) => (
+              <div className="type-row" key={point.label}>
+                <span>{point.label}</span>
+                <div className="type-track">
+                  <div
+                    className="type-fill"
+                    style={{ width: `${Math.max(4, point.percent)}%` }}
+                  />
+                </div>
+                <strong>{point.count}</strong>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function MemoryList({
   memories,
   onForget,
@@ -535,6 +667,79 @@ function MemoryList({
         </article>
       ))}
     </div>
+  );
+}
+
+function KnowledgeMap({
+  memories,
+  neighbors,
+  selectedMemoryId,
+  onInspect,
+}: Readonly<{
+  memories: Memory[];
+  neighbors: GraphEdge[];
+  selectedMemoryId: string | null;
+  onInspect: (id: string) => Promise<void>;
+}>) {
+  const graph = useMemo(
+    () => getKnowledgeMap(memories, neighbors, selectedMemoryId),
+    [memories, neighbors, selectedMemoryId],
+  );
+
+  if (graph.nodes.length === 0) {
+    return (
+      <div className="knowledge-map empty-map">
+        <p className="muted">Capture memories to build the knowledge map.</p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="knowledge-map" aria-label="Knowledge map">
+      <div className="panel-heading">
+        <span>Knowledge map</span>
+        <strong>{graph.nodes.length} nodes</strong>
+      </div>
+      <svg role="img" viewBox="0 0 720 360" aria-label="Memory graph map">
+        <title>Memory graph map</title>
+        {graph.links.map((link) => (
+          <line
+            className="graph-link"
+            key={`${link.source.id}:${link.target.id}:${link.relationship}`}
+            x1={link.source.x}
+            x2={link.target.x}
+            y1={link.source.y}
+            y2={link.target.y}
+          />
+        ))}
+        {graph.nodes.map((node) => (
+          <a
+            className="graph-node-group"
+            href={`#memory-${node.id}`}
+            key={node.id}
+            onClick={(event) => {
+              event.preventDefault();
+              void onInspect(node.id);
+            }}
+          >
+            <title>{node.title}</title>
+            <circle
+              className={node.isSelected ? "graph-node selected" : "graph-node"}
+              cx={node.x}
+              cy={node.y}
+              r={node.size}
+            />
+            <text x={node.x} y={node.y + node.size + 18}>
+              {node.label}
+            </text>
+          </a>
+        ))}
+      </svg>
+      <p className="muted">
+        Nodes are recent memories. Lines use explicit graph edges when a memory
+        is selected, then fall back to shared tags and entities.
+      </p>
+    </section>
   );
 }
 
@@ -699,6 +904,171 @@ function McpSetup({
   );
 }
 
+function getDashboardMetrics(
+  memories: Memory[],
+  graphStats: GraphStats | null,
+  oauthConnections: OAuthConnection[],
+): DashboardMetrics {
+  const activeMemories =
+    graphStats?.activeMemories ??
+    memories.filter((memory) => memory.status === "active").length;
+
+  return {
+    activeMemories,
+    totalMemories: graphStats?.totalMemories ?? memories.length,
+    totalEdges: graphStats?.totalEdges ?? 0,
+    relationshipCount: graphStats?.relationshipCount ?? 0,
+    entityCount:
+      graphStats?.entityCount ??
+      new Set(memories.flatMap((memory) => memory.entityIds)).size,
+    tagCount:
+      graphStats?.tagCount ??
+      new Set(memories.flatMap((memory) => memory.tags)).size,
+    oauthConnections: oauthConnections.length,
+    recalledMemories: memories.filter((memory) => memory.isLatest).length,
+  };
+}
+
+function getRecentActivity(memories: Memory[]): ActivityPoint[] {
+  const now = new Date();
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(now);
+    date.setDate(now.getDate() - (6 - index));
+    return {
+      key: date.toISOString().slice(0, 10),
+      label: date
+        .toLocaleDateString(undefined, { weekday: "short" })
+        .slice(0, 3),
+      count: 0,
+      percent: 0,
+    };
+  });
+  const dayByKey = new Map(days.map((day) => [day.key, day]));
+
+  for (const memory of memories) {
+    const key = new Date(memory.createdAt).toISOString().slice(0, 10);
+    const day = dayByKey.get(key);
+    if (day) {
+      day.count += 1;
+    }
+  }
+
+  const max = Math.max(1, ...days.map((day) => day.count));
+  return days.map((day) => ({
+    ...day,
+    percent: Math.round((day.count / max) * 100),
+  }));
+}
+
+function getTypeDistribution(memories: Memory[]): DistributionPoint[] {
+  const counts = new Map<string, number>();
+  for (const memory of memories) {
+    counts.set(memory.type, (counts.get(memory.type) ?? 0) + 1);
+  }
+  const max = Math.max(1, ...counts.values());
+
+  return Array.from(counts, ([label, count]) => ({
+    label,
+    count,
+    percent: Math.round((count / max) * 100),
+  })).sort(
+    (left, right) =>
+      right.count - left.count || left.label.localeCompare(right.label),
+  );
+}
+
+function getKnowledgeMap(
+  memories: Memory[],
+  neighbors: GraphEdge[],
+  selectedMemoryId: string | null,
+): KnowledgeGraph {
+  const visibleMemories = memories
+    .filter((memory) => memory.status !== "forgotten")
+    .slice()
+    .sort(
+      (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
+    )
+    .slice(0, 18);
+  const selectedMemory = selectedMemoryId
+    ? memories.find((memory) => memory.id === selectedMemoryId)
+    : null;
+
+  if (
+    selectedMemory &&
+    !visibleMemories.some((memory) => memory.id === selectedMemory.id)
+  ) {
+    visibleMemories.unshift(selectedMemory);
+  }
+
+  const centerX = 360;
+  const centerY = 178;
+  const radiusX = 260;
+  const radiusY = 112;
+  const nodes = visibleMemories.map((memory, index) => {
+    const angle =
+      (index / Math.max(1, visibleMemories.length)) * Math.PI * 2 - Math.PI / 2;
+    const isSelected = memory.id === selectedMemoryId;
+    return {
+      id: memory.id,
+      label: getMemoryLabel(memory),
+      title: memory.content,
+      x: Math.round(centerX + Math.cos(angle) * radiusX),
+      y: Math.round(centerY + Math.sin(angle) * radiusY),
+      size: isSelected
+        ? 13
+        : Math.min(10, 6 + memory.tags.length + memory.entityIds.length),
+      isSelected,
+      memory,
+    };
+  });
+  const nodeById = new Map(nodes.map((node) => [node.id, node]));
+  const links: KnowledgeLink[] = [];
+  const linkKeys = new Set<string>();
+
+  for (const edge of neighbors) {
+    const source = nodeById.get(edge.sourceId);
+    const target = nodeById.get(edge.targetId);
+    if (source && target) {
+      const key = [source.id, target.id, edge.relationship].join(":");
+      linkKeys.add(key);
+      links.push({ source, target, relationship: edge.relationship });
+    }
+  }
+
+  for (let index = 0; index < nodes.length; index += 1) {
+    const source = nodes[index];
+    for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
+      const target = nodes[nextIndex];
+      if (!sharesMemorySignal(source.memory, target.memory)) {
+        continue;
+      }
+      const key = [source.id, target.id, "shared-signal"].join(":");
+      if (!linkKeys.has(key) && links.length < 34) {
+        linkKeys.add(key);
+        links.push({ source, target, relationship: "shared-signal" });
+      }
+    }
+  }
+
+  return { nodes, links };
+}
+
+function sharesMemorySignal(left: Memory, right: Memory) {
+  const leftSignals = new Set([...left.tags, ...left.entityIds, left.type]);
+  return [...right.tags, ...right.entityIds, right.type].some((signal) =>
+    leftSignals.has(signal),
+  );
+}
+
+function getMemoryLabel(memory: Memory) {
+  const clean = memory.content.replace(/\s+/g, " ").trim();
+  if (clean.length <= 18) {
+    return clean;
+  }
+
+  return `${clean.slice(0, 17)}...`;
+}
+
 function useLocalStorage(key: string, initialValue: string) {
   const [value, setValue] = useState(() => {
     if (typeof window === "undefined") {
@@ -772,4 +1142,50 @@ type AuthUser = {
   id: string;
   email: string;
   name?: string;
+};
+
+type DashboardMetrics = {
+  activeMemories: number;
+  totalMemories: number;
+  totalEdges: number;
+  relationshipCount: number;
+  entityCount: number;
+  tagCount: number;
+  oauthConnections: number;
+  recalledMemories: number;
+};
+
+type ActivityPoint = {
+  key: string;
+  label: string;
+  count: number;
+  percent: number;
+};
+
+type DistributionPoint = {
+  label: string;
+  count: number;
+  percent: number;
+};
+
+type KnowledgeNode = {
+  id: string;
+  label: string;
+  title: string;
+  x: number;
+  y: number;
+  size: number;
+  isSelected: boolean;
+  memory: Memory;
+};
+
+type KnowledgeLink = {
+  source: KnowledgeNode;
+  target: KnowledgeNode;
+  relationship: string;
+};
+
+type KnowledgeGraph = {
+  nodes: KnowledgeNode[];
+  links: KnowledgeLink[];
 };

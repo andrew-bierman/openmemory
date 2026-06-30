@@ -20,6 +20,7 @@
   - Worker secrets for `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
 - The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
 - Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
+- `apps/web` now has a polished hosted-dashboard direction with memory health metrics, capture cadence charts, memory-type distribution, and an Obsidian-style knowledge map over graph-shaped memory data.
 - Opt-in production API E2E covers hosted UI response, Better Auth session, graph recall, OAuth PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh, recall, and forget.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
@@ -69,6 +70,10 @@
 
 4. Web app expansion
    - Add authenticated navigation, memory detail, graph neighbors, profile editor, source ingestion, and MCP connection views.
+   - Evolve the hosted TanStack Start UI into the primary OpenMemory product surface.
+   - Keep the visual direction closer to a native Apple/SwiftUI utility: calm translucent surfaces, dense controls, strong hierarchy, and premium motion.
+   - Expand charts for recall quality, memory growth, stale/superseded memories, indexing health, and MCP usage.
+   - Replace the first-pass SVG knowledge map with an interactive graph canvas when graph size and layout requirements justify it.
    - Expand browser tests for graph inspection, MCP connection revocation, and account settings.
 
 5. CI and deployment

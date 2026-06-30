@@ -44,7 +44,9 @@ to provide the infrastructure layer behind a more portable experience:
   `forget` tools.
 - Authenticated OAuth/MCP connection listing and revocation.
 - Worker-hosted dashboard for capture, recall, forgetting, and local inspection.
-- TanStack Start web app scaffold with shared shadcn-style UI package.
+- TanStack Start web app with a polished hosted-dashboard direction, shared
+  shadcn-style UI package, memory health metrics, charts, and an Obsidian-style
+  knowledge map.
 - Wrangler-backed integration tests and optional Docker reproduction.
 
 ## Architecture
@@ -218,6 +220,9 @@ the target workflow.
 Current priorities:
 
 - Polish authenticated product UI and account flows.
+- Evolve the hosted TanStack Start app into the primary OpenMemory product UI.
+- Expand charts and the knowledge map for graph health, recall quality, index
+  freshness, and MCP usage.
 - Move source/document ingestion to Queues and Workflows.
 - Add entity and relationship extraction workers.
 - Expand recall quality benchmarks with larger MemoryBench-style fixtures.
@@ -240,4 +245,3 @@ remaining implementation tracks.
 - [Supermemory feature evaluation](docs/research/supermemory-feature-evaluation.md)
 - [Requirements brainstorm](docs/brainstorms/openmemory-requirements.md)
 - [Implementation plan](docs/plans/openmemory-plan.md)
-
