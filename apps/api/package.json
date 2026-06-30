@@ -11,7 +11,8 @@
     "dev:remote": "wrangler dev --remote",
     "deploy": "wrangler deploy",
     "check-types": "cd ../.. && node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit && node_modules/.bin/tsc -p apps/api/test/tsconfig.json --noEmit",
-    "test": "vitest run test"
+    "test": "vitest run test",
+    "test:live": "OPENMEMORY_LIVE_E2E=true vitest run test/live.e2e.test.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.6.14",

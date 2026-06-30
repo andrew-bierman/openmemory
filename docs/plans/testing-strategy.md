@@ -85,6 +85,14 @@ Scope:
 
 Use Playwright or the Codex Browser plugin once the web app exists. These tests should still use explicit non-default ports.
 
+Command for the opt-in live production smoke:
+
+```sh
+bun run --cwd apps/api test:live
+```
+
+This uses `OPENMEMORY_LIVE_BASE_URL` when provided and otherwise targets the deployed Workers URL. It is intentionally excluded from default `bun run check` runs because it creates real remote auth and memory state.
+
 ## Required Regression Fixtures
 
 - Tenant A cannot read Tenant B memories.
@@ -102,10 +110,13 @@ Use Playwright or the Codex Browser plugin once the web app exists. These tests 
 
 - Core schema/unit tests in `packages/core/src/index.test.ts`.
 - Worker integration test in `apps/api/test/http.integration.test.ts`.
+- Client request contract tests in `packages/client/src/index.test.ts`.
+- Opt-in production E2E smoke in `apps/api/test/live.e2e.test.ts`.
 
 ## Next Coverage Work
 
 - Add Cloudflare Vitest worker-pool tests if we need direct Durable Object method tests without HTTP.
 - Add pure retrieval module tests before implementing graph expansion/reranking.
 - Add MemoryBench provider once graph-aware recall is available.
-- Add MCP protocol tests before exposing remote MCP publicly.
+- Add browser-level Web UI E2E for sign-in, ingest, recall, graph inspection, and MCP setup.
+- Add provider contract tests for Workers AI and Vectorize with explicit remote opt-in.
