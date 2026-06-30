@@ -4,4 +4,6 @@ node_modules
 .dev.vars
 dist
 coverage
+playwright-report
+test-results
 *.log

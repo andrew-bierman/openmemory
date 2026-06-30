@@ -91,6 +91,12 @@ Command for the opt-in live production smoke:
 bun run --cwd apps/api test:live
 ```
 
+Command for opt-in hosted UI browser E2E:
+
+```sh
+bun run test:e2e:ui
+```
+
 This uses `OPENMEMORY_LIVE_BASE_URL` when provided and otherwise targets the deployed Workers URL. It is intentionally excluded from default `bun run check` runs because it creates real remote auth and memory state.
 
 ## Required Regression Fixtures
@@ -112,11 +118,12 @@ This uses `OPENMEMORY_LIVE_BASE_URL` when provided and otherwise targets the dep
 - Worker integration test in `apps/api/test/http.integration.test.ts`.
 - Client request contract tests in `packages/client/src/index.test.ts`.
 - Opt-in production E2E smoke in `apps/api/test/live.e2e.test.ts`.
+- Opt-in hosted UI browser E2E in `apps/api/e2e/live-ui.spec.ts`.
+- Workers AI / Vectorize binding contract tests in `apps/api/test/semantic-index.test.ts`.
 
 ## Next Coverage Work
 
 - Add Cloudflare Vitest worker-pool tests if we need direct Durable Object method tests without HTTP.
-- Add pure retrieval module tests before implementing graph expansion/reranking.
 - Add MemoryBench provider once graph-aware recall is available.
-- Add browser-level Web UI E2E for sign-in, ingest, recall, graph inspection, and MCP setup.
-- Add provider contract tests for Workers AI and Vectorize with explicit remote opt-in.
+- Expand browser-level Web UI E2E for ingest, graph inspection, and MCP setup.
+- Add remote provider smoke tests for Workers AI and Vectorize with explicit opt-in.

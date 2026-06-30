@@ -19,10 +19,12 @@
     "check": "biome check . && turbo run check-types test",
     "check-types": "turbo run check-types",
     "format": "biome check --write .",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "test:e2e:ui": "OPENMEMORY_LIVE_E2E=true playwright test -c playwright.config.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",
+    "@playwright/test": "^1.57.0",
     "drizzle-kit": "^0.31.10",
     "turbo": "^2.9.16",
     "typescript": "^5.9.2",

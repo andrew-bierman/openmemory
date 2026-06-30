@@ -20,6 +20,8 @@ import { handleOpenMemoryAuthRequest, isAuthRoute } from "./better-auth";
 import type { Env } from "./env";
 import { createOpenMemoryMcpHandler } from "./mcp";
 import { MemoryGraph } from "./memory-graph";
+import { enrichMemoryInput } from "./memory-signals";
+import { indexMemory, semanticSearch } from "./semantic-index";
 
 export { MemoryGraph };
 
@@ -417,200 +419,6 @@ function corsHeaders(request: Request) {
   });
 }
 
-function enrichMemoryInput<
-  T extends {
-    content?: string;
-    tags?: string[];
-    metadata?: Record<string, unknown>;
-    entityIds?: string[];
-  },
->(input: T) {
-  if (!input.content) {
-    return input;
-  }
-
-  const extracted = extractMemorySignals(input.content);
-  return {
-    ...input,
-    tags: mergeUnique([...(input.tags ?? []), ...extracted.tags]),
-    entityIds: mergeUnique([
-      ...(input.entityIds ?? []),
-      ...extracted.entityIds,
-    ]),
-    metadata: {
-      ...(input.metadata ?? {}),
-      extraction: {
-        strategy: "deterministic-v1",
-        entityIds: extracted.entityIds,
-        tags: extracted.tags,
-      },
-    },
-  };
-}
-
-function extractMemorySignals(content: string) {
-  const entityIds = new Set<string>();
-  const tags = new Set<string>();
-
-  for (const match of content.matchAll(
-    /\b[A-Z][a-z0-9]+(?:\s+[A-Z][a-z0-9]+){0,3}\b/g,
-  )) {
-    const value = match[0].trim();
-    if (value.length >= 3 && !COMMON_TITLE_WORDS.has(value)) {
-      entityIds.add(entityId(value));
-    }
-  }
-
-  for (const match of content.matchAll(/\b[A-Z]{2,}\b/g)) {
-    entityIds.add(entityId(match[0]));
-  }
-
-  for (const match of content.matchAll(/#([a-zA-Z0-9_-]{2,40})/g)) {
-    tags.add(match[1].toLowerCase());
-  }
-
-  for (const term of tokenizeContent(content)) {
-    if (DOMAIN_TAGS.has(term)) {
-      tags.add(term);
-    }
-  }
-
-  return {
-    entityIds: [...entityIds].slice(0, 30),
-    tags: [...tags].slice(0, 20),
-  };
-}
-
-function mergeUnique(values: string[]) {
-  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
-}
-
-function entityId(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 160);
-}
-
-function tokenizeContent(content: string) {
-  return content
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(Boolean);
-}
-
-const COMMON_TITLE_WORDS = new Set([
-  "The",
-  "This",
-  "That",
-  "When",
-  "Where",
-  "OpenMemory",
-]);
-
-const DOMAIN_TAGS = new Set([
-  "api",
-  "auth",
-  "cloudflare",
-  "durable",
-  "graph",
-  "mcp",
-  "memory",
-  "oauth",
-  "rag",
-  "vectorize",
-]);
-
-async function indexMemory(env: Env, tenantId: string, memory: unknown) {
-  if (!isMemoryForIndex(memory)) {
-    return;
-  }
-
-  try {
-    if (!env.AI || !env.MEMORY_VECTORS) {
-      return;
-    }
-
-    const embedding = await embed(env, memory.content);
-    if (!embedding) {
-      return;
-    }
-
-    await env.MEMORY_VECTORS.upsert([
-      {
-        id: `${tenantId}:${memory.id}`,
-        values: embedding,
-        metadata: {
-          tenantId,
-          memoryId: memory.id,
-          source: memory.source,
-          tags: memory.tags,
-          status: memory.status,
-          isLatest: memory.isLatest,
-        },
-      },
-    ]);
-  } catch {
-    // Local Wrangler cannot emulate AI/Vectorize bindings. The graph write is canonical.
-  }
-}
-
-async function semanticSearch(
-  env: Env,
-  tenantId: string,
-  q: string,
-  limit: number,
-) {
-  try {
-    if (!env.AI || !env.MEMORY_VECTORS) {
-      return [];
-    }
-
-    const embedding = await embed(env, q);
-    if (!embedding) {
-      return [];
-    }
-
-    const matches = await env.MEMORY_VECTORS.query(embedding, {
-      topK: Math.min(limit * 3, 50),
-      filter: { tenantId, status: "active", isLatest: true },
-      returnMetadata: true,
-    });
-
-    return matches.matches
-      .map((match) => match.metadata?.memoryId)
-      .filter((id): id is string => typeof id === "string");
-  } catch {
-    return [];
-  }
-}
-
-async function embed(env: Env, text: string) {
-  const response = await env.AI?.run(env.EMBEDDING_MODEL, { text });
-  const data = response as { data?: number[][] };
-  return data.data?.[0];
-}
-
-function isMemoryForIndex(value: unknown): value is {
-  id: string;
-  content: string;
-  source: string;
-  tags: string[];
-  status: string;
-  isLatest: boolean;
-} {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "id" in value &&
-    "content" in value &&
-    "source" in value &&
-    "tags" in value
-  );
-}
-
 const PAGE_STYLE = `
   :root { color-scheme: light; --bg:#f6f7f9; --panel:#ffffff; --ink:#18212f; --muted:#627085; --line:#dfe5ee; --accent:#0f766e; --danger:#991b1b; }
   * { box-sizing: border-box; }
@@ -655,7 +463,7 @@ const DASHBOARD_HTML = `<!doctype html>
 <body>
   <header>
     <h1>OpenMemory</h1>
-    <div class="row"><span class="meta" id="session"></span><a href="/login"><button class="ghost">Account</button></a><button id="signOut" class="secondary">Sign out</button></div>
+    <div class="row"><span class="meta" id="session"></span><button id="refresh" class="ghost">Refresh</button><a href="/login"><button class="ghost">Account</button></a><button id="signOut" class="secondary">Sign out</button></div>
   </header>
   <main class="app-shell">
     <aside>
