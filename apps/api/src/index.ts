@@ -2,7 +2,9 @@ import { env as workerEnv } from "cloudflare:workers";
 import {
   ContextSchema,
   CreateMemorySchema,
+  createSourceId,
   ForgetMemorySchema,
+  IngestSourceSchema,
   SearchSchema,
   UpdateMemorySchema,
 } from "@openmemory/core";
@@ -97,6 +99,18 @@ const contextBody = t.Object({
   limit: t.Optional(t.Number({ minimum: 1, maximum: 30 })),
   includeProfile: t.Optional(t.Boolean()),
   includeHistorical: t.Optional(t.Boolean()),
+});
+
+const sourceBody = t.Object({
+  content: t.String({ minLength: 1, maxLength: 500_000 }),
+  source: t.Optional(t.String({ minLength: 1, maxLength: 120 })),
+  title: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
+  tags: t.Optional(
+    t.Array(t.String({ minLength: 1, maxLength: 80 }), { maxItems: 50 }),
+  ),
+  metadata: t.Optional(t.Record(t.String(), t.Unknown())),
+  chunkSize: t.Optional(t.Number({ minimum: 400, maximum: 4_000 })),
+  overlap: t.Optional(t.Number({ minimum: 0, maximum: 800 })),
 });
 
 async function withTenant(request: Request, headers: HeaderSource) {
@@ -222,6 +236,96 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       return status(201, { memory, edges });
     },
     { body: memoryBody },
+  )
+  .post(
+    "/v1/sources",
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+
+      const input = IngestSourceSchema.parse({
+        source: "document",
+        tags: [],
+        metadata: {},
+        ...body,
+      });
+      const sourceId = createSourceId();
+      const chunks = chunkSourceContent(input.content, {
+        chunkSize: input.chunkSize,
+        overlap: input.overlap,
+      });
+      const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+      const memories = [];
+      const edges = [];
+
+      for (const chunk of chunks) {
+        const memory = await graph.createMemory(
+          CreateMemorySchema.parse(
+            enrichMemoryInput({
+              content: chunk.content,
+              source: input.source,
+              tags: input.tags,
+              metadata: {
+                ...input.metadata,
+                sourceId,
+                title: input.title,
+                chunkIndex: chunk.index,
+                chunkCount: chunks.length,
+                chunkStart: chunk.start,
+                chunkEnd: chunk.end,
+                ingestion: {
+                  strategy: "chunked-source-v1",
+                  chunkSize: input.chunkSize,
+                  overlap: input.overlap,
+                },
+              },
+              type: "insight",
+            }),
+          ),
+        );
+        await indexMemory(env, tenantId, memory);
+        memories.push(memory);
+        edges.push(...(await graph.linkRelatedMemories(memory.id)));
+
+        const previous = memories.at(-2);
+        if (previous) {
+          edges.push(
+            await graph.addEdge({
+              sourceId: previous.id,
+              targetId: memory.id,
+              relationship: "next_chunk",
+              weight: 0.9,
+              metadata: {
+                sourceId,
+                createdBy: "ingestSource",
+              },
+            }),
+          );
+          edges.push(
+            await graph.addEdge({
+              sourceId: memory.id,
+              targetId: previous.id,
+              relationship: "previous_chunk",
+              weight: 0.9,
+              metadata: {
+                sourceId,
+                createdBy: "ingestSource",
+              },
+            }),
+          );
+        }
+      }
+
+      return status(201, {
+        sourceId,
+        chunkCount: memories.length,
+        memories,
+        edges,
+      });
+    },
+    { body: sourceBody },
   )
   .get("/v1/memories", async ({ headers, query, request, status }) => {
     const { tenant, graph } = await withTenant(request, headers);
@@ -417,6 +521,64 @@ function corsHeaders(request: Request) {
     "access-control-allow-origin": origin,
     vary: "Origin",
   });
+}
+
+function chunkSourceContent(
+  content: string,
+  options: { chunkSize: number; overlap: number },
+) {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (normalized.length <= options.chunkSize) {
+    return [
+      {
+        content: normalized,
+        index: 0,
+        start: 0,
+        end: normalized.length,
+      },
+    ];
+  }
+
+  const chunks: Array<{
+    content: string;
+    index: number;
+    start: number;
+    end: number;
+  }> = [];
+  const step = Math.max(1, options.chunkSize - options.overlap);
+  let start = 0;
+
+  while (start < normalized.length) {
+    const hardEnd = Math.min(start + options.chunkSize, normalized.length);
+    const end =
+      hardEnd === normalized.length
+        ? hardEnd
+        : findChunkBoundary(normalized, start, hardEnd);
+    chunks.push({
+      content: normalized.slice(start, end).trim(),
+      index: chunks.length,
+      start,
+      end,
+    });
+
+    if (end === normalized.length) {
+      break;
+    }
+
+    start = Math.max(end - options.overlap, start + step);
+  }
+
+  return chunks.filter((chunk) => chunk.content.length > 0);
+}
+
+function findChunkBoundary(content: string, start: number, hardEnd: number) {
+  const minEnd = start + Math.floor((hardEnd - start) * 0.65);
+  const candidate = Math.max(
+    content.lastIndexOf(". ", hardEnd),
+    content.lastIndexOf("\n", hardEnd),
+    content.lastIndexOf(" ", hardEnd),
+  );
+  return candidate > minEnd ? candidate + 1 : hardEnd;
 }
 
 const PAGE_STYLE = `

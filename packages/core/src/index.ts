@@ -72,12 +72,23 @@ export const ContextSchema = z.object({
   includeHistorical: z.boolean().default(false),
 });
 
+export const IngestSourceSchema = z.object({
+  content: z.string().min(1).max(500_000),
+  source: z.string().min(1).max(120).default("document"),
+  title: z.string().min(1).max(200).optional(),
+  tags: z.array(z.string().min(1).max(80)).max(50).default([]),
+  metadata: MemoryMetadataSchema,
+  chunkSize: z.number().int().min(400).max(4_000).default(1_600),
+  overlap: z.number().int().min(0).max(800).default(180),
+});
+
 export type CreateMemoryInput = z.infer<typeof CreateMemorySchema>;
 export type SearchInput = z.infer<typeof SearchSchema>;
 export type GraphEdgeInput = z.infer<typeof GraphEdgeSchema>;
 export type UpdateMemoryInput = z.infer<typeof UpdateMemorySchema>;
 export type ForgetMemoryInput = z.infer<typeof ForgetMemorySchema>;
 export type ContextInput = z.infer<typeof ContextSchema>;
+export type IngestSourceInput = z.infer<typeof IngestSourceSchema>;
 export type MemoryType = z.infer<typeof MemoryTypeSchema>;
 export type MemoryStatus = z.infer<typeof MemoryStatusSchema>;
 
@@ -109,6 +120,7 @@ export type SearchResult = MemoryRecord & {
 };
 
 export const createMemoryId = () => `mem_${crypto.randomUUID()}`;
+export const createSourceId = () => `src_${crypto.randomUUID()}`;
 
 export const normalizeTenantId = (value: string) =>
   value

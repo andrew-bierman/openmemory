@@ -46,6 +46,20 @@ export type IngestResult = {
   edges: GraphEdge[];
 };
 
+export type SourceIngestInput = CreateMemoryInput & {
+  title?: string;
+  metadata?: Record<string, unknown>;
+  chunkSize?: number;
+  overlap?: number;
+};
+
+export type SourceIngestResult = {
+  sourceId: string;
+  chunkCount: number;
+  memories: Memory[];
+  edges: GraphEdge[];
+};
+
 export type OpenMemoryClientOptions = {
   tenantId?: string;
   token?: string;
@@ -99,6 +113,8 @@ export function createOpenMemoryClient(
       unwrap<GraphEdge[]>(client.v1.graph({ id }).neighbors.get()),
     ingest: (input: CreateMemoryInput) =>
       unwrap<IngestResult>(client.v1.ingest.post(input)),
+    ingestSource: (input: SourceIngestInput) =>
+      unwrap<SourceIngestResult>(client.v1.sources.post(input)),
     getContext: (q: string) =>
       unwrap<ContextResult>(
         client.v1.context.post({ q, limit: 8, includeProfile: true }),
@@ -131,6 +147,9 @@ type EdenClient = {
     });
     ingest: {
       post(input: CreateMemoryInput): EdenResult;
+    };
+    sources: {
+      post(input: SourceIngestInput): EdenResult;
     };
     context: {
       post(input: {

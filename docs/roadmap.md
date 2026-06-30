@@ -22,6 +22,7 @@
 - Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
 - Opt-in production API E2E covers hosted UI response, Better Auth session, graph recall, OAuth PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh, recall, and forget.
+- `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
@@ -32,7 +33,7 @@
   - the Worker-hosted dashboard is functional but minimal
   - the TanStack app still needs richer authenticated navigation and deployment wiring
 - RAG quality is still basic:
-  - no async ingestion pipeline
+  - source/document ingestion is synchronous rather than Queue/Workflow-backed
   - no entity extraction worker
   - no relationship extraction worker
   - no reranker
@@ -53,9 +54,9 @@
    - Add admin UI for OAuth client lifecycle.
 
 3. RAG pipeline
-   - Add ingestion jobs for messages/documents.
-   - Extract entities and relationships into the graph.
-   - Store embeddings in Vectorize.
+   - Move source/document ingestion onto Queues and Workflows.
+   - Extract richer entities and relationships into the graph.
+   - Store embeddings in Vectorize for every chunk and repair stale indexes.
    - Combine vector candidates, graph neighbors, profile state, and recency.
    - Expand recall quality benchmarks with MemoryBench-style fixtures.
 

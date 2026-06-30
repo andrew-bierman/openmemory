@@ -122,7 +122,7 @@ function Home() {
   async function ingest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await run(async () => {
-      const result = await api.ingest({
+      const result = await api.ingestSource({
         content: ingestContent,
         source: ingestSource,
         tags: tags
@@ -131,7 +131,7 @@ function Home() {
           .filter(Boolean),
       });
       setIngestContent("");
-      setSelectedMemory(result.memory);
+      setSelectedMemory(result.memories[0] ?? null);
       setNeighbors(result.edges);
       setView("graph");
       await refresh();

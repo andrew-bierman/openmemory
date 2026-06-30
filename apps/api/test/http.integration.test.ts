@@ -476,6 +476,76 @@ test("ingestion extracts entities, links graph neighbors, and improves recall", 
   );
 }, 45_000);
 
+test("source ingestion chunks documents, preserves provenance, and links chunk graph", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-source-${crypto.randomUUID()}`;
+  const anchor = await createMemory(worker, tenant, {
+    content: "Boris maintains Graph Indexing for OpenMemory retrieval.",
+    tags: ["architecture"],
+  });
+
+  const source = await getJson<SourceIngestResponse>(
+    await worker.fetch("/v1/sources", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenant),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "OpenMemory architecture notes",
+        source: "architecture-doc",
+        tags: ["docs"],
+        chunkSize: 450,
+        overlap: 80,
+        content: [
+          "Graph Indexing is the retrieval strategy Boris uses to connect related OpenMemory memories.",
+          "It links source chunks to canonical facts so recall can expand through Durable Object graph edges.",
+          "Workers AI creates embeddings and Vectorize supplies semantic candidates when Cloudflare bindings are available.",
+          "The RAG pipeline keeps graph currentness separate from raw document chunks so outdated facts can be superseded.",
+          "Document ingestion should preserve provenance, source ids, chunk boundaries, titles, and relationships between adjacent chunks.",
+          "Graph Indexing also helps a later query about Boris discover nearby source material even when the exact chunk does not mention every keyword.",
+        ].join(" "),
+      }),
+    }),
+  );
+
+  expect(source.sourceId).toMatch(/^src_/);
+  expect(source.chunkCount).toBeGreaterThan(1);
+  expect(source.memories).toHaveLength(source.chunkCount);
+  expect(source.memories[0]?.metadata).toMatchObject({
+    sourceId: source.sourceId,
+    title: "OpenMemory architecture notes",
+    chunkIndex: 0,
+    chunkCount: source.chunkCount,
+  });
+  expect(source.memories[0]?.metadata.ingestion).toMatchObject({
+    strategy: "chunked-source-v1",
+  });
+  expect(source.edges).toContainEqual(
+    expect.objectContaining({
+      sourceId: source.memories[0]?.id,
+      targetId: source.memories[1]?.id,
+      relationship: "next_chunk",
+    }),
+  );
+  expect(source.edges).toContainEqual(
+    expect.objectContaining({
+      targetId: anchor.id,
+      relationship: "shares_entity",
+    }),
+  );
+
+  const results = await search(worker, tenant, {
+    q: "Workers AI Vectorize source chunks",
+    limit: 5,
+  });
+  expect(
+    results.some((result) => result.metadata.sourceId === source.sourceId),
+  ).toBe(true);
+}, 45_000);
+
 test("recall benchmark preserves ranking quality across direct and graph retrieval", async () => {
   const worker = await startWorker();
   workers.push(worker);
@@ -947,5 +1017,12 @@ type SessionResponse = {
 
 type IngestResponse = {
   memory: MemoryResponse;
+  edges: EdgeResponse[];
+};
+
+type SourceIngestResponse = {
+  sourceId: string;
+  chunkCount: number;
+  memories: MemoryResponse[];
   edges: EdgeResponse[];
 };
