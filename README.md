@@ -32,6 +32,7 @@ The current alpha is a multi-user memory API that stores each user's evolving me
 - Chunked source ingestion through `/v1/sources`, with source/chunk provenance metadata and graph edges between adjacent chunks.
 - Graph stats through `/v1/graph/stats` for local scale checks and UI inspection.
 - Tenant graph export through `/v1/exports`, writing JSON backups to R2 when `MEMORY_EXPORTS` is configured.
+- Tenant Vectorize repair through `/v1/index/repair`, re-upserting active memories through the embedding/indexing path.
 - Native streamable HTTP MCP endpoint at `/mcp` with `remember`, `recall`, `forget`, and `profile` tools.
 - Authenticated OAuth connection listing and revocation for MCP clients through `/v1/oauth/connections`.
 - Minimal dashboard at `/` for local inspection and capture.
@@ -86,6 +87,7 @@ Useful endpoints:
 - `GET /v1/graph/stats`
 - `GET /v1/graph/:id/neighbors`
 - `POST /v1/exports`
+- `POST /v1/index/repair`
 - `GET /v1/oauth/connections`
 - `DELETE /v1/oauth/connections/:clientId`
 - `POST /mcp`

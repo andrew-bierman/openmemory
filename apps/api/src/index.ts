@@ -482,6 +482,24 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       writtenToR2: Boolean(env.MEMORY_EXPORTS),
     });
   })
+  .post("/v1/index/repair", async ({ headers, request, status }) => {
+    const { tenant, graph } = await withTenant(request, headers);
+    if (!graph) {
+      return status(errorStatus(tenantError(tenant)), tenant);
+    }
+
+    const tenantId = "tenantId" in tenant ? tenant.tenantId : "unknown";
+    const memories = await graph.listMemories(100, false);
+    for (const memory of memories) {
+      await indexMemory(env, tenantId, memory);
+    }
+
+    return status(202, {
+      attempted: memories.length,
+      tenantId,
+      vectorizeConfigured: Boolean(env.AI && env.MEMORY_VECTORS),
+    });
+  })
   .post(
     "/v1/graph/edges",
     async ({ body, headers, request, status }) => {

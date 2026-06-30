@@ -4,6 +4,7 @@ import {
   type GraphEdge,
   type GraphExportResult,
   type GraphStats,
+  type IndexRepairResult,
   type Memory,
   type OAuthConnection,
   OpenMemoryApiError,
@@ -52,6 +53,8 @@ function Home() {
   const [neighbors, setNeighbors] = useState<GraphEdge[]>([]);
   const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
   const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
+  const [lastIndexRepair, setLastIndexRepair] =
+    useState<IndexRepairResult | null>(null);
   const [oauthConnections, setOauthConnections] = useState<OAuthConnection[]>(
     [],
   );
@@ -221,6 +224,12 @@ function Home() {
   async function exportGraph() {
     await run(async () => {
       setLastExport(await api.exportGraph());
+    });
+  }
+
+  async function repairIndex() {
+    await run(async () => {
+      setLastIndexRepair(await api.repairIndex());
     });
   }
 
@@ -425,9 +434,22 @@ function Home() {
                   >
                     Export
                   </Button>
+                  <Button
+                    disabled={isLoading}
+                    onClick={() => void repairIndex()}
+                    type="button"
+                    variant="outline"
+                  >
+                    Repair index
+                  </Button>
                   {lastExport ? (
                     <span className="muted">
                       {lastExport.memoryCount} memories exported
+                    </span>
+                  ) : null}
+                  {lastIndexRepair ? (
+                    <span className="muted">
+                      {lastIndexRepair.attempted} memories queued
                     </span>
                   ) : null}
                 </div>

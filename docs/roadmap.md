@@ -28,6 +28,7 @@
 - Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
+- `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
@@ -60,7 +61,7 @@
 3. RAG pipeline
    - Move source/document ingestion onto Queues and Workflows.
    - Extract richer entities and relationships into the graph.
-   - Store embeddings in Vectorize for every chunk and repair stale indexes.
+   - Store embeddings in Vectorize for every chunk and add deeper stale-index diagnostics.
    - Tune deterministic reranking and evaluate an optional LLM/ML reranker.
    - Expand recall quality benchmarks with MemoryBench-style fixtures.
    - Add larger graph performance benchmarks and production telemetry.

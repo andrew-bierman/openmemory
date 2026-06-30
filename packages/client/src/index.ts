@@ -64,6 +64,12 @@ export type GraphExportResult = {
   writtenToR2: boolean;
 };
 
+export type IndexRepairResult = {
+  attempted: number;
+  tenantId: string;
+  vectorizeConfigured: boolean;
+};
+
 export type CreateMemoryInput = {
   content: string;
   tags?: string[];
@@ -149,6 +155,7 @@ export function createOpenMemoryClient(
         client.v1.oauth.connections({ clientId }).delete(),
       ),
     exportGraph: () => unwrap<GraphExportResult>(client.v1.exports.post()),
+    repairIndex: () => unwrap<IndexRepairResult>(client.v1.index.repair.post()),
     ingest: (input: CreateMemoryInput) =>
       unwrap<IngestResult>(client.v1.ingest.post(input)),
     ingestSource: (input: SourceIngestInput) =>
@@ -208,6 +215,11 @@ type EdenClient = {
     };
     exports: {
       post(): EdenResult;
+    };
+    index: {
+      repair: {
+        post(): EdenResult;
+      };
     };
     search: {
       post(input: { q: string; limit?: number }): EdenResult;

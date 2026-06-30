@@ -180,6 +180,17 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(exported.memoryCount).toBe(2);
   expect(exported.edgeCount).toBeGreaterThanOrEqual(1);
   expect(exported.bytes).toBeGreaterThan(500);
+
+  const repair = await getJson<IndexRepairResponse>(
+    await worker.fetch("/v1/index/repair", {
+      method: "POST",
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(repair).toMatchObject({
+    attempted: 2,
+    tenantId: tenantA,
+  });
 }, 45_000);
 
 test("worker API supports memory lifecycle, profile context, MCP, and dashboard", async () => {
@@ -1172,4 +1183,10 @@ type GraphExportResponse = {
   memoryCount: number;
   edgeCount: number;
   writtenToR2: boolean;
+};
+
+type IndexRepairResponse = {
+  attempted: number;
+  tenantId: string;
+  vectorizeConfigured: boolean;
 };
