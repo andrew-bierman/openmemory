@@ -408,6 +408,38 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   const code = callback.searchParams.get("code");
   expect(code, callback.toString()).toBeTruthy();
 
+  const connections = await getJson<OAuthConnectionResponse[]>(
+    await worker.fetch("/v1/oauth/connections", {
+      headers: { cookie },
+    }),
+  );
+  expect(connections).toContainEqual(
+    expect.objectContaining({
+      clientId: oauthClient.client_id,
+      name: "OpenMemory OAuth Token Flow",
+      scopes: expect.arrayContaining(["memory:read", "memory:write"]),
+    }),
+  );
+
+  const revoked = await getJson<OAuthRevokeResponse>(
+    await worker.fetch(`/v1/oauth/connections/${oauthClient.client_id}`, {
+      method: "DELETE",
+      headers: { cookie },
+    }),
+  );
+  expect(revoked).toEqual({
+    clientId: oauthClient.client_id,
+    revoked: true,
+  });
+  const afterRevoke = await getJson<OAuthConnectionResponse[]>(
+    await worker.fetch("/v1/oauth/connections", {
+      headers: { cookie },
+    }),
+  );
+  expect(afterRevoke.map((connection) => connection.clientId)).not.toContain(
+    oauthClient.client_id,
+  );
+
   const memory = await getJson<MemoryResponse>(
     await worker.fetch("/v1/memories", {
       method: "POST",
@@ -1079,6 +1111,17 @@ type OAuthClientResponse = {
 
 type OAuthRedirectResponse = {
   url: string;
+};
+
+type OAuthConnectionResponse = {
+  clientId: string;
+  name: string;
+  scopes: string[];
+};
+
+type OAuthRevokeResponse = {
+  clientId: string;
+  revoked: boolean;
 };
 
 type SessionResponse = {

@@ -25,6 +25,7 @@
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
 - `/v1/graph/stats` exposes graph size counters, and local Wrangler integration includes a moderate graph-scale recall smoke.
 - Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.
+- Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
@@ -53,7 +54,7 @@
 2. MCP production flow
    - Add MCP client documentation and config snippets.
    - Add external MCP client smoke with a real client once chosen.
-   - Add admin UI for OAuth client lifecycle.
+   - Expand OAuth lifecycle UI from connection revocation into full client registration/management if we need first-party clients.
 
 3. RAG pipeline
    - Move source/document ingestion onto Queues and Workflows.
@@ -65,7 +66,7 @@
 
 4. Web app expansion
    - Add authenticated navigation, memory detail, graph neighbors, profile editor, source ingestion, and MCP connection views.
-   - Expand browser tests for graph inspection, MCP setup, and account settings.
+   - Expand browser tests for graph inspection, MCP connection revocation, and account settings.
 
 5. CI and deployment
    - Connect Cloudflare Git/Workers Builds to `main`.

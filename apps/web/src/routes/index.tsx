@@ -4,6 +4,7 @@ import {
   type GraphEdge,
   type GraphStats,
   type Memory,
+  type OAuthConnection,
   OpenMemoryApiError,
 } from "@openmemory/client";
 import { Button } from "@openmemory/ui";
@@ -49,6 +50,9 @@ function Home() {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [neighbors, setNeighbors] = useState<GraphEdge[]>([]);
   const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
+  const [oauthConnections, setOauthConnections] = useState<OAuthConnection[]>(
+    [],
+  );
   const [profile, setProfile] = useState("");
   const [view, setView] = useState<"recall" | "ingest" | "graph" | "mcp">(
     "recall",
@@ -82,17 +86,24 @@ function Home() {
 
   const refresh = useCallback(async () => {
     await run(async () => {
-      const [nextSession, nextMemories, nextProfile, nextGraphStats] =
-        await Promise.all([
-          getSession(apiUrl),
-          api.listMemories(),
-          api.getProfile(),
-          api.getGraphStats(),
-        ]);
+      const [
+        nextSession,
+        nextMemories,
+        nextProfile,
+        nextGraphStats,
+        nextOAuthConnections,
+      ] = await Promise.all([
+        getSession(apiUrl),
+        api.listMemories(),
+        api.getProfile(),
+        api.getGraphStats(),
+        api.listOAuthConnections().catch(() => []),
+      ]);
       setSessionUser(nextSession);
       setMemories(nextMemories);
       setProfile(nextProfile.summary);
       setGraphStats(nextGraphStats);
+      setOauthConnections(nextOAuthConnections);
     });
   }, [api, apiUrl, run]);
 
@@ -194,6 +205,14 @@ function Home() {
       setMemories([]);
       setProfile("");
       setContext(null);
+      setOauthConnections([]);
+    });
+  }
+
+  async function revokeOAuthConnection(clientId: string) {
+    await run(async () => {
+      await api.revokeOAuthConnection(clientId);
+      setOauthConnections(await api.listOAuthConnections().catch(() => []));
     });
   }
 
@@ -396,7 +415,11 @@ function Home() {
                 />
               </div>
             ) : view === "mcp" ? (
-              <McpSetup apiUrl={apiUrl} />
+              <McpSetup
+                apiUrl={apiUrl}
+                connections={oauthConnections}
+                onRevoke={revokeOAuthConnection}
+              />
             ) : (
               <>
                 <h2>Memories</h2>
@@ -566,7 +589,15 @@ function MemoryMeta({ memory }: Readonly<{ memory: Memory }>) {
   );
 }
 
-function McpSetup({ apiUrl }: Readonly<{ apiUrl: string }>) {
+function McpSetup({
+  apiUrl,
+  connections,
+  onRevoke,
+}: Readonly<{
+  apiUrl: string;
+  connections: OAuthConnection[];
+  onRevoke: (clientId: string) => Promise<void>;
+}>) {
   const baseUrl = cleanBaseUrl(apiUrl);
   return (
     <div className="stack">
@@ -591,6 +622,34 @@ function McpSetup({ apiUrl }: Readonly<{ apiUrl: string }>) {
           2,
         )}
       </pre>
+      <h2>Connections</h2>
+      {connections.length === 0 ? (
+        <p className="muted">No OAuth MCP clients have been authorized.</p>
+      ) : (
+        <div className="memory-list">
+          {connections.map((connection) => (
+            <article className="memory compact" key={connection.clientId}>
+              <div className="meta">
+                <span className="pill">{connection.name}</span>
+                {connection.scopes.map((scope) => (
+                  <span className="pill" key={scope}>
+                    {scope}
+                  </span>
+                ))}
+              </div>
+              <pre className="context">{connection.clientId}</pre>
+              <Button
+                onClick={() => void onRevoke(connection.clientId)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                Revoke
+              </Button>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

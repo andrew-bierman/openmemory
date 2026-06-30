@@ -46,6 +46,16 @@ export type GraphStats = {
   generatedAt: string;
 };
 
+export type OAuthConnection = {
+  clientId: string;
+  name: string;
+  scopes: string[];
+  redirectUris: string[];
+  disabled: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type CreateMemoryInput = {
   content: string;
   tags?: string[];
@@ -124,6 +134,12 @@ export function createOpenMemoryClient(
     getNeighbors: (id: string) =>
       unwrap<GraphEdge[]>(client.v1.graph({ id }).neighbors.get()),
     getGraphStats: () => unwrap<GraphStats>(client.v1.graph.stats.get()),
+    listOAuthConnections: () =>
+      unwrap<OAuthConnection[]>(client.v1.oauth.connections.get()),
+    revokeOAuthConnection: (clientId: string) =>
+      unwrap<{ clientId: string; revoked: boolean }>(
+        client.v1.oauth.connections({ clientId }).delete(),
+      ),
     ingest: (input: CreateMemoryInput) =>
       unwrap<IngestResult>(client.v1.ingest.post(input)),
     ingestSource: (input: SourceIngestInput) =>
@@ -173,6 +189,13 @@ type EdenClient = {
     };
     profile: {
       get(): EdenResult;
+    };
+    oauth: {
+      connections: {
+        get(): EdenResult;
+      } & ((params: { clientId: string }) => {
+        delete(): EdenResult;
+      });
     };
     search: {
       post(input: { q: string; limit?: number }): EdenResult;

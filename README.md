@@ -32,6 +32,7 @@ The current alpha is a multi-user memory API that stores each user's evolving me
 - Chunked source ingestion through `/v1/sources`, with source/chunk provenance metadata and graph edges between adjacent chunks.
 - Graph stats through `/v1/graph/stats` for local scale checks and UI inspection.
 - Native streamable HTTP MCP endpoint at `/mcp` with `remember`, `recall`, `forget`, and `profile` tools.
+- Authenticated OAuth connection listing and revocation for MCP clients through `/v1/oauth/connections`.
 - Minimal dashboard at `/` for local inspection and capture.
 - Better Auth routes at `/api/auth/*`, plus root OAuth/OIDC discovery at `/.well-known/oauth-authorization-server` and `/.well-known/openid-configuration`.
 - Tenant headers are supported only for localhost development.
@@ -83,6 +84,8 @@ Useful endpoints:
 - `GET /v1/profile`
 - `GET /v1/graph/stats`
 - `GET /v1/graph/:id/neighbors`
+- `GET /v1/oauth/connections`
+- `DELETE /v1/oauth/connections/:clientId`
 - `POST /mcp`
 - `GET /.well-known/oauth-authorization-server`
 - `GET /.well-known/openid-configuration`

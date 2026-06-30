@@ -23,6 +23,10 @@ import type { Env } from "./env";
 import { createOpenMemoryMcpHandler } from "./mcp";
 import { MemoryGraph } from "./memory-graph";
 import { enrichMemoryInput } from "./memory-signals";
+import {
+  listOAuthConnections,
+  revokeOAuthConnection,
+} from "./oauth-connections";
 import { indexMemory, semanticSearch } from "./semantic-index";
 
 export { MemoryGraph };
@@ -437,6 +441,17 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
 
     return graph.getProfile();
   })
+  .get("/v1/oauth/connections", async ({ request, status }) => {
+    const result = await listOAuthConnections(env, request);
+    return status(result.status, result.body);
+  })
+  .delete(
+    "/v1/oauth/connections/:clientId",
+    async ({ params, request, status }) => {
+      const result = await revokeOAuthConnection(env, request, params.clientId);
+      return status(result.status, result.body);
+    },
+  )
   .post(
     "/v1/graph/edges",
     async ({ body, headers, request, status }) => {
