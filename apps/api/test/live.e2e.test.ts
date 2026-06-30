@@ -103,6 +103,24 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       title: "Live E2E source notes",
     });
 
+    const stats = await authedJson<GraphStatsResponse>(
+      cookie,
+      "/v1/graph/stats",
+    );
+    expect(stats.activeMemories).toBeGreaterThanOrEqual(source.chunkCount + 2);
+    expect(stats.totalEdges).toBeGreaterThan(0);
+
+    const exported = await authedJson<GraphExportResponse>(
+      cookie,
+      "/v1/exports",
+      {
+        method: "POST",
+      },
+    );
+    expect(exported.key).toContain("/exports/");
+    expect(exported.memoryCount).toBeGreaterThanOrEqual(stats.activeMemories);
+    expect(exported.writtenToR2).toBe(true);
+
     const oauthClient = await getJson<OAuthClientResponse>(
       fetchLive("/api/auth/oauth2/register", {
         method: "POST",
@@ -408,6 +426,17 @@ type SourceIngestResponse = {
   chunkCount: number;
   memories: MemoryResponse[];
   edges: EdgeResponse[];
+};
+
+type GraphStatsResponse = {
+  activeMemories: number;
+  totalEdges: number;
+};
+
+type GraphExportResponse = {
+  key: string;
+  memoryCount: number;
+  writtenToR2: boolean;
 };
 
 type OAuthClientResponse = {
