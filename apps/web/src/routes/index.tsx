@@ -262,7 +262,8 @@ function Home() {
           </div>
         </div>
 
-        <div className="stack">
+        <section className="sidebar-section">
+          <div className="section-label">Connection</div>
           <div className="field">
             <label htmlFor="apiUrl">API URL</label>
             <input
@@ -290,9 +291,10 @@ function Home() {
               value={token}
             />
           </div>
-        </div>
+        </section>
 
-        <form className="stack auth-box" onSubmit={signIn}>
+        <form className="sidebar-section" onSubmit={signIn}>
+          <div className="section-label">Account</div>
           <div className="session-row">
             <strong>{sessionUser ? sessionUser.email : "Not signed in"}</strong>
             {sessionUser ? (
@@ -343,7 +345,8 @@ function Home() {
           </div>
         </form>
 
-        <form className="stack" onSubmit={remember}>
+        <form className="sidebar-section capture-section" onSubmit={remember}>
+          <div className="section-label">Capture</div>
           <div className="field">
             <label htmlFor="content">Memory</label>
             <textarea
@@ -387,21 +390,27 @@ function Home() {
       </aside>
 
       <section className="content">
-        <header className="hero-panel">
+        <header className="page-header">
           <div>
-            <p className="eyebrow">Cloudflare-native memory OS</p>
-            <h2>Graph-aware recall across every AI surface.</h2>
+            <p className="eyebrow">OpenMemory Control Plane</p>
+            <h2>Memory Dashboard</h2>
             <p>
-              Capture durable context, inspect how memories connect, and expose
-              the same user-owned graph to MCP clients.
+              Inspect graph health, capture context, and manage the MCP surface
+              that feeds external AI tools.
             </p>
           </div>
-          <div className="status-card">
-            <span>Runtime</span>
-            <strong>
-              {usesLocalTenant ? "Local worker" : "Hosted worker"}
-            </strong>
-            <small>{sessionUser ? sessionUser.email : tenantId}</small>
+          <div className="header-actions">
+            <div className="runtime-pill">
+              <span>{usesLocalTenant ? "Local worker" : "Hosted worker"}</span>
+              <strong>{sessionUser ? sessionUser.email : tenantId}</strong>
+            </div>
+            <Button
+              disabled={isLoading}
+              onClick={() => void refresh()}
+              type="button"
+            >
+              Refresh
+            </Button>
           </div>
         </header>
 
@@ -411,7 +420,7 @@ function Home() {
           typeDistribution={typeDistribution}
         />
 
-        <nav aria-label="Workspace views" className="tabs">
+        <nav aria-label="Workspace views" className="tabs segmented-control">
           {(["recall", "ingest", "graph", "mcp"] as const).map((item) => (
             <Button
               key={item}
@@ -442,7 +451,12 @@ function Home() {
           <div className="panel">
             {view === "ingest" ? (
               <form className="stack" onSubmit={ingest}>
-                <h2>Ingest Source</h2>
+                <div className="panel-title">
+                  <div>
+                    <p className="eyebrow">Pipeline</p>
+                    <h2>Ingest Source</h2>
+                  </div>
+                </div>
                 <div className="field">
                   <label htmlFor="ingestSource">Source</label>
                   <input
@@ -469,6 +483,12 @@ function Home() {
               </form>
             ) : view === "graph" ? (
               <div className="stack">
+                <div className="panel-title">
+                  <div>
+                    <p className="eyebrow">Graph</p>
+                    <h2>Knowledge Map</h2>
+                  </div>
+                </div>
                 <GraphStatsPanel stats={graphStats} />
                 <KnowledgeMap
                   memories={memories}
@@ -518,7 +538,12 @@ function Home() {
               />
             ) : (
               <>
-                <h2>Memories</h2>
+                <div className="panel-title">
+                  <div>
+                    <p className="eyebrow">Recall</p>
+                    <h2>Memories</h2>
+                  </div>
+                </div>
                 <MemoryList
                   memories={memories}
                   onForget={forget}
@@ -530,13 +555,17 @@ function Home() {
 
           <div className="stack">
             <div className="panel">
-              <h2>Context</h2>
+              <div className="panel-title compact">
+                <h2>Context</h2>
+              </div>
               <pre className="context">
                 {context?.context || "Run recall to assemble graph context."}
               </pre>
             </div>
             <div className="panel">
-              <h2>Profile</h2>
+              <div className="panel-title compact">
+                <h2>Profile</h2>
+              </div>
               <pre className="context">{profile || "No profile yet."}</pre>
             </div>
           </div>
