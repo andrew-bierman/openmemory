@@ -76,6 +76,33 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       }),
     );
 
+    const source = await authedJson<SourceIngestResponse>(
+      cookie,
+      "/v1/sources",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Live E2E source notes",
+          source: "live-e2e-source",
+          tags: ["e2e"],
+          chunkSize: 450,
+          overlap: 80,
+          content: [
+            "Graph Indexing keeps OpenMemory source chunks connected to canonical facts.",
+            "Workers AI creates embeddings and Vectorize supplies semantic candidates for source recall.",
+            "Adjacent chunk edges preserve document order for RAG context assembly.",
+            "Boris can use chunked source ingestion to retrieve related architecture notes.",
+          ].join(" "),
+        }),
+      },
+    );
+    expect(source.sourceId).toMatch(/^src_/);
+    expect(source.chunkCount).toBeGreaterThan(0);
+    expect(source.memories[0]?.metadata).toMatchObject({
+      sourceId: source.sourceId,
+      title: "Live E2E source notes",
+    });
+
     const oauthClient = await getJson<OAuthClientResponse>(
       fetchLive("/api/auth/oauth2/register", {
         method: "POST",
@@ -359,6 +386,7 @@ type SessionResponse = {
 type MemoryResponse = {
   id: string;
   entityIds: string[];
+  metadata: Record<string, unknown>;
 };
 
 type SearchResponse = MemoryResponse & {
@@ -372,6 +400,13 @@ type EdgeResponse = {
 
 type IngestResponse = {
   memory: MemoryResponse;
+  edges: EdgeResponse[];
+};
+
+type SourceIngestResponse = {
+  sourceId: string;
+  chunkCount: number;
+  memories: MemoryResponse[];
   edges: EdgeResponse[];
 };
 
