@@ -5,10 +5,21 @@
 The API is deployed to Cloudflare Workers:
 
 - `https://openmemory-api.abbierman101.workers.dev`
+- HTTP API, Better Auth routes, the hosted dashboard, and `/mcp` currently deploy as one Worker.
 - D1 `openmemory-auth` is bound as `AUTH_DB`.
 - Vectorize `openmemory-vectors` is bound as `MEMORY_VECTORS`.
 - R2 `openmemory-exports` is bound as `MEMORY_EXPORTS`.
 - `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` are set as Worker secrets.
+
+## Deployment Shape
+
+Default to a single Worker deploy for now:
+
+- The backend is the workhorse and owns memory graph logic, auth, Vectorize, exports, and MCP tools.
+- The hosted UI is a companion dashboard/control plane served from the same origin so cookies, OAuth redirects, and MCP discovery stay simple.
+- The MCP endpoint uses Cloudflare Agents' `createMcpHandler`, which is Cloudflare's lightweight Worker-native path for streamable HTTP MCP servers.
+
+Split MCP into a dedicated Cloudflare Agents `McpAgent` Worker only when we need session-specific Agent state, separate scaling/isolation, or a different release cadence. The persistent OpenMemory state currently lives in Durable Objects, so a separate MCP Agent would mostly add operational surface area rather than new durability.
 
 If provisioning a new account, authenticate Wrangler first:
 

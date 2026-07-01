@@ -70,6 +70,11 @@ Runtime services:
 - **Cloudflare Agents MCP**: streamable HTTP MCP surface.
 - **Queues/Workflows**: planned async ingestion and extraction pipeline.
 
+The default deployment shape is intentionally monolithic: API routes, Better
+Auth, hosted dashboard, and `/mcp` ship as one Worker. MCP uses Cloudflare
+Agents' `createMcpHandler`; split it into a dedicated `McpAgent` Worker only if
+session-specific MCP state or separate operational scaling becomes necessary.
+
 Cloudflare AI Search is tracked as an optional managed-search layer, not the
 core graph/RAG substrate.
 
@@ -220,7 +225,8 @@ the target workflow.
 Current priorities:
 
 - Polish authenticated product UI and account flows.
-- Evolve the hosted TanStack Start app into the primary OpenMemory product UI.
+- Keep the hosted TanStack Start app as a companion dashboard/control plane
+  while API and MCP integrations remain the primary product surfaces.
 - Expand charts and the knowledge map for graph health, recall quality, index
   freshness, and MCP usage.
 - Move source/document ingestion to Queues and Workflows.

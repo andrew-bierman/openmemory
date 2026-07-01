@@ -70,8 +70,8 @@
 
 4. Web app expansion
    - Add authenticated navigation, memory detail, graph neighbors, profile editor, source ingestion, and MCP connection views.
-   - Evolve the hosted TanStack Start UI into the primary OpenMemory product surface.
-   - Keep the visual direction closer to a native Apple/SwiftUI utility: calm translucent surfaces, dense controls, strong hierarchy, and premium motion.
+   - Keep the hosted TanStack Start UI as a companion dashboard/control plane; the API and MCP integrations remain the primary product surfaces.
+   - Use shadcn dashboard templates, defaults, and theme tokens as the baseline; defer Apple/SwiftUI-specific styling until the product structure is stronger.
    - Expand charts for recall quality, memory growth, stale/superseded memories, indexing health, and MCP usage.
    - Replace the first-pass SVG knowledge map with a proven graph visualization library when graph size and layout requirements justify it.
    - Evaluate Sigma.js + Graphology, `react-force-graph`, Reagraph, and React Flow before writing any custom graph layout code.

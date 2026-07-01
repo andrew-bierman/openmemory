@@ -8,6 +8,8 @@ https://openmemory-api.abbierman101.workers.dev/mcp
 
 The MCP server uses OAuth-backed identity in production. Local development can use the tenant header flow for fast iteration, but deployed clients should use OAuth discovery and dynamic client registration.
 
+Implementation note: OpenMemory currently serves MCP from the main API Worker using Cloudflare Agents' `createMcpHandler`. That is the Worker-native stateless MCP hosting path. Durable memory state is stored in OpenMemory Durable Objects, not in per-MCP-session Agent state. If we later need session-specific state or independent MCP scaling, move the endpoint to a dedicated Cloudflare Agents `McpAgent` Worker.
+
 ## Discovery
 
 OAuth authorization server metadata:
