@@ -35,6 +35,8 @@ const VIEW_LABELS = {
   mcp: "MCP",
 } as const;
 
+type View = keyof typeof VIEW_LABELS;
+
 function Home() {
   const [apiUrl, setApiUrl] = useLocalStorage(
     "openmemory:apiUrl",
@@ -66,9 +68,7 @@ function Home() {
     [],
   );
   const [profile, setProfile] = useState("");
-  const [view, setView] = useState<"recall" | "ingest" | "graph" | "mcp">(
-    "recall",
-  );
+  const [view, setView] = useState<View>("recall");
   const [sessionUser, setSessionUser] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -261,6 +261,8 @@ function Home() {
             <p>Hosted graph memory for AI tools.</p>
           </div>
         </div>
+
+        <SidebarNav activeView={view} onSelect={setView} />
 
         <section className="sidebar-section">
           <div className="section-label">Connection</div>
@@ -544,7 +546,7 @@ function Home() {
                     <h2>Memories</h2>
                   </div>
                 </div>
-                <MemoryList
+                <MemoryDataTable
                   memories={memories}
                   onForget={forget}
                   onInspect={inspectMemory}
@@ -572,6 +574,58 @@ function Home() {
         </div>
       </section>
     </main>
+  );
+}
+
+function SidebarNav({
+  activeView,
+  onSelect,
+}: Readonly<{
+  activeView: View;
+  onSelect: (view: View) => void;
+}>) {
+  const items: Array<{
+    view: View;
+    label: string;
+    description: string;
+  }> = [
+    {
+      view: "recall",
+      label: "Dashboard",
+      description: "Memories and recall context",
+    },
+    {
+      view: "ingest",
+      label: "Sources",
+      description: "Documents and long-form context",
+    },
+    {
+      view: "graph",
+      label: "Knowledge Map",
+      description: "Graph inspection and repair",
+    },
+    {
+      view: "mcp",
+      label: "MCP",
+      description: "Client setup and connections",
+    },
+  ];
+
+  return (
+    <nav aria-label="Main navigation" className="sidebar-nav">
+      <div className="section-label">Workspace</div>
+      {items.map((item) => (
+        <button
+          className={activeView === item.view ? "nav-item active" : "nav-item"}
+          key={item.view}
+          onClick={() => onSelect(item.view)}
+          type="button"
+        >
+          <span>{item.label}</span>
+          <small>{item.description}</small>
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -656,7 +710,7 @@ function DashboardOverview({
   );
 }
 
-function MemoryList({
+function MemoryDataTable({
   memories,
   onForget,
   onInspect,
@@ -666,35 +720,89 @@ function MemoryList({
   onInspect: (id: string) => Promise<void>;
 }>) {
   if (memories.length === 0) {
-    return <p className="muted">No memories yet.</p>;
+    return (
+      <div className="empty-state">
+        <h3>No memories yet</h3>
+        <p>
+          Capture a memory or ingest a source to populate this tenant graph.
+        </p>
+      </div>
+    );
   }
 
   return (
-    <div className="memory-list">
-      {memories.map((memory) => (
-        <article className="memory" key={memory.id}>
-          <p>{memory.content}</p>
-          <MemoryMeta memory={memory} />
-          <div className="row">
-            <Button
-              onClick={() => void onInspect(memory.id)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Inspect
-            </Button>
-            <Button
-              onClick={() => void onForget(memory.id)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              Forget
-            </Button>
-          </div>
-        </article>
-      ))}
+    <div className="data-table-shell">
+      <div className="data-table-toolbar">
+        <div>
+          <strong>Memory records</strong>
+          <span>{memories.length} rows</span>
+        </div>
+      </div>
+      <div className="data-table-scroll">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Memory</th>
+              <th>Status</th>
+              <th>Signals</th>
+              <th>Updated</th>
+              <th aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {memories.map((memory) => (
+              <tr key={memory.id}>
+                <td>
+                  <span className="table-badge">{memory.type}</span>
+                </td>
+                <td>
+                  <button
+                    className="table-memory-button"
+                    onClick={() => void onInspect(memory.id)}
+                    type="button"
+                  >
+                    {memory.content}
+                  </button>
+                </td>
+                <td>
+                  <span className="pill">{memory.status}</span>
+                </td>
+                <td>
+                  <span className="muted">
+                    {memory.tags.length + memory.entityIds.length}
+                  </span>
+                </td>
+                <td>
+                  <time dateTime={memory.updatedAt}>
+                    {formatShortDate(memory.updatedAt)}
+                  </time>
+                </td>
+                <td>
+                  <div className="table-actions">
+                    <Button
+                      onClick={() => void onInspect(memory.id)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      Inspect
+                    </Button>
+                    <Button
+                      onClick={() => void onForget(memory.id)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      Forget
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1096,6 +1204,18 @@ function getMemoryLabel(memory: Memory) {
   }
 
   return `${clean.slice(0, 17)}...`;
+}
+
+function formatShortDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function useLocalStorage(key: string, initialValue: string) {
