@@ -470,6 +470,7 @@ textarea:focus-visible,
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   border-bottom: 1px solid var(--border);
   padding: 12px 14px;
 }
@@ -487,6 +488,13 @@ textarea:focus-visible,
 .data-table-toolbar span {
   color: var(--muted-foreground);
   font-size: 12px;
+}
+
+.table-filters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 140px;
+  gap: 8px;
+  width: min(420px, 100%);
 }
 
 .data-table-scroll {
@@ -657,6 +665,13 @@ textarea:focus-visible,
   padding: 15px;
 }
 
+.graph-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 160px auto;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 .force-graph-frame {
   width: 100%;
   min-height: 420px;
@@ -675,6 +690,64 @@ textarea:focus-visible,
 
 .force-graph-frame canvas {
   display: block;
+}
+
+.graph-node-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.graph-node-card {
+  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 10px;
+  box-shadow: none;
+  text-align: left;
+}
+
+.graph-node-card:hover:not(:disabled),
+.graph-node-card.selected {
+  transform: none;
+  border-color: #93c5fd;
+  background: #eff6ff;
+  box-shadow: var(--shadow-sm);
+}
+
+.graph-node-card span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.graph-node-card strong {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.graph-node-card small,
+.graph-node-card > span:last-child {
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.graph-node-card > span:last-child {
+  color: var(--foreground);
+  font-weight: 680;
 }
 
 .empty-map {
@@ -770,6 +843,20 @@ textarea:focus-visible,
 
   .toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .graph-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .data-table-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-filters {
+    grid-template-columns: 1fr;
+    width: 100%;
   }
 
   .row,

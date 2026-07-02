@@ -32,6 +32,7 @@ import {
   type ColumnDef,
   flexRender,
   getCoreRowModel,
+  getFilteredRowModel,
   getSortedRowModel,
   type SortingState,
   useReactTable,
@@ -873,9 +874,25 @@ function MemoryDataTable({
   onForget: (id: string) => Promise<void>;
   onInspect: (id: string) => Promise<void>;
 }>) {
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [sorting, setSorting] = useState<SortingState>([
     { id: "updatedAt", desc: true },
   ]);
+  const memoryTypes = useMemo(
+    () =>
+      Array.from(new Set(memories.map((memory) => memory.type))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [memories],
+  );
+  const filteredMemories = useMemo(() => {
+    if (typeFilter === "all") {
+      return memories;
+    }
+
+    return memories.filter((memory) => memory.type === typeFilter);
+  }, [memories, typeFilter]);
   const columns = useMemo<ColumnDef<Memory>[]>(
     () => [
       {
@@ -952,11 +969,31 @@ function MemoryDataTable({
   );
   const table = useReactTable({
     columns,
-    data: memories,
+    data: filteredMemories,
+    getFilteredRowModel: getFilteredRowModel(),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    globalFilterFn: (row, _columnId, filterValue) => {
+      const needle = String(filterValue).trim().toLowerCase();
+      if (!needle) {
+        return true;
+      }
+
+      const memory = row.original;
+      return [
+        memory.content,
+        memory.type,
+        memory.status,
+        ...memory.tags,
+        ...memory.entityIds,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle);
+    },
+    onGlobalFilterChange: setGlobalFilter,
     onSortingChange: setSorting,
-    state: { sorting },
+    state: { globalFilter, sorting },
   });
 
   if (memories.length === 0) {
@@ -975,7 +1012,29 @@ function MemoryDataTable({
       <div className="data-table-toolbar">
         <div>
           <strong>Memory records</strong>
-          <span>{memories.length} rows</span>
+          <span>
+            {table.getRowModel().rows.length} of {memories.length} rows
+          </span>
+        </div>
+        <div className="table-filters">
+          <Input
+            aria-label="Search memory records"
+            onChange={(event) => setGlobalFilter(event.target.value)}
+            placeholder="Filter memories"
+            value={globalFilter}
+          />
+          <Select
+            aria-label="Filter memories by type"
+            onChange={(event) => setTypeFilter(event.target.value)}
+            value={typeFilter}
+          >
+            <option value="all">All types</option>
+            {memoryTypes.map((memoryType) => (
+              <option key={memoryType} value={memoryType}>
+                {memoryType}
+              </option>
+            ))}
+          </Select>
         </div>
       </div>
       <div className="data-table-scroll">
@@ -1036,10 +1095,25 @@ function KnowledgeMap({
   const [ForceGraph, setForceGraph] = useState<ForceGraph2DComponent | null>(
     null,
   );
+  const [graphSearch, setGraphSearch] = useState("");
+  const [graphType, setGraphType] = useState("all");
   const graphRef = useRef<ForceGraph2DMethods | null>(null);
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [graphWidth, setGraphWidth] = useState(680);
+  const memoryTypes = useMemo(
+    () =>
+      Array.from(new Set(memories.map((memory) => memory.type))).sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [memories],
+  );
   const graph = useMemo(
-    () => getKnowledgeMap(memories, neighbors, selectedMemoryId),
-    [memories, neighbors, selectedMemoryId],
+    () =>
+      getKnowledgeMap(memories, neighbors, selectedMemoryId, {
+        search: graphSearch,
+        type: graphType,
+      }),
+    [graphSearch, graphType, memories, neighbors, selectedMemoryId],
   );
   const graphData = useMemo(
     () => ({
@@ -1056,6 +1130,13 @@ function KnowledgeMap({
     }),
     [graph],
   );
+  const visibleRelationshipCount = new Set(
+    graph.links.map((link) => link.relationship),
+  ).size;
+
+  const fitGraph = useCallback(() => {
+    graphRef.current?.zoomToFit(350, 48);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -1070,11 +1151,49 @@ function KnowledgeMap({
     };
   }, []);
 
+  useEffect(() => {
+    const frame = frameRef.current;
+    if (!frame) {
+      return;
+    }
+
+    const resize = () => {
+      setGraphWidth(
+        Math.max(320, Math.floor(frame.getBoundingClientRect().width)),
+      );
+    };
+    resize();
+
+    const observer = new ResizeObserver(resize);
+    observer.observe(frame);
+
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const delay = graph.nodes.length > 12 || graphWidth < 480 ? 180 : 120;
+    const timeout = window.setTimeout(fitGraph, delay);
+    return () => window.clearTimeout(timeout);
+  }, [fitGraph, graph.nodes.length, graphWidth]);
+
   if (graph.nodes.length === 0) {
     return (
-      <div className="knowledge-map empty-map">
-        <p className="muted">Capture memories to build the knowledge map.</p>
-      </div>
+      <section className="knowledge-map" aria-label="Knowledge map">
+        <GraphExplorerControls
+          graphSearch={graphSearch}
+          graphType={graphType}
+          memoryTypes={memoryTypes}
+          onFit={fitGraph}
+          onSearchChange={setGraphSearch}
+          onTypeChange={setGraphType}
+        />
+        <div className="empty-map">
+          <p className="muted">
+            No memories match this graph filter. Clear the filter or capture new
+            memories.
+          </p>
+        </div>
+      </section>
     );
   }
 
@@ -1082,9 +1201,19 @@ function KnowledgeMap({
     <section className="knowledge-map" aria-label="Knowledge map">
       <div className="panel-heading">
         <span>Knowledge map</span>
-        <strong>{graph.nodes.length} nodes</strong>
+        <strong>
+          {graph.nodes.length} nodes · {visibleRelationshipCount} relationships
+        </strong>
       </div>
-      <div className="force-graph-frame">
+      <GraphExplorerControls
+        graphSearch={graphSearch}
+        graphType={graphType}
+        memoryTypes={memoryTypes}
+        onFit={fitGraph}
+        onSearchChange={setGraphSearch}
+        onTypeChange={setGraphType}
+      />
+      <div className="force-graph-frame" ref={frameRef}>
         {ForceGraph ? (
           <ForceGraph
             cooldownTicks={80}
@@ -1128,13 +1257,33 @@ function KnowledgeMap({
             nodeId="id"
             nodeLabel={(node) => (node as KnowledgeNode).title}
             nodeVal={(node) => (node as KnowledgeNode).size}
-            onEngineStop={() => graphRef.current?.zoomToFit(350, 48)}
+            onEngineStop={fitGraph}
             onNodeClick={(node) => void onInspect((node as KnowledgeNode).id)}
-            width={680}
+            width={graphWidth}
           />
         ) : (
           <p className="muted">Loading graph explorer...</p>
         )}
+      </div>
+      <div className="graph-node-list">
+        {graph.nodes.map((node) => (
+          <button
+            className={
+              node.isSelected ? "graph-node-card selected" : "graph-node-card"
+            }
+            key={node.id}
+            onClick={() => void onInspect(node.id)}
+            type="button"
+          >
+            <span>
+              <strong>{node.memory.type}</strong>
+              <small>
+                {node.memory.tags.slice(0, 3).join(", ") || "untagged"}
+              </small>
+            </span>
+            <span>{node.label}</span>
+          </button>
+        ))}
       </div>
       <p className="muted">
         Drag nodes to explore memory neighborhoods. Lines use explicit graph
@@ -1142,6 +1291,48 @@ function KnowledgeMap({
         entities.
       </p>
     </section>
+  );
+}
+
+function GraphExplorerControls({
+  graphSearch,
+  graphType,
+  memoryTypes,
+  onFit,
+  onSearchChange,
+  onTypeChange,
+}: Readonly<{
+  graphSearch: string;
+  graphType: string;
+  memoryTypes: string[];
+  onFit: () => void;
+  onSearchChange: (value: string) => void;
+  onTypeChange: (value: string) => void;
+}>) {
+  return (
+    <div className="graph-controls">
+      <Input
+        aria-label="Filter graph memories"
+        onChange={(event) => onSearchChange(event.target.value)}
+        placeholder="Filter memories, tags, or entities"
+        value={graphSearch}
+      />
+      <Select
+        aria-label="Filter graph by memory type"
+        onChange={(event) => onTypeChange(event.target.value)}
+        value={graphType}
+      >
+        <option value="all">All types</option>
+        {memoryTypes.map((type) => (
+          <option key={type} value={type}>
+            {type}
+          </option>
+        ))}
+      </Select>
+      <Button onClick={onFit} type="button" variant="outline">
+        Fit graph
+      </Button>
+    </div>
   );
 }
 
@@ -1383,9 +1574,34 @@ function getKnowledgeMap(
   memories: Memory[],
   neighbors: GraphEdge[],
   selectedMemoryId: string | null,
+  filters: GraphFilters = { search: "", type: "all" },
 ): KnowledgeGraph {
+  const search = filters.search.trim().toLowerCase();
   const visibleMemories = memories
-    .filter((memory) => memory.status !== "forgotten")
+    .filter((memory) => {
+      if (memory.status === "forgotten") {
+        return false;
+      }
+
+      if (filters.type !== "all" && memory.type !== filters.type) {
+        return false;
+      }
+
+      if (!search) {
+        return true;
+      }
+
+      return [
+        memory.content,
+        memory.type,
+        memory.status,
+        ...memory.tags,
+        ...memory.entityIds,
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(search);
+    })
     .slice()
     .sort(
       (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
@@ -1609,6 +1825,11 @@ type KnowledgeLink = {
 type KnowledgeGraph = {
   nodes: KnowledgeNode[];
   links: KnowledgeLink[];
+};
+
+type GraphFilters = {
+  search: string;
+  type: string;
 };
 
 type ForceGraph2DComponent = ComponentType<{
