@@ -69,6 +69,27 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
 
   await page.getByRole("button", { name: "Fit graph" }).click();
 
+  await page
+    .locator(".tabs")
+    .getByRole("button", { name: "Admin", exact: true })
+    .click();
+  const adminGrid = page.locator(".admin-grid");
+  await expect(adminGrid).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
+  await expect(adminGrid.getByLabel("API URL")).toHaveValue(API_URL);
+  await expect(adminGrid.getByLabel("Local tenant")).toHaveValue(tenant);
+  await expect(
+    page.getByText("Header tenant for local development"),
+  ).toBeVisible();
+
+  await page
+    .locator(".tabs")
+    .getByRole("button", { name: "MCP", exact: true })
+    .click();
+  await expect(page.locator("pre.context").first()).toContainText(
+    "/.well-known/oauth-authorization-server/api/auth",
+  );
+
   expect(errors).toEqual([]);
 });
 

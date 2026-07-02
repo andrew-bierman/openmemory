@@ -32,6 +32,7 @@ import {
   Plug,
   RefreshCw,
   Send,
+  ShieldCheck,
 } from "lucide-react";
 import {
   type FormEvent,
@@ -51,6 +52,11 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  AccountStatus,
+  AdminWorkspace,
+  type AuthUser,
+} from "../admin-components";
 import { KnowledgeMap, MemoryDataTable } from "../dashboard-components";
 import {
   type ActivityPoint,
@@ -75,6 +81,7 @@ const VIEW_LABELS = {
   ingest: "Ingest",
   graph: "Knowledge Map",
   mcp: "MCP",
+  admin: "Admin",
 } as const;
 
 type View = keyof typeof VIEW_LABELS;
@@ -394,61 +401,12 @@ function Home() {
           </div>
         </Card>
 
-        <Card className="sidebar-section">
-          <form className="stack" onSubmit={signIn}>
-            <div className="section-label">Account</div>
-            <div className="session-row">
-              <strong>
-                {sessionUser ? sessionUser.email : "Not signed in"}
-              </strong>
-              {sessionUser ? (
-                <Button onClick={() => void signOut()} size="sm" type="button">
-                  Sign out
-                </Button>
-              ) : null}
-            </div>
-            <div className="field">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                onChange={(event) => setName(event.target.value)}
-                value={name}
-              />
-            </div>
-            <div className="field">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                onChange={(event) => setEmail(event.target.value)}
-                type="email"
-                value={email}
-              />
-            </div>
-            <div className="field">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                minLength={8}
-                onChange={(event) => setPassword(event.target.value)}
-                type="password"
-                value={password}
-              />
-            </div>
-            <div className="row">
-              <Button disabled={isLoading || !email || !password} type="submit">
-                Sign in
-              </Button>
-              <Button
-                disabled={isLoading || !email || !password}
-                onClick={() => void signUp()}
-                type="button"
-                variant="outline"
-              >
-                Create account
-              </Button>
-            </div>
-          </form>
-        </Card>
+        <AccountStatus
+          onSignOut={signOut}
+          sessionUser={sessionUser}
+          tenantId={tenantId}
+          usesLocalTenant={usesLocalTenant}
+        />
 
         <Card className="sidebar-section capture-section">
           <form className="stack" onSubmit={remember}>
@@ -529,16 +487,19 @@ function Home() {
         />
 
         <TabsList aria-label="Workspace views" className="tabs">
-          {(["recall", "ingest", "graph", "mcp"] as const).map((item) => (
-            <TabsTrigger
-              active={view === item}
-              key={item}
-              onClick={() => setView(item)}
-              type="button"
-            >
-              {VIEW_LABELS[item]}
-            </TabsTrigger>
-          ))}
+          {(["recall", "ingest", "graph", "mcp", "admin"] as const).map(
+            (item) => (
+              <TabsTrigger
+                active={view === item}
+                aria-selected={view === item}
+                key={item}
+                onClick={() => setView(item)}
+                type="button"
+              >
+                {VIEW_LABELS[item]}
+              </TabsTrigger>
+            ),
+          )}
         </TabsList>
 
         <form className="toolbar" onSubmit={recall}>
@@ -556,7 +517,11 @@ function Home() {
 
         {error ? <div className="error">{error}</div> : null}
 
-        <div className="workspace">
+        <div
+          className={
+            view === "admin" ? "workspace workspace-wide" : "workspace"
+          }
+        >
           <div className="panel">
             {view === "ingest" ? (
               <form className="stack" onSubmit={ingest}>
@@ -645,6 +610,29 @@ function Home() {
                 connections={oauthConnections}
                 onRevoke={revokeOAuthConnection}
               />
+            ) : view === "admin" ? (
+              <AdminWorkspace
+                apiUrl={apiUrl}
+                connections={oauthConnections}
+                email={email}
+                isLoading={isLoading}
+                name={name}
+                onRevoke={revokeOAuthConnection}
+                onSignIn={signIn}
+                onSignOut={signOut}
+                onSignUp={signUp}
+                password={password}
+                sessionUser={sessionUser}
+                setApiUrl={setApiUrl}
+                setEmail={setEmail}
+                setName={setName}
+                setPassword={setPassword}
+                setTenantId={setTenantId}
+                setToken={setToken}
+                tenantId={tenantId}
+                token={token}
+                usesLocalTenant={usesLocalTenant}
+              />
             ) : (
               <>
                 <div className="panel-title">
@@ -662,22 +650,24 @@ function Home() {
             )}
           </div>
 
-          <div className="stack">
-            <div className="panel">
-              <div className="panel-title compact">
-                <h2>Context</h2>
+          {view === "admin" ? null : (
+            <div className="stack">
+              <div className="panel">
+                <div className="panel-title compact">
+                  <h2>Context</h2>
+                </div>
+                <pre className="context">
+                  {context?.context || "Run recall to assemble graph context."}
+                </pre>
               </div>
-              <pre className="context">
-                {context?.context || "Run recall to assemble graph context."}
-              </pre>
-            </div>
-            <div className="panel">
-              <div className="panel-title compact">
-                <h2>Profile</h2>
+              <div className="panel">
+                <div className="panel-title compact">
+                  <h2>Profile</h2>
+                </div>
+                <pre className="context">{profile || "No profile yet."}</pre>
               </div>
-              <pre className="context">{profile || "No profile yet."}</pre>
             </div>
-          </div>
+          )}
         </div>
       </section>
     </main>
@@ -714,6 +704,12 @@ function SidebarNav({
       label: "Knowledge Map",
       description: "Graph inspection and repair",
       icon: <Network aria-hidden="true" />,
+    },
+    {
+      view: "admin",
+      label: "Admin",
+      description: "Account, tenants, and access",
+      icon: <ShieldCheck aria-hidden="true" />,
     },
     {
       view: "mcp",
@@ -959,6 +955,7 @@ function McpSetup({
   onRevoke: (clientId: string) => Promise<void>;
 }>) {
   const baseUrl = cleanBaseUrl(apiUrl);
+  const authServerMetadataUrl = `${baseUrl}/.well-known/oauth-authorization-server/api/auth`;
   return (
     <div className="stack">
       <h2>MCP</h2>
@@ -975,7 +972,7 @@ function McpSetup({
           {
             transport: "streamable-http",
             url: `${baseUrl}/mcp`,
-            authorizationServer: `${baseUrl}/.well-known/oauth-authorization-server`,
+            authorizationServer: authServerMetadataUrl,
             scopes: ["openid", "profile", "memory:read", "memory:write"],
           },
           null,
@@ -1093,9 +1090,3 @@ function isLocalApiUrl(apiUrl: string) {
     return false;
   }
 }
-
-type AuthUser = {
-  id: string;
-  email: string;
-  name?: string;
-};

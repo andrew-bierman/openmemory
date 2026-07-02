@@ -44,6 +44,13 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     "/api/auth/oauth2/register",
   );
   expect(oauthMetadata.scopes_supported).toContain("memory:read");
+  const issuerOAuthMetadata = await getJson<OAuthMetadataResponse>(
+    await worker.fetch("/.well-known/oauth-authorization-server/api/auth"),
+  );
+  expect(issuerOAuthMetadata.issuer).toContain("/api/auth");
+  expect(issuerOAuthMetadata.authorization_endpoint).toBe(
+    oauthMetadata.authorization_endpoint,
+  );
 
   const oauthClient = await getJson<OAuthClientResponse>(
     await worker.fetch("/api/auth/oauth2/register", {
@@ -1150,6 +1157,7 @@ type JsonRpcResponse = {
 };
 
 type OAuthMetadataResponse = {
+  issuer: string;
   authorization_endpoint: string;
   registration_endpoint: string;
   scopes_supported: string[];

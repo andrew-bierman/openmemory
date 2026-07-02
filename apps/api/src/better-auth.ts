@@ -74,6 +74,10 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
         customIdTokenClaims: ({ user }) => ({
           "https://openmemory.dev/tenant_id": user.id,
         }),
+        silenceWarnings: {
+          oauthAuthServerConfig: true,
+          openidConfig: true,
+        },
       }),
     ],
   } satisfies BetterAuthOptions);
