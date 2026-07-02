@@ -3,11 +3,13 @@ import { describe, expect, test } from "vitest";
 import {
   getActivitySummary,
   getDashboardMetrics,
+  getGraphHealthSummary,
   getKnowledgeMap,
   getMemoryLabel,
   getMemoryNeighborDetails,
   getRecentActivity,
   getRelationshipDistribution,
+  getRelationshipReadinessSummary,
   getSelectedNodeRelationships,
   getTypeDistribution,
   getTypeDistributionSummary,
@@ -100,6 +102,43 @@ describe("dashboard model", () => {
       leadingLabel: "decision",
       leadingShare: 25,
       total: 4,
+    });
+  });
+
+  test("summarizes graph health from dashboard metrics", () => {
+    expect(
+      getGraphHealthSummary({
+        activeMemories: 4,
+        totalMemories: 4,
+        totalEdges: 5,
+        relationshipCount: 3,
+        entityCount: 6,
+        tagCount: 10,
+        oauthConnections: 0,
+        recalledMemories: 4,
+      }),
+    ).toEqual({
+      edgeDensity: 1.3,
+      signalCoverage: 80,
+      status: "Well linked",
+    });
+  });
+
+  test("summarizes relationship readiness from graph metrics", () => {
+    expect(
+      getRelationshipReadinessSummary({
+        activeMemories: 4,
+        totalMemories: 4,
+        totalEdges: 5,
+        relationshipCount: 3,
+        entityCount: 6,
+        tagCount: 10,
+        oauthConnections: 0,
+        recalledMemories: 4,
+      }),
+    ).toEqual({
+      relationshipDiversity: 60,
+      status: "Typed graph",
     });
   });
 

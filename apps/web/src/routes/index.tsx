@@ -68,8 +68,10 @@ import {
   type DistributionPoint,
   getActivitySummary,
   getDashboardMetrics,
+  getGraphHealthSummary,
   getMemoryNeighborDetails,
   getRecentActivity,
+  getRelationshipReadinessSummary,
   getTypeDistribution,
   getTypeDistributionSummary,
 } from "../dashboard-model";
@@ -952,6 +954,8 @@ function DashboardOverview({
   typeDistribution: DistributionPoint[];
 }>) {
   const activitySummary = getActivitySummary(recentActivity);
+  const graphHealth = getGraphHealthSummary(metrics);
+  const relationshipReadiness = getRelationshipReadinessSummary(metrics);
   const typeSummary = getTypeDistributionSummary(typeDistribution);
 
   return (
@@ -1023,6 +1027,26 @@ function DashboardOverview({
           </div>
         </div>
       </div>
+      <div className="insight-panel graph-health-panel">
+        <div className="panel-heading">
+          <span>Graph health</span>
+          <strong>{graphHealth.status}</strong>
+        </div>
+        <ul aria-label="Graph health signals" className="insight-list">
+          <li>
+            <span>Edge density</span>
+            <strong>{graphHealth.edgeDensity}</strong>
+          </li>
+          <li>
+            <span>Signal coverage</span>
+            <strong>{graphHealth.signalCoverage}%</strong>
+          </li>
+          <li>
+            <span>Active nodes</span>
+            <strong>{metrics.activeMemories}</strong>
+          </li>
+        </ul>
+      </div>
       <div className="chart-panel type-panel">
         <div className="panel-heading">
           <span>Memory mix</span>
@@ -1088,6 +1112,29 @@ function DashboardOverview({
             )}
           </div>
         </div>
+      </div>
+      <div className="insight-panel relationship-health-panel">
+        <div className="panel-heading">
+          <span>Relationship readiness</span>
+          <strong>{relationshipReadiness.status}</strong>
+        </div>
+        <ul
+          aria-label="Relationship readiness signals"
+          className="insight-list"
+        >
+          <li>
+            <span>Relationship diversity</span>
+            <strong>{relationshipReadiness.relationshipDiversity}%</strong>
+          </li>
+          <li>
+            <span>Types indexed</span>
+            <strong>{metrics.relationshipCount}</strong>
+          </li>
+          <li>
+            <span>Total edges</span>
+            <strong>{metrics.totalEdges}</strong>
+          </li>
+        </ul>
       </div>
     </section>
   );

@@ -359,6 +359,7 @@ textarea:focus-visible,
 
 .metric-tile,
 .chart-panel,
+.insight-panel,
 .panel,
 .memory,
 .stat,
@@ -414,6 +415,42 @@ textarea:focus-visible,
 
 .type-panel {
   grid-column: span 3;
+}
+
+.insight-panel {
+  min-height: 100%;
+  border-radius: var(--radius-lg);
+  padding: 15px;
+}
+
+.insight-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.insight-list li {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--secondary);
+  padding: 10px;
+}
+
+.insight-list span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.insight-list strong {
+  color: var(--foreground);
+  font-size: 20px;
+  line-height: 1.1;
 }
 
 .panel-heading,

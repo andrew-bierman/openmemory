@@ -114,6 +114,60 @@ export function getTypeDistributionSummary(
   };
 }
 
+export function getGraphHealthSummary(
+  metrics: DashboardMetrics,
+): GraphHealthSummary {
+  const activeMemories = Math.max(0, metrics.activeMemories);
+  const edgeDensity =
+    activeMemories > 0
+      ? Number((metrics.totalEdges / activeMemories).toFixed(1))
+      : 0;
+  const signalCoverage =
+    activeMemories > 0
+      ? Math.min(
+          100,
+          Math.round(
+            ((metrics.entityCount + metrics.tagCount) / activeMemories) * 20,
+          ),
+        )
+      : 0;
+  const status =
+    metrics.totalEdges === 0
+      ? "Needs edges"
+      : edgeDensity >= 1 && signalCoverage >= 80
+        ? "Well linked"
+        : "Building";
+
+  return {
+    edgeDensity,
+    signalCoverage,
+    status,
+  };
+}
+
+export function getRelationshipReadinessSummary(
+  metrics: DashboardMetrics,
+): RelationshipReadinessSummary {
+  const relationshipDiversity =
+    metrics.totalEdges > 0
+      ? Math.min(
+          100,
+          Math.round((metrics.relationshipCount / metrics.totalEdges) * 100),
+        )
+      : 0;
+  const status =
+    metrics.relationshipCount === 0
+      ? "No relationships"
+      : metrics.relationshipCount >= 3
+        ? "Typed graph"
+        : "Basic graph";
+
+  return {
+    relationshipDiversity,
+    status,
+  };
+}
+
 export function getRelationshipDistribution(
   links: KnowledgeLink[],
 ): DistributionPoint[] {
@@ -374,6 +428,17 @@ export type TypeDistributionSummary = {
   leadingLabel: string;
   leadingShare: number;
   total: number;
+};
+
+export type GraphHealthSummary = {
+  edgeDensity: number;
+  signalCoverage: number;
+  status: "Building" | "Needs edges" | "Well linked";
+};
+
+export type RelationshipReadinessSummary = {
+  relationshipDiversity: number;
+  status: "Basic graph" | "No relationships" | "Typed graph";
 };
 
 export type KnowledgeNode = {
