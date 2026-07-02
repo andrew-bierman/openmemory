@@ -73,6 +73,7 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     .locator(".tabs")
     .getByRole("button", { name: "Admin", exact: true })
     .click();
+  await expect(page).toHaveURL(/view=admin/);
   const adminGrid = page.locator(".admin-grid");
   await expect(adminGrid).toBeVisible();
   await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
@@ -86,9 +87,24 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     .locator(".tabs")
     .getByRole("button", { name: "MCP", exact: true })
     .click();
+  await expect(page).toHaveURL(/view=mcp/);
   await expect(page.locator("pre.context").first()).toContainText(
     "/.well-known/oauth-authorization-server/api/auth",
   );
+
+  await page.goto("/?view=admin");
+  await expect(page.locator(".admin-grid")).toBeVisible();
+  await expect(
+    page.locator(".tabs").getByRole("button", { name: "Admin", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+
+  await page.goto("/?view=graph");
+  await expect(page.locator(".force-graph-frame canvas")).toHaveCount(1);
+  await expect(
+    page
+      .locator(".tabs")
+      .getByRole("button", { name: "Knowledge Map", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
 
   expect(errors).toEqual([]);
 });

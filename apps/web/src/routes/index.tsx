@@ -73,6 +73,9 @@ const DEFAULT_API_URL = "http://127.0.0.1:54150";
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
+  validateSearch: (search: Record<string, unknown>) => ({
+    view: parseView(search.view),
+  }),
   component: Home,
 });
 
@@ -87,6 +90,8 @@ const VIEW_LABELS = {
 type View = keyof typeof VIEW_LABELS;
 
 function Home() {
+  const { view } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [apiUrl, setApiUrl] = useLocalStorage(
     "openmemory:apiUrl",
     DEFAULT_API_URL,
@@ -111,7 +116,6 @@ function Home() {
   const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
   const [lastIndexRepair, setLastIndexRepair] =
     useState<IndexRepairResult | null>(null);
-  const [view, setView] = useState<View>("recall");
   const [error, setError] = useState<string | null>(null);
   const usesLocalTenant = isLocalApiUrl(apiUrl);
   const queryClient = useQueryClient();
@@ -191,6 +195,14 @@ function Home() {
   const refresh = useCallback(async () => {
     await run(invalidateDashboard);
   }, [invalidateDashboard, run]);
+  const selectView = useCallback(
+    (nextView: View) => {
+      void navigate({
+        search: { view: nextView },
+      });
+    },
+    [navigate],
+  );
 
   const createMemoryMutation = useMutation({
     mutationFn: api.createMemory,
@@ -282,7 +294,7 @@ function Home() {
     setIngestContent("");
     setSelectedMemory(result.memories[0] ?? null);
     setNeighbors(result.edges);
-    setView("graph");
+    selectView("graph");
   }
 
   async function inspectMemory(id: string) {
@@ -293,7 +305,7 @@ function Home() {
       ]);
       setSelectedMemory(memory);
       setNeighbors(nextNeighbors);
-      setView("graph");
+      selectView("graph");
     });
   }
 
@@ -368,7 +380,7 @@ function Home() {
           </div>
         </div>
 
-        <SidebarNav activeView={view} onSelect={setView} />
+        <SidebarNav activeView={view} onSelect={selectView} />
 
         <Card className="sidebar-section">
           <div className="section-label">Connection</div>
@@ -493,7 +505,7 @@ function Home() {
                 active={view === item}
                 aria-selected={view === item}
                 key={item}
-                onClick={() => setView(item)}
+                onClick={() => selectView(item)}
                 type="button"
               >
                 {VIEW_LABELS[item]}
@@ -1089,4 +1101,10 @@ function isLocalApiUrl(apiUrl: string) {
   } catch {
     return false;
   }
+}
+
+function parseView(value: unknown): View {
+  return typeof value === "string" && value in VIEW_LABELS
+    ? (value as View)
+    : "recall";
 }
