@@ -4,7 +4,9 @@ import {
   getActivitySummary,
   getDashboardMetrics,
   getGraphHealthSummary,
+  getIndexReadinessSummary,
   getKnowledgeMap,
+  getLifecycleDistribution,
   getMemoryLabel,
   getMemoryNeighborDetails,
   getRecentActivity,
@@ -106,6 +108,14 @@ describe("dashboard model", () => {
     });
   });
 
+  test("summarizes memory lifecycle for dashboard health charts", () => {
+    expect(getLifecycleDistribution(memories)).toEqual([
+      { label: "active", count: 3, percent: 100 },
+      { label: "historical", count: 0, percent: 0 },
+      { label: "forgotten", count: 1, percent: 33 },
+    ]);
+  });
+
   test("summarizes graph health from dashboard metrics", () => {
     expect(
       getGraphHealthSummary({
@@ -140,6 +150,25 @@ describe("dashboard model", () => {
     ).toEqual({
       relationshipDiversity: 60,
       status: "Typed graph",
+    });
+  });
+
+  test("summarizes index readiness from latest memory state", () => {
+    expect(
+      getIndexReadinessSummary([
+        ...memories,
+        memory({
+          id: "mem_superseded",
+          content: "Older project preference revision.",
+          isLatest: false,
+          status: "superseded",
+        }),
+      ]),
+    ).toEqual({
+      currentMemories: 3,
+      currentShare: 75,
+      staleMemories: 1,
+      status: "Needs repair",
     });
   });
 

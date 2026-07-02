@@ -81,6 +81,33 @@ export function getTypeDistribution(memories: Memory[]): DistributionPoint[] {
   );
 }
 
+export function getLifecycleDistribution(
+  memories: Memory[],
+): DistributionPoint[] {
+  const counts = new Map([
+    ["active", 0],
+    ["historical", 0],
+    ["forgotten", 0],
+  ]);
+
+  for (const memory of memories) {
+    if (memory.status === "forgotten") {
+      counts.set("forgotten", (counts.get("forgotten") ?? 0) + 1);
+    } else if (memory.status !== "active" || !memory.isLatest) {
+      counts.set("historical", (counts.get("historical") ?? 0) + 1);
+    } else {
+      counts.set("active", (counts.get("active") ?? 0) + 1);
+    }
+  }
+
+  const max = Math.max(1, ...counts.values());
+  return Array.from(counts, ([label, count]) => ({
+    label,
+    count,
+    percent: Math.round((count / max) * 100),
+  }));
+}
+
 export function getActivitySummary(activity: ActivityPoint[]): ActivitySummary {
   const total = activity.reduce((sum, point) => sum + point.count, 0);
   const activeDays = activity.filter((point) => point.count > 0).length;
@@ -165,6 +192,33 @@ export function getRelationshipReadinessSummary(
 
   return {
     relationshipDiversity,
+    status,
+  };
+}
+
+export function getIndexReadinessSummary(
+  memories: Memory[],
+): IndexReadinessSummary {
+  const indexedMemories = memories.filter(
+    (memory) => memory.status !== "forgotten",
+  );
+  const staleMemories = indexedMemories.filter((memory) => !memory.isLatest);
+  const currentMemories = indexedMemories.length - staleMemories.length;
+  const currentShare =
+    indexedMemories.length > 0
+      ? Math.round((currentMemories / indexedMemories.length) * 100)
+      : 0;
+  const status =
+    indexedMemories.length === 0
+      ? "Empty"
+      : staleMemories.length > 0
+        ? "Needs repair"
+        : "Current";
+
+  return {
+    currentMemories,
+    currentShare,
+    staleMemories: staleMemories.length,
     status,
   };
 }
@@ -463,6 +517,13 @@ export type GraphHealthSummary = {
 export type RelationshipReadinessSummary = {
   relationshipDiversity: number;
   status: "Basic graph" | "No relationships" | "Typed graph";
+};
+
+export type IndexReadinessSummary = {
+  currentMemories: number;
+  currentShare: number;
+  staleMemories: number;
+  status: "Current" | "Empty" | "Needs repair";
 };
 
 export type SourceIngestSummary = {

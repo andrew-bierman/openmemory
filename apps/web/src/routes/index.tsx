@@ -70,6 +70,8 @@ import {
   getActivitySummary,
   getDashboardMetrics,
   getGraphHealthSummary,
+  getIndexReadinessSummary,
+  getLifecycleDistribution,
   getMemoryNeighborDetails,
   getRecentActivity,
   getRelationshipReadinessSummary,
@@ -235,6 +237,10 @@ function Home() {
   const recentActivity = useMemo(() => getRecentActivity(memories), [memories]);
   const typeDistribution = useMemo(
     () => getTypeDistribution(memories),
+    [memories],
+  );
+  const lifecycleDistribution = useMemo(
+    () => getLifecycleDistribution(memories),
     [memories],
   );
   const tableGlobalFilter = memorySearch ?? "";
@@ -693,6 +699,8 @@ function Home() {
         </header>
 
         <DashboardOverview
+          lifecycleDistribution={lifecycleDistribution}
+          memories={memories}
           metrics={dashboardMetrics}
           recentActivity={recentActivity}
           typeDistribution={typeDistribution}
@@ -978,16 +986,21 @@ function SidebarNav({
 }
 
 function DashboardOverview({
+  lifecycleDistribution,
+  memories,
   metrics,
   recentActivity,
   typeDistribution,
 }: Readonly<{
+  lifecycleDistribution: DistributionPoint[];
+  memories: Memory[];
   metrics: DashboardMetrics;
   recentActivity: ActivityPoint[];
   typeDistribution: DistributionPoint[];
 }>) {
   const activitySummary = getActivitySummary(recentActivity);
   const graphHealth = getGraphHealthSummary(metrics);
+  const indexReadiness = getIndexReadinessSummary(memories);
   const relationshipReadiness = getRelationshipReadinessSummary(metrics);
   const typeSummary = getTypeDistributionSummary(typeDistribution);
 
@@ -1166,6 +1179,103 @@ function DashboardOverview({
           <li>
             <span>Total edges</span>
             <strong>{metrics.totalEdges}</strong>
+          </li>
+        </ul>
+      </div>
+      <div className="chart-panel lifecycle-panel">
+        <div className="panel-heading">
+          <span>Memory lifecycle</span>
+          <strong>{indexReadiness.currentShare}% current</strong>
+        </div>
+        <div className="chart-panel-grid">
+          <div className="chart-summary">
+            <span>Current index</span>
+            <strong>{indexReadiness.currentMemories}</strong>
+            <small>
+              {indexReadiness.staleMemories} stale records ·{" "}
+              {indexReadiness.status}
+            </small>
+            <ul
+              aria-label="Memory lifecycle ranking"
+              className="distribution-list"
+            >
+              {lifecycleDistribution.map((point) => (
+                <li className="distribution-row" key={point.label}>
+                  <span>{point.label}</span>
+                  <div aria-hidden="true">
+                    <i
+                      style={{
+                        inlineSize: `${Math.max(8, point.percent)}%`,
+                      }}
+                    />
+                  </div>
+                  <strong>{point.count}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div
+            className="chart-frame"
+            role="img"
+            aria-label="Memory lifecycle status"
+          >
+            <ResponsiveContainer height={150} width="100%">
+              <BarChart
+                data={lifecycleDistribution}
+                margin={{ bottom: 0, left: 0, right: 12, top: 4 }}
+              >
+                <CartesianGrid stroke="#e4e4e7" vertical={false} />
+                <XAxis
+                  axisLine={false}
+                  dataKey="label"
+                  tickLine={false}
+                  tickMargin={8}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(15, 118, 110, 0.08)" }}
+                  formatter={(value) => [value, "Memories"]}
+                />
+                <Bar dataKey="count" radius={[6, 6, 2, 2]}>
+                  {lifecycleDistribution.map((point) => (
+                    <Cell
+                      fill={
+                        point.label === "forgotten"
+                          ? "#71717a"
+                          : point.label === "historical"
+                            ? "#d97706"
+                            : "#0f766e"
+                      }
+                      key={point.label}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+      <div className="insight-panel index-health-panel">
+        <div className="panel-heading">
+          <span>Index readiness</span>
+          <strong>{indexReadiness.status}</strong>
+        </div>
+        <ul aria-label="Index readiness signals" className="insight-list">
+          <li>
+            <span>Current share</span>
+            <strong>{indexReadiness.currentShare}%</strong>
+          </li>
+          <li>
+            <span>Current records</span>
+            <strong>{indexReadiness.currentMemories}</strong>
+          </li>
+          <li>
+            <span>Stale records</span>
+            <strong>{indexReadiness.staleMemories}</strong>
           </li>
         </ul>
       </div>

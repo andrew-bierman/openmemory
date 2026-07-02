@@ -417,6 +417,10 @@ textarea:focus-visible,
   grid-column: span 3;
 }
 
+.lifecycle-panel {
+  grid-column: span 3;
+}
+
 .insight-panel {
   min-height: 100%;
   border-radius: var(--radius-lg);
