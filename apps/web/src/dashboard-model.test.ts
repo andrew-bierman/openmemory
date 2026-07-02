@@ -7,6 +7,7 @@ import {
   getMemoryLabel,
   getRecentActivity,
   getRelationshipDistribution,
+  getSelectedNodeRelationships,
   getTypeDistribution,
   getTypeDistributionSummary,
 } from "./dashboard-model";
@@ -142,6 +143,39 @@ describe("dashboard model", () => {
       { label: "shared-signal", count: 1, percent: 100 },
       { label: "supports", count: 1, percent: 100 },
     ]);
+  });
+
+  test("describes relationships touching the selected graph node", () => {
+    const graph = getKnowledgeMap(memories, edges, "mem_rag");
+
+    expect(
+      getSelectedNodeRelationships(graph).map((relationship) => ({
+        direction: relationship.direction,
+        relationship: relationship.relationship,
+        memoryId: relationship.memory.id,
+      })),
+    ).toEqual([
+      {
+        direction: "outgoing",
+        relationship: "informs",
+        memoryId: "mem_ui",
+      },
+      {
+        direction: "incoming",
+        relationship: "supports",
+        memoryId: "mem_arch",
+      },
+    ]);
+  });
+
+  test("prioritizes explicit selected relationships over fallback graph signals", () => {
+    const graph = getKnowledgeMap(memories, edges, "mem_arch");
+
+    expect(
+      getSelectedNodeRelationships(graph).map(
+        (relationship) => relationship.relationship,
+      ),
+    ).toEqual(["supports", "shared-signal"]);
   });
 
   test("truncates long memory labels for graph cards and canvas labels", () => {

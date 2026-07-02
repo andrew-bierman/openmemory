@@ -34,6 +34,7 @@ import {
 import {
   getKnowledgeMap,
   getRelationshipDistribution,
+  getSelectedNodeRelationships,
   type KnowledgeNode,
 } from "./dashboard-model";
 
@@ -328,7 +329,19 @@ export function KnowledgeMap({
     () => getRelationshipDistribution(graph.links),
     [graph.links],
   );
+  const selectedRelationships = useMemo(
+    () => getSelectedNodeRelationships(graph),
+    [graph],
+  );
   const selectedNode = graph.nodes.find((node) => node.isSelected) ?? null;
+  const selectedSignals = selectedNode
+    ? Array.from(
+        new Set([
+          ...selectedNode.memory.tags,
+          ...selectedNode.memory.entityIds,
+        ]),
+      ).slice(0, 6)
+    : [];
 
   const fitGraph = useCallback(() => {
     if (graph.nodes.length <= 1) {
@@ -476,6 +489,25 @@ export function KnowledgeMap({
             <strong>{selectedNode?.memory.type ?? "None"}</strong>
             <small>{selectedNode?.label ?? "Choose a memory to inspect"}</small>
           </div>
+          {selectedNode ? (
+            <article
+              className="selected-node-detail"
+              aria-label="Selected memory graph detail"
+            >
+              <div>
+                <Badge>{selectedNode.memory.type}</Badge>
+                <time dateTime={selectedNode.memory.updatedAt}>
+                  {formatShortDate(selectedNode.memory.updatedAt)}
+                </time>
+              </div>
+              <p>{selectedNode.memory.content}</p>
+              <ul aria-label="Selected memory signals">
+                {selectedSignals.map((signal) => (
+                  <li key={signal}>{signal}</li>
+                ))}
+              </ul>
+            </article>
+          ) : null}
           <ul
             aria-label="Visible relationship types"
             className="relationship-list"
@@ -494,6 +526,30 @@ export function KnowledgeMap({
                     />
                   </div>
                   <strong>{relationship.count}</strong>
+                </li>
+              ))
+            )}
+          </ul>
+          <ul
+            aria-label="Selected memory relationships"
+            className="selected-relationship-list"
+          >
+            {selectedRelationships.length === 0 ? (
+              <li className="selected-relationship-empty">
+                Select a memory to inspect direct graph relationships.
+              </li>
+            ) : (
+              selectedRelationships.slice(0, 4).map((relationship) => (
+                <li
+                  className="selected-relationship-row"
+                  key={`${relationship.direction}:${relationship.relationship}:${relationship.memory.id}`}
+                >
+                  <span>{relationship.relationship}</span>
+                  <strong>{relationship.memory.type}</strong>
+                  <small>
+                    {relationship.direction === "incoming" ? "From" : "To"} ·{" "}
+                    {getCompactMemoryText(relationship.memory.content)}
+                  </small>
                 </li>
               ))
             )}
@@ -585,6 +641,11 @@ function formatShortDate(value: string) {
 
 function truncateGraphLabel(label: string) {
   return label.length > 22 ? `${label.slice(0, 21)}...` : label;
+}
+
+function getCompactMemoryText(content: string) {
+  const clean = content.replace(/\s+/g, " ").trim();
+  return clean.length > 74 ? `${clean.slice(0, 73)}...` : clean;
 }
 
 type ForceGraph2DComponent = ComponentType<{

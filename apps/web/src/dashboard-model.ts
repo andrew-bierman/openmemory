@@ -133,6 +133,44 @@ export function getRelationshipDistribution(
   );
 }
 
+export function getSelectedNodeRelationships(
+  graph: KnowledgeGraph,
+): SelectedNodeRelationship[] {
+  const selectedNode = graph.nodes.find((node) => node.isSelected);
+  if (!selectedNode) {
+    return [];
+  }
+
+  const relationships: SelectedNodeRelationship[] = [];
+
+  for (const link of graph.links) {
+    if (link.source.id === selectedNode.id) {
+      relationships.push({
+        direction: "outgoing",
+        relationship: link.relationship,
+        memory: link.target.memory,
+      });
+    }
+
+    if (link.target.id === selectedNode.id) {
+      relationships.push({
+        direction: "incoming",
+        relationship: link.relationship,
+        memory: link.source.memory,
+      });
+    }
+  }
+
+  return relationships.sort(
+    (left, right) =>
+      getRelationshipPriority(left.relationship) -
+        getRelationshipPriority(right.relationship) ||
+      left.relationship.localeCompare(right.relationship) ||
+      left.memory.type.localeCompare(right.memory.type) ||
+      left.memory.content.localeCompare(right.memory.content),
+  );
+}
+
 export function getKnowledgeMap(
   memories: Memory[],
   neighbors: GraphEdge[],
@@ -250,6 +288,12 @@ function sharesMemorySignal(left: Memory, right: Memory) {
   );
 }
 
+function getRelationshipPriority(relationship: string) {
+  return relationship === "shared-signal" || relationship.startsWith("shares_")
+    ? 1
+    : 0;
+}
+
 export type DashboardMetrics = {
   activeMemories: number;
   totalMemories: number;
@@ -308,6 +352,12 @@ export type KnowledgeLink = {
 export type KnowledgeGraph = {
   nodes: KnowledgeNode[];
   links: KnowledgeLink[];
+};
+
+export type SelectedNodeRelationship = {
+  direction: "incoming" | "outgoing";
+  relationship: string;
+  memory: Memory;
 };
 
 export type GraphFilters = {

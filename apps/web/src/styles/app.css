@@ -1016,6 +1016,109 @@ textarea:focus-visible,
   font-size: 12px;
 }
 
+.selected-node-detail {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--background);
+  padding: 10px;
+}
+
+.selected-node-detail > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.selected-node-detail time {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.selected-node-detail p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  -webkit-box-orient: vertical;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 650;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+
+.selected-node-detail ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selected-node-detail li {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--muted);
+  padding: 3px 7px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.selected-relationship-list {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selected-relationship-empty,
+.selected-relationship-row {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+  padding: 9px;
+}
+
+.selected-relationship-empty {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.selected-relationship-row {
+  display: grid;
+  gap: 3px;
+}
+
+.selected-relationship-row span {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.selected-relationship-row strong {
+  color: var(--foreground);
+  font-size: 13px;
+}
+
+.selected-relationship-row small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  color: var(--muted-foreground);
+  white-space: normal;
+  -webkit-line-clamp: 2;
+}
+
 .graph-node-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

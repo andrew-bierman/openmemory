@@ -224,6 +224,12 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.locator(".memory").first()).toContainText(
     "OpenMemory uses Durable Objects",
   );
+  await expect(page.getByLabel("Selected memory graph detail")).toContainText(
+    "OpenMemory uses Durable Objects",
+  );
+  await expect(page.getByLabel("Selected memory relationships")).toContainText(
+    "supports",
+  );
   await expect(page.locator(".memory.compact").first()).toContainText(
     "supports",
   );
