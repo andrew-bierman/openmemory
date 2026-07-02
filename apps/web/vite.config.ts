@@ -10,5 +10,26 @@ export default defineConfig({
     port: 54152,
     strictPort: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) {
+            return undefined;
+          }
+
+          if (id.includes("react-force-graph-2d")) {
+            return "graph";
+          }
+
+          if (id.includes("recharts") || id.includes("d3-")) {
+            return "charts";
+          }
+
+          return undefined;
+        },
+      },
+    },
+  },
   plugins: [tsconfigPaths(), tailwindcss(), tanstackStart(), react()],
 });
