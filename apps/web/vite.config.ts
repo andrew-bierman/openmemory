@@ -1,3 +1,4 @@
+import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
@@ -9,5 +10,5 @@ export default defineConfig({
     port: 54152,
     strictPort: true,
   },
-  plugins: [tsconfigPaths(), tanstackStart(), react()],
+  plugins: [tsconfigPaths(), tailwindcss(), tanstackStart(), react()],
 });

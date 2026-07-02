@@ -20,10 +20,12 @@
   },
   "devDependencies": {
     "@openmemory/typescript-config": "workspace:*",
+    "@tailwindcss/vite": "^4.3.2",
     "@types/node": "^25.0.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
+    "tailwindcss": "^4.3.2",
     "typescript": "^5.9.2",
     "vite": "^7.2.7",
     "vite-tsconfig-paths": "^5.1.4",

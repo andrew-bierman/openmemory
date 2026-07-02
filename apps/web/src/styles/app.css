@@ -1,3 +1,7 @@
+@import "tailwindcss";
+@source "../../../../packages/ui/src";
+@source "../**/*.{ts,tsx}";
+
 :root {
   --background: #f8fafc;
   --foreground: #09090b;
@@ -46,71 +50,18 @@ textarea {
   font: inherit;
 }
 
-button {
-  min-height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: linear-gradient(180deg, #ffffff, #eef2f6);
-  color: var(--foreground);
-  padding: 7px 12px;
-  font-size: 13px;
-  font-weight: 750;
-  line-height: 1;
-  cursor: pointer;
-  box-shadow:
-    var(--shadow-sm),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  transition:
-    transform 140ms ease,
-    border-color 140ms ease,
-    background-color 140ms ease,
-    box-shadow 140ms ease;
-}
-
 button svg {
   width: 15px;
   height: 15px;
   flex: 0 0 auto;
 }
 
-button:hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: rgba(37, 111, 159, 0.36);
-  box-shadow: 0 12px 28px rgba(53, 64, 80, 0.14);
-}
-
-button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 .graph-node-group:focus-visible {
   outline: none;
   box-shadow: 0 0 0 4px var(--ring);
-}
-
-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.46;
-  transform: none;
-  box-shadow: none;
-}
-
-button[class*="bg-zinc-950"],
-.tabs button[class*="bg-zinc-950"] {
-  border-color: rgba(17, 24, 39, 0.94);
-  background: linear-gradient(180deg, #263244, #111827);
-  color: var(--primary-foreground);
-}
-
-button[class*="border-zinc-200"],
-button[class*="text-zinc-950"] {
-  border-color: var(--border);
-  background: rgba(255, 255, 255, 0.66);
-  color: var(--foreground);
 }
 
 .app-shell {
@@ -184,9 +135,12 @@ button[class*="text-zinc-950"] {
   align-items: flex-start;
   gap: 9px;
   border: 1px solid transparent;
+  border-radius: var(--radius);
   background: transparent;
+  padding: 9px 11px;
   box-shadow: none;
   text-align: left;
+  cursor: pointer;
 }
 
 .nav-item:hover:not(:disabled) {
@@ -263,41 +217,6 @@ button[class*="text-zinc-950"] {
   color: #3f3f46;
   font-size: 12px;
   font-weight: 760;
-}
-
-.field input,
-.field select,
-.field textarea,
-.toolbar input {
-  width: 100%;
-  border: 1px solid var(--input);
-  border-radius: 11px;
-  background: var(--card-solid);
-  color: var(--foreground);
-  padding: 10px 12px;
-  outline: none;
-  transition:
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    background-color 160ms ease;
-}
-
-.field input:focus,
-.field select:focus,
-.field textarea:focus,
-.toolbar input:focus {
-  border-color: rgba(37, 111, 159, 0.55);
-  background: var(--card-solid);
-}
-
-.field input:disabled {
-  color: #8b95a5;
-  background: var(--muted);
-}
-
-.field textarea {
-  min-height: 134px;
-  resize: vertical;
 }
 
 .stack {
@@ -643,21 +562,6 @@ button[class*="text-zinc-950"] {
   table-layout: fixed;
 }
 
-.data-table th,
-.data-table td {
-  border-bottom: 1px solid var(--border);
-  padding: 11px 12px;
-  text-align: left;
-  vertical-align: top;
-}
-
-.data-table th {
-  color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 820;
-  text-transform: uppercase;
-}
-
 .data-table tr:last-child td {
   border-bottom: 0;
 }
@@ -685,19 +589,6 @@ button[class*="text-zinc-950"] {
 .data-table th:nth-child(6),
 .data-table td:nth-child(6) {
   width: 142px;
-}
-
-.table-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--secondary);
-  padding: 3px 8px;
-  color: #27272a;
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .table-memory-button {

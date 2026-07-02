@@ -9,7 +9,23 @@ import {
   type OAuthConnection,
   OpenMemoryApiError,
 } from "@openmemory/client";
-import { Button } from "@openmemory/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Input,
+  Label,
+  Select,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+} from "@openmemory/ui";
 import { createRoute } from "@tanstack/react-router";
 import {
   Activity,
@@ -279,19 +295,19 @@ function Home() {
 
         <SidebarNav activeView={view} onSelect={setView} />
 
-        <section className="sidebar-section">
+        <Card className="sidebar-section">
           <div className="section-label">Connection</div>
           <div className="field">
-            <label htmlFor="apiUrl">API URL</label>
-            <input
+            <Label htmlFor="apiUrl">API URL</Label>
+            <Input
               id="apiUrl"
               onChange={(event) => setApiUrl(event.target.value)}
               value={apiUrl}
             />
           </div>
           <div className="field">
-            <label htmlFor="tenant">Tenant</label>
-            <input
+            <Label htmlFor="tenant">Tenant</Label>
+            <Input
               disabled={!usesLocalTenant}
               id="tenant"
               onChange={(event) => setTenantId(event.target.value)}
@@ -299,8 +315,8 @@ function Home() {
             />
           </div>
           <div className="field">
-            <label htmlFor="token">Bearer token</label>
-            <input
+            <Label htmlFor="token">Bearer token</Label>
+            <Input
               id="token"
               onChange={(event) => setToken(event.target.value)}
               placeholder="Optional"
@@ -308,102 +324,108 @@ function Home() {
               value={token}
             />
           </div>
-        </section>
+        </Card>
 
-        <form className="sidebar-section" onSubmit={signIn}>
-          <div className="section-label">Account</div>
-          <div className="session-row">
-            <strong>{sessionUser ? sessionUser.email : "Not signed in"}</strong>
-            {sessionUser ? (
-              <Button onClick={() => void signOut()} size="sm" type="button">
-                Sign out
-              </Button>
-            ) : null}
-          </div>
-          <div className="field">
-            <label htmlFor="name">Name</label>
-            <input
-              id="name"
-              onChange={(event) => setName(event.target.value)}
-              value={name}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="email">Email</label>
-            <input
-              id="email"
-              onChange={(event) => setEmail(event.target.value)}
-              type="email"
-              value={email}
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              minLength={8}
-              onChange={(event) => setPassword(event.target.value)}
-              type="password"
-              value={password}
-            />
-          </div>
-          <div className="row">
-            <Button disabled={isLoading || !email || !password} type="submit">
-              Sign in
-            </Button>
-            <Button
-              disabled={isLoading || !email || !password}
-              onClick={() => void signUp()}
-              type="button"
-              variant="outline"
-            >
-              Create account
-            </Button>
-          </div>
-        </form>
-
-        <form className="sidebar-section capture-section" onSubmit={remember}>
-          <div className="section-label">Capture</div>
-          <div className="field">
-            <label htmlFor="content">Memory</label>
-            <textarea
-              id="content"
-              onChange={(event) => setContent(event.target.value)}
-              placeholder="Save a fact, preference, decision, episode, or insight."
-              required
-              value={content}
-            />
-          </div>
-          <div className="row">
-            <div className="field">
-              <label htmlFor="type">Type</label>
-              <select
-                id="type"
-                onChange={(event) => setType(event.target.value)}
-                value={type}
-              >
-                <option value="fact">Fact</option>
-                <option value="preference">Preference</option>
-                <option value="decision">Decision</option>
-                <option value="episode">Episode</option>
-                <option value="insight">Insight</option>
-                <option value="profile">Profile</option>
-              </select>
+        <Card className="sidebar-section">
+          <form className="stack" onSubmit={signIn}>
+            <div className="section-label">Account</div>
+            <div className="session-row">
+              <strong>
+                {sessionUser ? sessionUser.email : "Not signed in"}
+              </strong>
+              {sessionUser ? (
+                <Button onClick={() => void signOut()} size="sm" type="button">
+                  Sign out
+                </Button>
+              ) : null}
             </div>
             <div className="field">
-              <label htmlFor="tags">Tags</label>
-              <input
-                id="tags"
-                onChange={(event) => setTags(event.target.value)}
-                placeholder="work, project"
-                value={tags}
+              <Label htmlFor="name">Name</Label>
+              <Input
+                id="name"
+                onChange={(event) => setName(event.target.value)}
+                value={name}
               />
             </div>
-          </div>
-          <Button disabled={isLoading || !content.trim()} type="submit">
-            Remember
-          </Button>
-        </form>
+            <div className="field">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                onChange={(event) => setEmail(event.target.value)}
+                type="email"
+                value={email}
+              />
+            </div>
+            <div className="field">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                minLength={8}
+                onChange={(event) => setPassword(event.target.value)}
+                type="password"
+                value={password}
+              />
+            </div>
+            <div className="row">
+              <Button disabled={isLoading || !email || !password} type="submit">
+                Sign in
+              </Button>
+              <Button
+                disabled={isLoading || !email || !password}
+                onClick={() => void signUp()}
+                type="button"
+                variant="outline"
+              >
+                Create account
+              </Button>
+            </div>
+          </form>
+        </Card>
+
+        <Card className="sidebar-section capture-section">
+          <form className="stack" onSubmit={remember}>
+            <div className="section-label">Capture</div>
+            <div className="field">
+              <Label htmlFor="content">Memory</Label>
+              <Textarea
+                id="content"
+                onChange={(event) => setContent(event.target.value)}
+                placeholder="Save a fact, preference, decision, episode, or insight."
+                required
+                value={content}
+              />
+            </div>
+            <div className="row">
+              <div className="field">
+                <Label htmlFor="type">Type</Label>
+                <Select
+                  id="type"
+                  onChange={(event) => setType(event.target.value)}
+                  value={type}
+                >
+                  <option value="fact">Fact</option>
+                  <option value="preference">Preference</option>
+                  <option value="decision">Decision</option>
+                  <option value="episode">Episode</option>
+                  <option value="insight">Insight</option>
+                  <option value="profile">Profile</option>
+                </Select>
+              </div>
+              <div className="field">
+                <Label htmlFor="tags">Tags</Label>
+                <Input
+                  id="tags"
+                  onChange={(event) => setTags(event.target.value)}
+                  placeholder="work, project"
+                  value={tags}
+                />
+              </div>
+            </div>
+            <Button disabled={isLoading || !content.trim()} type="submit">
+              Remember
+            </Button>
+          </form>
+        </Card>
       </aside>
 
       <section className="content">
@@ -438,21 +460,21 @@ function Home() {
           typeDistribution={typeDistribution}
         />
 
-        <nav aria-label="Workspace views" className="tabs segmented-control">
+        <TabsList aria-label="Workspace views" className="tabs">
           {(["recall", "ingest", "graph", "mcp"] as const).map((item) => (
-            <Button
+            <TabsTrigger
+              active={view === item}
               key={item}
               onClick={() => setView(item)}
               type="button"
-              variant={view === item ? "default" : "outline"}
             >
               {VIEW_LABELS[item]}
-            </Button>
+            </TabsTrigger>
           ))}
-        </nav>
+        </TabsList>
 
         <form className="toolbar" onSubmit={recall}>
-          <input
+          <Input
             aria-label="Recall query"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Ask for context"
@@ -477,16 +499,16 @@ function Home() {
                   </div>
                 </div>
                 <div className="field">
-                  <label htmlFor="ingestSource">Source</label>
-                  <input
+                  <Label htmlFor="ingestSource">Source</Label>
+                  <Input
                     id="ingestSource"
                     onChange={(event) => setIngestSource(event.target.value)}
                     value={ingestSource}
                   />
                 </div>
                 <div className="field">
-                  <label htmlFor="ingestContent">Content</label>
-                  <textarea
+                  <Label htmlFor="ingestContent">Content</Label>
+                  <Textarea
                     id="ingestContent"
                     onChange={(event) => setIngestContent(event.target.value)}
                     required
@@ -768,24 +790,24 @@ function MemoryDataTable({
         </div>
       </div>
       <div className="data-table-scroll">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Memory</th>
-              <th>Status</th>
-              <th>Signals</th>
-              <th>Updated</th>
-              <th aria-label="Actions" />
-            </tr>
-          </thead>
-          <tbody>
+        <Table className="data-table">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Type</TableHead>
+              <TableHead>Memory</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Signals</TableHead>
+              <TableHead>Updated</TableHead>
+              <TableHead aria-label="Actions" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {memories.map((memory) => (
-              <tr key={memory.id}>
-                <td>
-                  <span className="table-badge">{memory.type}</span>
-                </td>
-                <td>
+              <TableRow key={memory.id}>
+                <TableCell>
+                  <Badge>{memory.type}</Badge>
+                </TableCell>
+                <TableCell>
                   <button
                     className="table-memory-button"
                     onClick={() => void onInspect(memory.id)}
@@ -793,21 +815,21 @@ function MemoryDataTable({
                   >
                     {memory.content}
                   </button>
-                </td>
-                <td>
-                  <span className="pill">{memory.status}</span>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
+                  <Badge variant="outline">{memory.status}</Badge>
+                </TableCell>
+                <TableCell>
                   <span className="muted">
                     {memory.tags.length + memory.entityIds.length}
                   </span>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <time dateTime={memory.updatedAt}>
                     {formatShortDate(memory.updatedAt)}
                   </time>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   <div className="table-actions">
                     <Button
                       onClick={() => void onInspect(memory.id)}
@@ -828,11 +850,11 @@ function MemoryDataTable({
                       Forget
                     </Button>
                   </div>
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
