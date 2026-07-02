@@ -13,13 +13,20 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     if (
       message.type() === "error" &&
       !message.text().includes("401") &&
-      !message.text().includes("Unauthorized")
+      !message.text().includes("Unauthorized") &&
+      !message.text().includes("Failed to load resource")
     ) {
       errors.push(message.text());
     }
   });
+  page.on("response", (response) => {
+    const status = response.status();
+    if (response.url().startsWith(API_URL) && status >= 400 && status !== 401) {
+      errors.push(`${status} ${response.url()}`);
+    }
+  });
 
-  await seedTenant(tenant);
+  const seeded = await seedTenant(tenant);
 
   await page.goto("/");
   await page.evaluate(
@@ -106,6 +113,44 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
       .getByRole("button", { name: "Knowledge Map", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
 
+  await page.goto("/");
+  await page.evaluate(
+    ({ apiUrl, tenantId }) => {
+      window.localStorage.setItem("openmemory:apiUrl", apiUrl);
+      window.localStorage.setItem("openmemory:tenantId", tenantId);
+    },
+    { apiUrl: API_URL, tenantId: tenant },
+  );
+  await page.reload({ waitUntil: "networkidle" });
+  await page
+    .locator("tbody")
+    .getByRole("button", { name: "Inspect", exact: true })
+    .first()
+    .click();
+  await expect(page).toHaveURL(/view=graph/);
+  await expect(page).toHaveURL(/memoryId=/);
+  await expect(
+    page.getByRole("heading", { name: "Memory Detail" }),
+  ).toBeVisible();
+
+  await page.evaluate(
+    ({ apiUrl, tenantId }) => {
+      window.localStorage.setItem("openmemory:apiUrl", apiUrl);
+      window.localStorage.setItem("openmemory:tenantId", tenantId);
+    },
+    { apiUrl: API_URL, tenantId: tenant },
+  );
+  await page.goto(`/?view=graph&memoryId=${seeded.decision.id}`, {
+    waitUntil: "networkidle",
+  });
+  await expect(
+    page.getByRole("heading", { name: "Memory Detail" }),
+  ).toBeVisible();
+  await expect(page.locator(".memory").first()).toContainText(
+    "OpenMemory uses Durable Objects",
+  );
+  await expect(page.getByText("supports")).toBeVisible();
+
   expect(errors).toEqual([]);
 });
 
@@ -157,6 +202,13 @@ async function seedTenant(tenant: string) {
       weight: 0.64,
     }),
   ]);
+
+  return {
+    decision: memories[0],
+    insight: memories[1],
+    preference: memories[2],
+    fact: memories[3],
+  };
 }
 
 async function createMemory(

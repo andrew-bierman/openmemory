@@ -74,6 +74,7 @@ export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   validateSearch: (search: Record<string, unknown>) => ({
+    memoryId: parseMemoryId(search.memoryId),
     view: parseView(search.view),
   }),
   component: Home,
@@ -90,17 +91,20 @@ const VIEW_LABELS = {
 type View = keyof typeof VIEW_LABELS;
 
 function Home() {
-  const { view } = Route.useSearch();
+  const { memoryId, view } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const [apiUrl, setApiUrl] = useLocalStorage(
+  const [apiUrl, setApiUrl, hasLoadedApiUrl] = useLocalStorage(
     "openmemory:apiUrl",
     DEFAULT_API_URL,
   );
-  const [tenantId, setTenantId] = useLocalStorage(
+  const [tenantId, setTenantId, hasLoadedTenantId] = useLocalStorage(
     "openmemory:tenantId",
     "local-user",
   );
-  const [token, setToken] = useLocalStorage("openmemory:token", "");
+  const [token, setToken, hasLoadedToken] = useLocalStorage(
+    "openmemory:token",
+    "",
+  );
   const [email, setEmail] = useLocalStorage("openmemory:email", "");
   const [name, setName] = useLocalStorage("openmemory:name", "");
   const [password, setPassword] = useState("");
@@ -111,13 +115,13 @@ function Home() {
   const [type, setType] = useState("fact");
   const [query, setQuery] = useState("recent project context");
   const [context, setContext] = useState<ContextResult | null>(null);
-  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  const [neighbors, setNeighbors] = useState<GraphEdge[]>([]);
   const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
   const [lastIndexRepair, setLastIndexRepair] =
     useState<IndexRepairResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const usesLocalTenant = isLocalApiUrl(apiUrl);
+  const hasLoadedConnection =
+    hasLoadedApiUrl && hasLoadedTenantId && hasLoadedToken;
   const queryClient = useQueryClient();
   const apiBaseUrl = cleanBaseUrl(apiUrl);
   const queryScope = useMemo(
@@ -135,26 +139,43 @@ function Home() {
     [apiBaseUrl, tenantId, token, usesLocalTenant],
   );
   const sessionQuery = useQuery({
+    enabled: hasLoadedConnection,
     queryKey: ["openmemory", "session", apiBaseUrl],
     queryFn: () => getSession(apiBaseUrl),
   });
   const memoriesQuery = useQuery({
+    enabled: hasLoadedConnection,
     queryKey: ["openmemory", "memories", ...queryScope],
     queryFn: () => api.listMemories(),
   });
   const profileQuery = useQuery({
+    enabled: hasLoadedConnection,
     queryKey: ["openmemory", "profile", ...queryScope],
     queryFn: () => api.getProfile(),
   });
   const graphStatsQuery = useQuery({
+    enabled: hasLoadedConnection,
     queryKey: ["openmemory", "graph-stats", ...queryScope],
     queryFn: () => api.getGraphStats(),
   });
+  const selectedMemoryQuery = useQuery({
+    enabled: hasLoadedConnection && Boolean(memoryId),
+    queryKey: ["openmemory", "memory", memoryId, ...queryScope],
+    queryFn: () => api.getMemory(memoryId ?? ""),
+  });
+  const neighborsQuery = useQuery({
+    enabled: hasLoadedConnection && Boolean(memoryId),
+    queryKey: ["openmemory", "neighbors", memoryId, ...queryScope],
+    queryFn: () => api.getNeighbors(memoryId ?? ""),
+  });
   const oauthConnectionsQuery = useQuery({
+    enabled: hasLoadedConnection,
     queryKey: ["openmemory", "oauth-connections", ...queryScope],
     queryFn: () => api.listOAuthConnections().catch(() => []),
   });
   const memories = memoriesQuery.data ?? [];
+  const selectedMemory = selectedMemoryQuery.data ?? null;
+  const neighbors = neighborsQuery.data ?? [];
   const graphStats = graphStatsQuery.data ?? null;
   const oauthConnections = oauthConnectionsQuery.data ?? [];
   const profile = profileQuery.data?.summary ?? "";
@@ -198,7 +219,24 @@ function Home() {
   const selectView = useCallback(
     (nextView: View) => {
       void navigate({
-        search: { view: nextView },
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          view: nextView,
+        }),
+      });
+    },
+    [navigate],
+  );
+  const selectMemory = useCallback(
+    (nextMemoryId: string | null) => {
+      void navigate({
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          memoryId: nextMemoryId ?? undefined,
+          view: "graph",
+        }),
       });
     },
     [navigate],
@@ -257,6 +295,8 @@ function Home() {
     memoriesQuery.isFetching ||
     profileQuery.isFetching ||
     graphStatsQuery.isFetching ||
+    selectedMemoryQuery.isFetching ||
+    neighborsQuery.isFetching ||
     oauthConnectionsQuery.isFetching ||
     createMemoryMutation.isPending ||
     ingestSourceMutation.isPending ||
@@ -292,21 +332,11 @@ function Home() {
       tags: parseTags(tags),
     });
     setIngestContent("");
-    setSelectedMemory(result.memories[0] ?? null);
-    setNeighbors(result.edges);
-    selectView("graph");
+    selectMemory(result.memories[0]?.id ?? null);
   }
 
   async function inspectMemory(id: string) {
-    await run(async () => {
-      const [memory, nextNeighbors] = await Promise.all([
-        api.getMemory(id),
-        api.getNeighbors(id),
-      ]);
-      setSelectedMemory(memory);
-      setNeighbors(nextNeighbors);
-      selectView("graph");
-    });
+    selectMemory(id);
   }
 
   async function forget(id: string) {
@@ -1047,7 +1077,7 @@ function useLocalStorage(key: string, initialValue: string) {
     window.localStorage.setItem(key, value);
   }, [hasLoaded, key, value]);
 
-  return [value, setValue] as const;
+  return [value, setValue, hasLoaded] as const;
 }
 
 function formatError(error: unknown) {
@@ -1107,4 +1137,8 @@ function parseView(value: unknown): View {
   return typeof value === "string" && value in VIEW_LABELS
     ? (value as View)
     : "recall";
+}
+
+function parseMemoryId(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : undefined;
 }
