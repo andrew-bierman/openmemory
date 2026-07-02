@@ -79,6 +79,8 @@ export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   validateSearch: (search: Record<string, unknown>) => ({
+    graphSearch: parseSearchTextParam(search.graphSearch),
+    graphType: parseMemoryTypeParam(search.graphType),
     memoryId: parseMemoryId(search.memoryId),
     memorySearch: parseSearchTextParam(search.memorySearch),
     memorySort: parseMemorySortParam(search.memorySort),
@@ -110,8 +112,15 @@ const MEMORY_SORT_COLUMNS = new Set([
 ]);
 
 function Home() {
-  const { memoryId, memorySearch, memorySort, memoryType, view } =
-    Route.useSearch();
+  const {
+    graphSearch,
+    graphType,
+    memoryId,
+    memorySearch,
+    memorySort,
+    memoryType,
+    view,
+  } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [apiUrl, setApiUrl, hasLoadedApiUrl] = useLocalStorage(
     "openmemory:apiUrl",
@@ -212,6 +221,8 @@ function Home() {
   const tableGlobalFilter = memorySearch ?? "";
   const tableTypeFilter = memoryType ?? "all";
   const tableSorting = useMemo(() => parseMemorySort(memorySort), [memorySort]);
+  const graphGlobalFilter = graphSearch ?? "";
+  const graphTypeFilter = graphType ?? "all";
 
   const invalidateDashboard = useCallback(async () => {
     await Promise.all([
@@ -312,6 +323,34 @@ function Home() {
       });
     },
     [navigate, tableSorting],
+  );
+  const updateGraphSearch = useCallback(
+    (nextSearch: string) => {
+      void navigate({
+        replace: true,
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          graphSearch: nextSearch.trim() ? nextSearch : undefined,
+          view: "graph",
+        }),
+      });
+    },
+    [navigate],
+  );
+  const updateGraphType = useCallback(
+    (nextType: string) => {
+      void navigate({
+        replace: true,
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          graphType: nextType === "all" ? undefined : nextType,
+          view: "graph",
+        }),
+      });
+    },
+    [navigate],
   );
 
   const createMemoryMutation = useMutation({
@@ -679,8 +718,12 @@ function Home() {
                 </div>
                 <GraphStatsPanel stats={graphStats} />
                 <KnowledgeMap
+                  graphSearch={graphGlobalFilter}
+                  graphType={graphTypeFilter}
                   memories={memories}
                   neighbors={neighbors}
+                  onGraphSearchChange={updateGraphSearch}
+                  onGraphTypeChange={updateGraphType}
                   onInspect={inspectMemory}
                   selectedMemoryId={selectedMemory?.id ?? null}
                 />

@@ -91,14 +91,26 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.locator(".graph-node-card")).toHaveCount(4);
 
   await page.getByLabel("Filter graph memories").fill("cloudflare");
+  await expect(page).toHaveURL(/graphSearch=cloudflare/);
+  await expect(page.locator(".graph-node-card")).toHaveCount(2);
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByLabel("Filter graph memories")).toHaveValue(
+    "cloudflare",
+  );
   await expect(page.locator(".graph-node-card")).toHaveCount(2);
 
   await page.getByLabel("Filter graph memories").fill("");
   await page.getByLabel("Filter graph by memory type").selectOption("insight");
+  await expect(page).toHaveURL(/graphType=insight/);
   await expect(page.locator(".graph-node-card")).toHaveCount(1);
   await expect(page.locator(".graph-node-card").first()).toContainText(
     "insight",
   );
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByLabel("Filter graph by memory type")).toHaveValue(
+    "insight",
+  );
+  await expect(page.locator(".graph-node-card")).toHaveCount(1);
 
   await page.getByRole("button", { name: "Fit graph" }).click();
 
@@ -138,6 +150,17 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
       .locator(".tabs")
       .getByRole("button", { name: "Knowledge Map", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
+
+  await page.goto("/?view=graph&graphSearch=cloudflare&graphType=decision", {
+    waitUntil: "networkidle",
+  });
+  await expect(page.getByLabel("Filter graph memories")).toHaveValue(
+    "cloudflare",
+  );
+  await expect(page.getByLabel("Filter graph by memory type")).toHaveValue(
+    "decision",
+  );
+  await expect(page.locator(".graph-node-card")).toHaveCount(1);
 
   await page.goto("/");
   await page.evaluate(

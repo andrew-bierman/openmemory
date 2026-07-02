@@ -263,21 +263,27 @@ export function MemoryDataTable({
 }
 
 export function KnowledgeMap({
+  graphSearch,
+  graphType,
   memories,
   neighbors,
-  selectedMemoryId,
+  onGraphSearchChange,
+  onGraphTypeChange,
   onInspect,
+  selectedMemoryId,
 }: Readonly<{
+  graphSearch: string;
+  graphType: string;
   memories: Memory[];
   neighbors: GraphEdge[];
-  selectedMemoryId: string | null;
+  onGraphSearchChange: (value: string) => void;
+  onGraphTypeChange: (value: string) => void;
   onInspect: (id: string) => Promise<void>;
+  selectedMemoryId: string | null;
 }>) {
   const [ForceGraph, setForceGraph] = useState<ForceGraph2DComponent | null>(
     null,
   );
-  const [graphSearch, setGraphSearch] = useState("");
-  const [graphType, setGraphType] = useState("all");
   const graphRef = useRef<ForceGraph2DMethods | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const [graphWidth, setGraphWidth] = useState(680);
@@ -316,8 +322,14 @@ export function KnowledgeMap({
   ).size;
 
   const fitGraph = useCallback(() => {
+    if (graph.nodes.length <= 1) {
+      graphRef.current?.centerAt(0, 0, 350);
+      graphRef.current?.zoom(1.3, 350);
+      return;
+    }
+
     graphRef.current?.zoomToFit(350, 48);
-  }, []);
+  }, [graph.nodes.length]);
 
   useEffect(() => {
     let mounted = true;
@@ -365,8 +377,8 @@ export function KnowledgeMap({
           graphType={graphType}
           memoryTypes={memoryTypes}
           onFit={fitGraph}
-          onSearchChange={setGraphSearch}
-          onTypeChange={setGraphType}
+          onSearchChange={onGraphSearchChange}
+          onTypeChange={onGraphTypeChange}
         />
         <div className="empty-map">
           <p className="muted">
@@ -391,8 +403,8 @@ export function KnowledgeMap({
         graphType={graphType}
         memoryTypes={memoryTypes}
         onFit={fitGraph}
-        onSearchChange={setGraphSearch}
-        onTypeChange={setGraphType}
+        onSearchChange={onGraphSearchChange}
+        onTypeChange={onGraphTypeChange}
       />
       <div className="force-graph-frame" ref={frameRef}>
         {ForceGraph ? (
@@ -555,5 +567,7 @@ type ForceGraph2DComponent = ComponentType<{
 }>;
 
 type ForceGraph2DMethods = {
+  centerAt: (x?: number, y?: number, durationMs?: number) => void;
+  zoom: (zoom?: number, durationMs?: number) => void;
   zoomToFit: (durationMs?: number, padding?: number) => void;
 };
