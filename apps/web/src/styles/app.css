@@ -59,7 +59,7 @@ button svg {
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
-.graph-node-group:focus-visible {
+.table-sort-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 4px var(--ring);
 }
@@ -409,70 +409,9 @@ textarea:focus-visible,
   font-weight: 760;
 }
 
-.bar-chart {
+.chart-frame {
   height: 128px;
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 10px;
-  align-items: end;
-}
-
-.bar-column {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted-foreground);
-  font-size: 11px;
-  font-weight: 720;
-}
-
-.bar-fill {
-  width: 100%;
-  max-width: 32px;
-  min-height: 8px;
-  border-radius: 999px 999px 6px 6px;
-  background: linear-gradient(180deg, var(--accent), #a9b995);
-  box-shadow: 0 10px 22px rgba(37, 111, 159, 0.18);
-}
-
-.type-bars {
-  display: grid;
-  gap: 10px;
-}
-
-.type-row {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr) 30px;
-  align-items: center;
-  gap: 10px;
-  color: #3f3f46;
-  font-size: 13px;
-}
-
-.type-row span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.type-row strong {
-  text-align: right;
-}
-
-.type-track {
-  height: 9px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--muted);
-}
-
-.type-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  min-width: 0;
 }
 
 .tabs {
@@ -591,6 +530,29 @@ textarea:focus-visible,
   width: 142px;
 }
 
+.table-sort-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  box-shadow: none;
+  font: inherit;
+  text-transform: inherit;
+}
+
+.table-sort-button:hover:not(:disabled) {
+  transform: none;
+  color: var(--foreground);
+  box-shadow: none;
+}
+
+.table-sort-button:disabled {
+  cursor: default;
+}
+
 .table-memory-button {
   min-height: auto;
   display: -webkit-box;
@@ -695,10 +657,10 @@ textarea:focus-visible,
   padding: 15px;
 }
 
-.knowledge-map svg {
+.force-graph-frame {
   width: 100%;
-  min-height: 292px;
-  display: block;
+  min-height: 420px;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 16px;
   background:
@@ -711,51 +673,14 @@ textarea:focus-visible,
     auto;
 }
 
+.force-graph-frame canvas {
+  display: block;
+}
+
 .empty-map {
   display: grid;
   min-height: 180px;
   place-items: center;
-}
-
-.graph-link {
-  stroke: rgba(63, 63, 70, 0.24);
-  stroke-width: 1.5;
-}
-
-.graph-node-group {
-  cursor: pointer;
-  outline: none;
-}
-
-.graph-node {
-  fill: #ffffff;
-  stroke: var(--accent);
-  stroke-width: 2;
-  filter: drop-shadow(0 10px 14px rgba(40, 67, 96, 0.16));
-  transition:
-    fill 160ms ease,
-    stroke 160ms ease,
-    transform 160ms ease;
-}
-
-.graph-node-group:hover .graph-node,
-.graph-node-group:focus-visible .graph-node {
-  fill: #eff6ff;
-  stroke: #1d4ed8;
-}
-
-.graph-node.selected {
-  fill: var(--accent);
-  stroke: #ffffff;
-  stroke-width: 3;
-}
-
-.graph-node-group text {
-  fill: #3f3f46;
-  font-size: 10px;
-  font-weight: 760;
-  pointer-events: none;
-  text-anchor: middle;
 }
 
 .meta {

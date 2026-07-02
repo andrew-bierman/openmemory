@@ -26,7 +26,16 @@ import {
   TabsTrigger,
   Textarea,
 } from "@openmemory/ui";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createRoute } from "@tanstack/react-router";
+import {
+  type ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  type SortingState,
+  useReactTable,
+} from "@tanstack/react-table";
 import {
   Activity,
   Brain,
@@ -42,13 +51,26 @@ import {
   Trash2,
 } from "lucide-react";
 import {
+  type ComponentType,
   type FormEvent,
   type ReactNode,
+  type Ref,
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Route as rootRoute } from "./__root";
 
 const DEFAULT_API_URL = "http://127.0.0.1:54150";
@@ -88,32 +110,55 @@ function Home() {
   const [type, setType] = useState("fact");
   const [query, setQuery] = useState("recent project context");
   const [context, setContext] = useState<ContextResult | null>(null);
-  const [memories, setMemories] = useState<Memory[]>([]);
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [neighbors, setNeighbors] = useState<GraphEdge[]>([]);
-  const [graphStats, setGraphStats] = useState<GraphStats | null>(null);
   const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
   const [lastIndexRepair, setLastIndexRepair] =
     useState<IndexRepairResult | null>(null);
-  const [oauthConnections, setOauthConnections] = useState<OAuthConnection[]>(
-    [],
-  );
-  const [profile, setProfile] = useState("");
   const [view, setView] = useState<View>("recall");
-  const [sessionUser, setSessionUser] = useState<AuthUser | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const usesLocalTenant = isLocalApiUrl(apiUrl);
+  const queryClient = useQueryClient();
+  const apiBaseUrl = cleanBaseUrl(apiUrl);
+  const queryScope = useMemo(
+    () => [apiBaseUrl, usesLocalTenant ? tenantId : "session", token] as const,
+    [apiBaseUrl, tenantId, token, usesLocalTenant],
+  );
 
   const api = useMemo(
     () =>
-      createOpenMemoryClient(apiUrl.replace(/\/+$/, ""), {
+      createOpenMemoryClient(apiBaseUrl, {
         tenantId: usesLocalTenant ? tenantId : undefined,
         token: token || undefined,
         credentials: "include",
       }),
-    [apiUrl, tenantId, token, usesLocalTenant],
+    [apiBaseUrl, tenantId, token, usesLocalTenant],
   );
+  const sessionQuery = useQuery({
+    queryKey: ["openmemory", "session", apiBaseUrl],
+    queryFn: () => getSession(apiBaseUrl),
+  });
+  const memoriesQuery = useQuery({
+    queryKey: ["openmemory", "memories", ...queryScope],
+    queryFn: () => api.listMemories(),
+  });
+  const profileQuery = useQuery({
+    queryKey: ["openmemory", "profile", ...queryScope],
+    queryFn: () => api.getProfile(),
+  });
+  const graphStatsQuery = useQuery({
+    queryKey: ["openmemory", "graph-stats", ...queryScope],
+    queryFn: () => api.getGraphStats(),
+  });
+  const oauthConnectionsQuery = useQuery({
+    queryKey: ["openmemory", "oauth-connections", ...queryScope],
+    queryFn: () => api.listOAuthConnections().catch(() => []),
+  });
+  const memories = memoriesQuery.data ?? [];
+  const graphStats = graphStatsQuery.data ?? null;
+  const oauthConnections = oauthConnectionsQuery.data ?? [];
+  const profile = profileQuery.data?.summary ?? "";
+  const sessionUser = sessionQuery.data ?? null;
   const dashboardMetrics = useMemo(
     () => getDashboardMetrics(memories, graphStats, oauthConnections),
     [memories, graphStats, oauthConnections],
@@ -124,60 +169,104 @@ function Home() {
     [memories],
   );
 
+  const invalidateDashboard = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["openmemory", "memories"] }),
+      queryClient.invalidateQueries({ queryKey: ["openmemory", "profile"] }),
+      queryClient.invalidateQueries({
+        queryKey: ["openmemory", "graph-stats"],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["openmemory", "oauth-connections"],
+      }),
+      queryClient.invalidateQueries({ queryKey: ["openmemory", "session"] }),
+    ]);
+  }, [queryClient]);
+
   const run = useCallback(async (action: () => Promise<void>) => {
-    setIsLoading(true);
     setError(null);
     try {
       await action();
     } catch (caught) {
       setError(formatError(caught));
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
   const refresh = useCallback(async () => {
-    await run(async () => {
-      const [
-        nextSession,
-        nextMemories,
-        nextProfile,
-        nextGraphStats,
-        nextOAuthConnections,
-      ] = await Promise.all([
-        getSession(apiUrl),
-        api.listMemories(),
-        api.getProfile(),
-        api.getGraphStats(),
-        api.listOAuthConnections().catch(() => []),
-      ]);
-      setSessionUser(nextSession);
-      setMemories(nextMemories);
-      setProfile(nextProfile.summary);
-      setGraphStats(nextGraphStats);
-      setOauthConnections(nextOAuthConnections);
-    });
-  }, [api, apiUrl, run]);
+    await run(invalidateDashboard);
+  }, [invalidateDashboard, run]);
 
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const createMemoryMutation = useMutation({
+    mutationFn: api.createMemory,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
+  const ingestSourceMutation = useMutation({
+    mutationFn: api.ingestSource,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
+  const forgetMemoryMutation = useMutation({
+    mutationFn: api.forgetMemory,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
+  const authMutation = useMutation({
+    mutationFn: ({
+      path,
+      body,
+    }: {
+      path: string;
+      body: Record<string, unknown>;
+    }) => authRequest(apiBaseUrl, path, body),
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
+  const revokeOAuthMutation = useMutation({
+    mutationFn: api.revokeOAuthConnection,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
+  const exportGraphMutation = useMutation({
+    mutationFn: api.exportGraph,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: (result) => setLastExport(result),
+  });
+  const repairIndexMutation = useMutation({
+    mutationFn: api.repairIndex,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: (result) => setLastIndexRepair(result),
+  });
+  const isLoading =
+    sessionQuery.isFetching ||
+    memoriesQuery.isFetching ||
+    profileQuery.isFetching ||
+    graphStatsQuery.isFetching ||
+    oauthConnectionsQuery.isFetching ||
+    createMemoryMutation.isPending ||
+    ingestSourceMutation.isPending ||
+    forgetMemoryMutation.isPending ||
+    authMutation.isPending ||
+    revokeOAuthMutation.isPending ||
+    exportGraphMutation.isPending ||
+    repairIndexMutation.isPending;
 
   async function remember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await run(async () => {
-      await api.createMemory({
-        content,
-        type,
-        tags: tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-      });
-      setContent("");
-      setTags("");
-      await refresh();
+    await createMemoryMutation.mutateAsync({
+      content,
+      type,
+      tags: parseTags(tags),
     });
+    setContent("");
+    setTags("");
   }
 
   async function recall(event?: FormEvent<HTMLFormElement>) {
@@ -189,21 +278,15 @@ function Home() {
 
   async function ingest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await run(async () => {
-      const result = await api.ingestSource({
-        content: ingestContent,
-        source: ingestSource,
-        tags: tags
-          .split(",")
-          .map((tag) => tag.trim())
-          .filter(Boolean),
-      });
-      setIngestContent("");
-      setSelectedMemory(result.memories[0] ?? null);
-      setNeighbors(result.edges);
-      setView("graph");
-      await refresh();
+    const result = await ingestSourceMutation.mutateAsync({
+      content: ingestContent,
+      source: ingestSource,
+      tags: parseTags(tags),
     });
+    setIngestContent("");
+    setSelectedMemory(result.memories[0] ?? null);
+    setNeighbors(result.edges);
+    setView("graph");
   }
 
   async function inspectMemory(id: string) {
@@ -219,65 +302,61 @@ function Home() {
   }
 
   async function forget(id: string) {
-    await run(async () => {
-      await api.forgetMemory(id);
-      await refresh();
-    });
+    await forgetMemoryMutation.mutateAsync(id);
   }
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await run(async () => {
-      await authRequest(apiUrl, "/api/auth/sign-in/email", {
+    await authMutation.mutateAsync({
+      path: "/api/auth/sign-in/email",
+      body: {
         email,
         password,
         rememberMe: true,
-      });
-      setPassword("");
-      await refresh();
+      },
     });
+    setPassword("");
   }
 
   async function signUp() {
-    await run(async () => {
-      await authRequest(apiUrl, "/api/auth/sign-up/email", {
+    await authMutation.mutateAsync({
+      path: "/api/auth/sign-up/email",
+      body: {
         email,
         password,
         name: name || email,
-      });
-      setPassword("");
-      await refresh();
+      },
     });
+    setPassword("");
   }
 
   async function signOut() {
-    await run(async () => {
-      await authRequest(apiUrl, "/api/auth/sign-out", {});
-      setSessionUser(null);
-      setMemories([]);
-      setProfile("");
-      setContext(null);
-      setOauthConnections([]);
+    await authMutation.mutateAsync({
+      path: "/api/auth/sign-out",
+      body: {},
     });
+    queryClient.setQueryData(["openmemory", "session", apiBaseUrl], null);
+    queryClient.setQueryData(["openmemory", "memories", ...queryScope], []);
+    queryClient.setQueryData(["openmemory", "profile", ...queryScope], {
+      summary: "",
+    });
+    queryClient.setQueryData(
+      ["openmemory", "oauth-connections", ...queryScope],
+      [],
+    );
+    setContext(null);
   }
 
   async function revokeOAuthConnection(clientId: string) {
-    await run(async () => {
-      await api.revokeOAuthConnection(clientId);
-      setOauthConnections(await api.listOAuthConnections().catch(() => []));
-    });
+    await revokeOAuthMutation.mutateAsync(clientId);
   }
 
   async function exportGraph() {
-    await run(async () => {
-      setLastExport(await api.exportGraph());
-    });
+    await exportGraphMutation.mutateAsync();
   }
 
   async function repairIndex() {
-    await run(async () => {
-      setLastIndexRepair(await api.repairIndex());
-    });
+    await repairIndexMutation.mutateAsync();
   }
 
   return (
@@ -717,20 +796,27 @@ function DashboardOverview({
           <strong>Last 7 days</strong>
         </div>
         <div
-          aria-label="Memory capture activity"
-          className="bar-chart"
+          className="chart-frame"
           role="img"
+          aria-label="Memory capture activity"
         >
-          {recentActivity.map((point) => (
-            <div className="bar-column" key={point.label}>
-              <div
-                className="bar-fill"
-                style={{ height: `${Math.max(8, point.percent)}%` }}
-                title={`${point.label}: ${point.count}`}
+          <ResponsiveContainer height={150} width="100%">
+            <BarChart data={recentActivity} margin={{ left: 0, right: 6 }}>
+              <CartesianGrid stroke="#e4e4e7" vertical={false} />
+              <XAxis
+                axisLine={false}
+                dataKey="label"
+                tickLine={false}
+                tickMargin={8}
               />
-              <span>{point.label}</span>
-            </div>
-          ))}
+              <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
+              <Tooltip
+                cursor={{ fill: "rgba(37, 99, 235, 0.08)" }}
+                formatter={(value) => [value, "Memories"]}
+              />
+              <Bar dataKey="count" fill="#2563eb" radius={[6, 6, 2, 2]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
       <div className="chart-panel type-panel">
@@ -738,22 +824,39 @@ function DashboardOverview({
           <span>Memory mix</span>
           <strong>{typeDistribution.length} types</strong>
         </div>
-        <div className="type-bars">
+        <div className="chart-frame">
           {typeDistribution.length === 0 ? (
             <p className="muted">No typed memories yet.</p>
           ) : (
-            typeDistribution.map((point) => (
-              <div className="type-row" key={point.label}>
-                <span>{point.label}</span>
-                <div className="type-track">
-                  <div
-                    className="type-fill"
-                    style={{ width: `${Math.max(4, point.percent)}%` }}
-                  />
-                </div>
-                <strong>{point.count}</strong>
-              </div>
-            ))
+            <ResponsiveContainer height={150} width="100%">
+              <BarChart
+                data={typeDistribution}
+                layout="vertical"
+                margin={{ bottom: 0, left: 10, right: 12, top: 0 }}
+              >
+                <CartesianGrid horizontal={false} stroke="#e4e4e7" />
+                <XAxis allowDecimals={false} axisLine={false} type="number" />
+                <YAxis
+                  axisLine={false}
+                  dataKey="label"
+                  tickLine={false}
+                  type="category"
+                  width={92}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(15, 118, 110, 0.08)" }}
+                  formatter={(value) => [value, "Memories"]}
+                />
+                <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                  {typeDistribution.map((point, index) => (
+                    <Cell
+                      fill={index % 2 === 0 ? "#2563eb" : "#0f766e"}
+                      key={point.label}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           )}
         </div>
       </div>
@@ -770,6 +873,92 @@ function MemoryDataTable({
   onForget: (id: string) => Promise<void>;
   onInspect: (id: string) => Promise<void>;
 }>) {
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "updatedAt", desc: true },
+  ]);
+  const columns = useMemo<ColumnDef<Memory>[]>(
+    () => [
+      {
+        accessorKey: "type",
+        header: "Type",
+        cell: ({ row }) => <Badge>{row.original.type}</Badge>,
+      },
+      {
+        accessorKey: "content",
+        header: "Memory",
+        cell: ({ row }) => (
+          <button
+            className="table-memory-button"
+            onClick={() => void onInspect(row.original.id)}
+            type="button"
+          >
+            {row.original.content}
+          </button>
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge variant="outline">{row.original.status}</Badge>
+        ),
+      },
+      {
+        id: "signals",
+        accessorFn: (memory) => memory.tags.length + memory.entityIds.length,
+        header: "Signals",
+        cell: ({ getValue }) => (
+          <span className="muted">{getValue<number>()}</span>
+        ),
+      },
+      {
+        accessorKey: "updatedAt",
+        header: "Updated",
+        cell: ({ row }) => (
+          <time dateTime={row.original.updatedAt}>
+            {formatShortDate(row.original.updatedAt)}
+          </time>
+        ),
+      },
+      {
+        id: "actions",
+        enableSorting: false,
+        header: "",
+        cell: ({ row }) => (
+          <div className="table-actions">
+            <Button
+              onClick={() => void onInspect(row.original.id)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Eye aria-hidden="true" />
+              Inspect
+            </Button>
+            <Button
+              onClick={() => void onForget(row.original.id)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Trash2 aria-hidden="true" />
+              Forget
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [onForget, onInspect],
+  );
+  const table = useReactTable({
+    columns,
+    data: memories,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
+    state: { sorting },
+  });
+
   if (memories.length === 0) {
     return (
       <div className="empty-state">
@@ -792,65 +981,38 @@ function MemoryDataTable({
       <div className="data-table-scroll">
         <Table className="data-table">
           <TableHeader>
-            <TableRow>
-              <TableHead>Type</TableHead>
-              <TableHead>Memory</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Signals</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead aria-label="Actions" />
-            </TableRow>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    {header.isPlaceholder ? null : (
+                      <button
+                        className="table-sort-button"
+                        disabled={!header.column.getCanSort()}
+                        onClick={header.column.getToggleSortingHandler()}
+                        type="button"
+                      >
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext(),
+                        )}
+                        {header.column.getIsSorted() === "asc" ? " ↑" : null}
+                        {header.column.getIsSorted() === "desc" ? " ↓" : null}
+                      </button>
+                    )}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
           </TableHeader>
           <TableBody>
-            {memories.map((memory) => (
-              <TableRow key={memory.id}>
-                <TableCell>
-                  <Badge>{memory.type}</Badge>
-                </TableCell>
-                <TableCell>
-                  <button
-                    className="table-memory-button"
-                    onClick={() => void onInspect(memory.id)}
-                    type="button"
-                  >
-                    {memory.content}
-                  </button>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline">{memory.status}</Badge>
-                </TableCell>
-                <TableCell>
-                  <span className="muted">
-                    {memory.tags.length + memory.entityIds.length}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <time dateTime={memory.updatedAt}>
-                    {formatShortDate(memory.updatedAt)}
-                  </time>
-                </TableCell>
-                <TableCell>
-                  <div className="table-actions">
-                    <Button
-                      onClick={() => void onInspect(memory.id)}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      <Eye aria-hidden="true" />
-                      Inspect
-                    </Button>
-                    <Button
-                      onClick={() => void onForget(memory.id)}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      <Trash2 aria-hidden="true" />
-                      Forget
-                    </Button>
-                  </div>
-                </TableCell>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>
@@ -871,10 +1033,42 @@ function KnowledgeMap({
   selectedMemoryId: string | null;
   onInspect: (id: string) => Promise<void>;
 }>) {
+  const [ForceGraph, setForceGraph] = useState<ForceGraph2DComponent | null>(
+    null,
+  );
+  const graphRef = useRef<ForceGraph2DMethods | null>(null);
   const graph = useMemo(
     () => getKnowledgeMap(memories, neighbors, selectedMemoryId),
     [memories, neighbors, selectedMemoryId],
   );
+  const graphData = useMemo(
+    () => ({
+      nodes: graph.nodes.map((node) => ({
+        ...node,
+        x: undefined,
+        y: undefined,
+      })),
+      links: graph.links.map((link) => ({
+        source: link.source.id,
+        target: link.target.id,
+        relationship: link.relationship,
+      })),
+    }),
+    [graph],
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    void import("react-force-graph-2d").then(({ default: ForceGraph2D }) => {
+      if (mounted) {
+        setForceGraph(() => ForceGraph2D as unknown as ForceGraph2DComponent);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   if (graph.nodes.length === 0) {
     return (
@@ -890,44 +1084,62 @@ function KnowledgeMap({
         <span>Knowledge map</span>
         <strong>{graph.nodes.length} nodes</strong>
       </div>
-      <svg role="img" viewBox="0 0 720 360" aria-label="Memory graph map">
-        <title>Memory graph map</title>
-        {graph.links.map((link) => (
-          <line
-            className="graph-link"
-            key={`${link.source.id}:${link.target.id}:${link.relationship}`}
-            x1={link.source.x}
-            x2={link.target.x}
-            y1={link.source.y}
-            y2={link.target.y}
-          />
-        ))}
-        {graph.nodes.map((node) => (
-          <a
-            className="graph-node-group"
-            href={`#memory-${node.id}`}
-            key={node.id}
-            onClick={(event) => {
-              event.preventDefault();
-              void onInspect(node.id);
+      <div className="force-graph-frame">
+        {ForceGraph ? (
+          <ForceGraph
+            cooldownTicks={80}
+            ref={graphRef}
+            graphData={graphData}
+            height={420}
+            linkColor={() => "rgba(63, 63, 70, 0.28)"}
+            linkDirectionalParticles={1}
+            linkDirectionalParticleSpeed={0.004}
+            nodeCanvasObject={(node, ctx, globalScale) => {
+              const graphNode = node as KnowledgeNode;
+              const label = graphNode.label;
+              const radius = graphNode.size;
+              ctx.beginPath();
+              ctx.arc(
+                graphNode.x ?? 0,
+                graphNode.y ?? 0,
+                radius,
+                0,
+                2 * Math.PI,
+              );
+              ctx.fillStyle = graphNode.isSelected ? "#2563eb" : "#ffffff";
+              ctx.fill();
+              ctx.lineWidth = graphNode.isSelected ? 3 : 2;
+              ctx.strokeStyle = graphNode.isSelected ? "#1d4ed8" : "#2563eb";
+              ctx.stroke();
+              const fontSize = Math.min(11, Math.max(7, 10 / globalScale));
+              ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui`;
+              ctx.textAlign = "center";
+              ctx.textBaseline = "top";
+              ctx.fillStyle = "#3f3f46";
+              ctx.fillText(
+                label,
+                graphNode.x ?? 0,
+                (graphNode.y ?? 0) + radius + 4,
+              );
             }}
-          >
-            <title>{node.title}</title>
-            <circle
-              className={node.isSelected ? "graph-node selected" : "graph-node"}
-              cx={node.x}
-              cy={node.y}
-              r={node.size}
-            />
-            <text x={node.x} y={node.y + node.size + 18}>
-              {node.label}
-            </text>
-          </a>
-        ))}
-      </svg>
+            nodeColor={(node) =>
+              (node as KnowledgeNode).isSelected ? "#2563eb" : "#ffffff"
+            }
+            nodeId="id"
+            nodeLabel={(node) => (node as KnowledgeNode).title}
+            nodeVal={(node) => (node as KnowledgeNode).size}
+            onEngineStop={() => graphRef.current?.zoomToFit(350, 48)}
+            onNodeClick={(node) => void onInspect((node as KnowledgeNode).id)}
+            width={680}
+          />
+        ) : (
+          <p className="muted">Loading graph explorer...</p>
+        )}
+      </div>
       <p className="muted">
-        Nodes are recent memories. Lines use explicit graph edges when a memory
-        is selected, then fall back to shared tags and entities.
+        Drag nodes to explore memory neighborhoods. Lines use explicit graph
+        edges when a memory is selected, then fall back to shared tags and
+        entities.
       </p>
     </section>
   );
@@ -1259,6 +1471,13 @@ function getMemoryLabel(memory: Memory) {
   return `${clean.slice(0, 17)}...`;
 }
 
+function parseTags(value: string) {
+  return value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
 function formatShortDate(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -1374,8 +1593,8 @@ type KnowledgeNode = {
   id: string;
   label: string;
   title: string;
-  x: number;
-  y: number;
+  x?: number;
+  y?: number;
   size: number;
   isSelected: boolean;
   memory: Memory;
@@ -1390,4 +1609,37 @@ type KnowledgeLink = {
 type KnowledgeGraph = {
   nodes: KnowledgeNode[];
   links: KnowledgeLink[];
+};
+
+type ForceGraph2DComponent = ComponentType<{
+  cooldownTicks?: number;
+  ref?: Ref<ForceGraph2DMethods>;
+  graphData: {
+    nodes: KnowledgeNode[];
+    links: Array<{
+      source: string;
+      target: string;
+      relationship: string;
+    }>;
+  };
+  height: number;
+  linkColor?: () => string;
+  linkDirectionalParticles?: number;
+  linkDirectionalParticleSpeed?: number;
+  nodeCanvasObject?: (
+    node: KnowledgeNode,
+    context: CanvasRenderingContext2D,
+    globalScale: number,
+  ) => void;
+  nodeColor?: (node: KnowledgeNode) => string;
+  nodeId?: string;
+  nodeLabel?: (node: KnowledgeNode) => string;
+  nodeVal?: (node: KnowledgeNode) => number;
+  onEngineStop?: () => void;
+  onNodeClick?: (node: KnowledgeNode) => void;
+  width: number;
+}>;
+
+type ForceGraph2DMethods = {
+  zoomToFit: (durationMs?: number, padding?: number) => void;
 };
