@@ -3,6 +3,7 @@ import type {
   GraphStats,
   Memory,
   OAuthConnection,
+  SourceIngestResult,
 } from "@openmemory/client";
 
 export function getDashboardMetrics(
@@ -165,6 +166,22 @@ export function getRelationshipReadinessSummary(
   return {
     relationshipDiversity,
     status,
+  };
+}
+
+export function getSourceIngestSummary(
+  result: SourceIngestResult,
+): SourceIngestSummary {
+  const memoryTypes = getTypeDistribution(result.memories);
+  const leadingType = memoryTypes[0] ?? null;
+
+  return {
+    chunkCount: result.chunkCount,
+    edgeCount: result.edges.length,
+    leadingType: leadingType?.label ?? "None",
+    memoryCount: result.memories.length,
+    sourceId: result.sourceId,
+    typeCount: memoryTypes.length,
   };
 }
 
@@ -439,6 +456,15 @@ export type GraphHealthSummary = {
 export type RelationshipReadinessSummary = {
   relationshipDiversity: number;
   status: "Basic graph" | "No relationships" | "Typed graph";
+};
+
+export type SourceIngestSummary = {
+  chunkCount: number;
+  edgeCount: number;
+  leadingType: string;
+  memoryCount: number;
+  sourceId: string;
+  typeCount: number;
 };
 
 export type KnowledgeNode = {

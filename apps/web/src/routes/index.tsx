@@ -7,6 +7,7 @@ import {
   type Memory,
   type OAuthConnection,
   OpenMemoryApiError,
+  type SourceIngestResult,
 } from "@openmemory/client";
 import {
   Button,
@@ -72,6 +73,7 @@ import {
   getMemoryNeighborDetails,
   getRecentActivity,
   getRelationshipReadinessSummary,
+  getSourceIngestSummary,
   getTypeDistribution,
   getTypeDistributionSummary,
 } from "../dashboard-model";
@@ -154,6 +156,8 @@ function Home() {
   const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
   const [lastIndexRepair, setLastIndexRepair] =
     useState<IndexRepairResult | null>(null);
+  const [lastSourceIngest, setLastSourceIngest] =
+    useState<SourceIngestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const usesLocalTenant = isLocalApiUrl(apiUrl);
   const hasLoadedConnection =
@@ -393,7 +397,10 @@ function Home() {
   const ingestSourceMutation = useMutation({
     mutationFn: api.ingestSource,
     onError: (caught) => setError(formatError(caught)),
-    onMutate: () => setError(null),
+    onMutate: () => {
+      setError(null);
+      setLastSourceIngest(null);
+    },
     onSuccess: invalidateDashboard,
   });
   const forgetMemoryMutation = useMutation({
@@ -473,7 +480,7 @@ function Home() {
       tags: parseTags(tags),
     });
     setIngestContent("");
-    selectMemory(result.memories[0]?.id ?? null);
+    setLastSourceIngest(result);
   }
 
   async function inspectMemory(id: string) {
@@ -713,37 +720,43 @@ function Home() {
         >
           <div className="panel">
             {view === "ingest" ? (
-              <form className="stack" onSubmit={ingest}>
-                <div className="panel-title">
-                  <div>
-                    <p className="eyebrow">Pipeline</p>
-                    <h2>Ingest Source</h2>
+              <div className="stack">
+                <form className="stack" onSubmit={ingest}>
+                  <div className="panel-title">
+                    <div>
+                      <p className="eyebrow">Pipeline</p>
+                      <h2>Ingest Source</h2>
+                    </div>
                   </div>
-                </div>
-                <div className="field">
-                  <Label htmlFor="ingestSource">Source</Label>
-                  <Input
-                    id="ingestSource"
-                    onChange={(event) => setIngestSource(event.target.value)}
-                    value={ingestSource}
-                  />
-                </div>
-                <div className="field">
-                  <Label htmlFor="ingestContent">Content</Label>
-                  <Textarea
-                    id="ingestContent"
-                    onChange={(event) => setIngestContent(event.target.value)}
-                    required
-                    value={ingestContent}
-                  />
-                </div>
-                <Button
-                  disabled={isLoading || !ingestContent.trim()}
-                  type="submit"
-                >
-                  Ingest
-                </Button>
-              </form>
+                  <div className="field">
+                    <Label htmlFor="ingestSource">Source</Label>
+                    <Input
+                      id="ingestSource"
+                      onChange={(event) => setIngestSource(event.target.value)}
+                      value={ingestSource}
+                    />
+                  </div>
+                  <div className="field">
+                    <Label htmlFor="ingestContent">Content</Label>
+                    <Textarea
+                      id="ingestContent"
+                      onChange={(event) => setIngestContent(event.target.value)}
+                      required
+                      value={ingestContent}
+                    />
+                  </div>
+                  <Button
+                    disabled={isLoading || !ingestContent.trim()}
+                    type="submit"
+                  >
+                    Ingest
+                  </Button>
+                </form>
+                <SourceIngestSummaryPanel
+                  onInspect={inspectMemory}
+                  result={lastSourceIngest}
+                />
+              </div>
             ) : view === "graph" ? (
               <div className="stack">
                 <div className="panel-title">
@@ -1136,6 +1149,66 @@ function DashboardOverview({
           </li>
         </ul>
       </div>
+    </section>
+  );
+}
+
+function SourceIngestSummaryPanel({
+  onInspect,
+  result,
+}: Readonly<{
+  onInspect: (id: string) => Promise<void>;
+  result: SourceIngestResult | null;
+}>) {
+  if (!result) {
+    return (
+      <section
+        className="source-result-panel empty"
+        aria-label="Source ingest summary"
+      >
+        <span>No source ingested yet</span>
+        <p>Submit a document to create chunk memories and graph edges.</p>
+      </section>
+    );
+  }
+
+  const summary = getSourceIngestSummary(result);
+  const firstMemoryId = result.memories[0]?.id ?? null;
+
+  return (
+    <section className="source-result-panel" aria-label="Source ingest summary">
+      <div className="panel-heading">
+        <span>Source indexed</span>
+        <strong>{summary.sourceId}</strong>
+      </div>
+      <ul className="source-result-grid">
+        <li>
+          <span>Chunks</span>
+          <strong>{summary.chunkCount}</strong>
+        </li>
+        <li>
+          <span>Memories</span>
+          <strong>{summary.memoryCount}</strong>
+        </li>
+        <li>
+          <span>Edges</span>
+          <strong>{summary.edgeCount}</strong>
+        </li>
+        <li>
+          <span>Leading type</span>
+          <strong>{summary.leadingType}</strong>
+        </li>
+      </ul>
+      {firstMemoryId ? (
+        <Button
+          onClick={() => void onInspect(firstMemoryId)}
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          Inspect first chunk
+        </Button>
+      ) : null}
     </section>
   );
 }

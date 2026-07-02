@@ -248,6 +248,44 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(neighborInspectButtons).toHaveCount(2);
   await expect(neighborInspectButtons.first()).toBeVisible();
 
+  await page
+    .locator(".tabs")
+    .getByRole("button", { name: "Ingest", exact: true })
+    .click();
+  await expect(page).toHaveURL(/view=ingest/);
+  await expect(page.getByLabel("Source ingest summary")).toContainText(
+    "No source ingested yet",
+  );
+  await page
+    .getByRole("textbox", { name: "Source" })
+    .fill("architecture-notes");
+  await page
+    .getByLabel("Content")
+    .fill(
+      [
+        "Source ingestion should preserve provenance and chunk long-form notes.",
+        "Graph edges should connect adjacent chunks and related concepts for recall.",
+        "Operators need a visible summary when documents enter the memory graph.",
+      ].join("\\n\\n"),
+    );
+  await page
+    .locator(".panel form")
+    .getByRole("button", {
+      name: "Ingest",
+      exact: true,
+    })
+    .click();
+  await expect(page.getByLabel("Source ingest summary")).toContainText(
+    "Source indexed",
+  );
+  await expect(page.getByLabel("Source ingest summary")).toContainText(
+    "Chunks",
+  );
+  await expect(page.getByLabel("Source ingest summary")).toContainText("Edges");
+  await page.getByRole("button", { name: "Inspect first chunk" }).click();
+  await expect(page).toHaveURL(/view=graph/);
+  await expect(page).toHaveURL(/memoryId=/);
+
   expect(errors).toEqual([]);
 });
 

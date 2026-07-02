@@ -11,6 +11,7 @@ import {
   getRelationshipDistribution,
   getRelationshipReadinessSummary,
   getSelectedNodeRelationships,
+  getSourceIngestSummary,
   getTypeDistribution,
   getTypeDistributionSummary,
 } from "./dashboard-model";
@@ -139,6 +140,24 @@ describe("dashboard model", () => {
     ).toEqual({
       relationshipDiversity: 60,
       status: "Typed graph",
+    });
+  });
+
+  test("summarizes completed source ingestion for the ingest view", () => {
+    expect(
+      getSourceIngestSummary({
+        sourceId: "src_docs",
+        chunkCount: 3,
+        memories: memories.slice(0, 3),
+        edges: edges.slice(0, 2),
+      }),
+    ).toEqual({
+      chunkCount: 3,
+      edgeCount: 2,
+      leadingType: "decision",
+      memoryCount: 3,
+      sourceId: "src_docs",
+      typeCount: 3,
     });
   });
 
