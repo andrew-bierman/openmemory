@@ -635,7 +635,7 @@ textarea:focus-visible,
 
 .data-table {
   width: 100%;
-  min-width: 0;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 13px;
   table-layout: fixed;

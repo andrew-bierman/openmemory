@@ -21,6 +21,7 @@ import {
 } from "@openmemory/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createRoute } from "@tanstack/react-router";
+import type { Updater } from "@tanstack/react-table";
 import {
   Activity,
   Brain,
@@ -57,7 +58,11 @@ import {
   AdminWorkspace,
   type AuthUser,
 } from "../admin-components";
-import { KnowledgeMap, MemoryDataTable } from "../dashboard-components";
+import {
+  KnowledgeMap,
+  MemoryDataTable,
+  type MemoryTableSorting,
+} from "../dashboard-components";
 import {
   type ActivityPoint,
   type DashboardMetrics,
@@ -75,6 +80,9 @@ export const Route = createRoute({
   path: "/",
   validateSearch: (search: Record<string, unknown>) => ({
     memoryId: parseMemoryId(search.memoryId),
+    memorySearch: parseSearchTextParam(search.memorySearch),
+    memorySort: parseMemorySortParam(search.memorySort),
+    memoryType: parseMemoryTypeParam(search.memoryType),
     view: parseView(search.view),
   }),
   component: Home,
@@ -90,8 +98,20 @@ const VIEW_LABELS = {
 
 type View = keyof typeof VIEW_LABELS;
 
+const DEFAULT_MEMORY_SORT: MemoryTableSorting = [
+  { id: "updatedAt", desc: true },
+];
+const MEMORY_SORT_COLUMNS = new Set([
+  "content",
+  "signals",
+  "status",
+  "type",
+  "updatedAt",
+]);
+
 function Home() {
-  const { memoryId, view } = Route.useSearch();
+  const { memoryId, memorySearch, memorySort, memoryType, view } =
+    Route.useSearch();
   const navigate = Route.useNavigate();
   const [apiUrl, setApiUrl, hasLoadedApiUrl] = useLocalStorage(
     "openmemory:apiUrl",
@@ -189,6 +209,9 @@ function Home() {
     () => getTypeDistribution(memories),
     [memories],
   );
+  const tableGlobalFilter = memorySearch ?? "";
+  const tableTypeFilter = memoryType ?? "all";
+  const tableSorting = useMemo(() => parseMemorySort(memorySort), [memorySort]);
 
   const invalidateDashboard = useCallback(async () => {
     await Promise.all([
@@ -222,6 +245,7 @@ function Home() {
         to: "/",
         search: (previous) => ({
           ...previous,
+          memoryId: nextView === "graph" ? previous.memoryId : undefined,
           view: nextView,
         }),
       });
@@ -240,6 +264,54 @@ function Home() {
       });
     },
     [navigate],
+  );
+  const updateMemorySearch = useCallback(
+    (nextSearch: string) => {
+      void navigate({
+        replace: true,
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          memoryId: undefined,
+          memorySearch: nextSearch.trim() ? nextSearch : undefined,
+          view: "recall",
+        }),
+      });
+    },
+    [navigate],
+  );
+  const updateMemoryType = useCallback(
+    (nextType: string) => {
+      void navigate({
+        replace: true,
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          memoryId: undefined,
+          memoryType: nextType === "all" ? undefined : nextType,
+          view: "recall",
+        }),
+      });
+    },
+    [navigate],
+  );
+  const updateMemorySorting = useCallback(
+    (updater: Updater<MemoryTableSorting>) => {
+      const nextSorting =
+        typeof updater === "function" ? updater(tableSorting) : updater;
+
+      void navigate({
+        replace: true,
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          memoryId: undefined,
+          memorySort: serializeMemorySort(nextSorting),
+          view: "recall",
+        }),
+      });
+    },
+    [navigate, tableSorting],
   );
 
   const createMemoryMutation = useMutation({
@@ -684,9 +756,15 @@ function Home() {
                   </div>
                 </div>
                 <MemoryDataTable
+                  globalFilter={tableGlobalFilter}
                   memories={memories}
                   onForget={forget}
+                  onGlobalFilterChange={updateMemorySearch}
                   onInspect={inspectMemory}
+                  onSortingChange={updateMemorySorting}
+                  onTypeFilterChange={updateMemoryType}
+                  sorting={tableSorting}
+                  typeFilter={tableTypeFilter}
                 />
               </>
             )}
@@ -1141,4 +1219,54 @@ function parseView(value: unknown): View {
 
 function parseMemoryId(value: unknown) {
   return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function parseSearchTextParam(value: unknown) {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function parseMemoryTypeParam(value: unknown) {
+  return typeof value === "string" && value.trim() && value !== "all"
+    ? value
+    : undefined;
+}
+
+function parseMemorySortParam(value: unknown) {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const [columnId, direction] = value.split(".");
+  if (
+    columnId &&
+    MEMORY_SORT_COLUMNS.has(columnId) &&
+    (direction === "asc" || direction === "desc")
+  ) {
+    return `${columnId}.${direction}`;
+  }
+
+  return undefined;
+}
+
+function parseMemorySort(value: string | undefined): MemoryTableSorting {
+  const parsed = parseMemorySortParam(value);
+  if (!parsed) {
+    return [...DEFAULT_MEMORY_SORT];
+  }
+
+  const [columnId, direction] = parsed.split(".");
+  return [{ id: columnId, desc: direction === "desc" }];
+}
+
+function serializeMemorySort(sorting: MemoryTableSorting) {
+  const [firstSort] = sorting;
+  if (!firstSort || !MEMORY_SORT_COLUMNS.has(firstSort.id)) {
+    return undefined;
+  }
+
+  if (firstSort.id === "updatedAt" && firstSort.desc) {
+    return undefined;
+  }
+
+  return `${firstSort.id}.${firstSort.desc ? "desc" : "asc"}`;
 }

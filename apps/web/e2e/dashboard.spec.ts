@@ -47,13 +47,39 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.getByText("4 of 4 rows")).toBeVisible();
 
   await page.getByLabel("Search memory records").fill("graph");
+  await expect(page).toHaveURL(/memorySearch=graph/);
   await expect(page.locator("tbody tr")).toHaveCount(3);
   await expect(page.getByText("3 of 4 rows")).toBeVisible();
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByLabel("Search memory records")).toHaveValue("graph");
+  await expect(page.locator("tbody tr")).toHaveCount(3);
 
   await page.getByLabel("Search memory records").fill("");
   await page.getByLabel("Filter memories by type").selectOption("decision");
+  await expect(page).toHaveURL(/memoryType=decision/);
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.getByText("1 of 4 rows")).toBeVisible();
+  await page.getByRole("button", { name: /Updated/ }).click();
+  await expect(page).toHaveURL(/memorySort=updatedAt\.asc/);
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByLabel("Filter memories by type")).toHaveValue(
+    "decision",
+  );
+  await expect(page.getByRole("button", { name: /Updated/ })).toContainText(
+    "↑",
+  );
+
+  await page.goto("/?memorySearch=graph&memoryType=insight", {
+    waitUntil: "networkidle",
+  });
+  await expect(page.getByLabel("Search memory records")).toHaveValue("graph");
+  await expect(page.getByLabel("Filter memories by type")).toHaveValue(
+    "insight",
+  );
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(page.getByText("1 of 4 rows")).toBeVisible();
+  await page.goto("/");
+  await expect(page.locator("tbody tr")).toHaveCount(4);
 
   await page
     .locator(".tabs")

@@ -18,6 +18,7 @@ import {
   getFilteredRowModel,
   getSortedRowModel,
   type SortingState,
+  type Updater,
   useReactTable,
 } from "@tanstack/react-table";
 import { Eye, Trash2 } from "lucide-react";
@@ -32,20 +33,29 @@ import {
 } from "react";
 import { getKnowledgeMap, type KnowledgeNode } from "./dashboard-model";
 
+export type MemoryTableSorting = SortingState;
+
 export function MemoryDataTable({
+  globalFilter,
   memories,
   onForget,
+  onGlobalFilterChange,
   onInspect,
+  onSortingChange,
+  onTypeFilterChange,
+  sorting,
+  typeFilter,
 }: Readonly<{
+  globalFilter: string;
   memories: Memory[];
   onForget: (id: string) => Promise<void>;
+  onGlobalFilterChange: (value: string) => void;
   onInspect: (id: string) => Promise<void>;
+  onSortingChange: (updater: Updater<MemoryTableSorting>) => void;
+  onTypeFilterChange: (value: string) => void;
+  sorting: MemoryTableSorting;
+  typeFilter: string;
 }>) {
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "updatedAt", desc: true },
-  ]);
   const memoryTypes = useMemo(
     () =>
       Array.from(new Set(memories.map((memory) => memory.type))).sort(
@@ -158,8 +168,12 @@ export function MemoryDataTable({
         .toLowerCase()
         .includes(needle);
     },
-    onGlobalFilterChange: setGlobalFilter,
-    onSortingChange: setSorting,
+    onGlobalFilterChange: (updater) => {
+      const nextValue =
+        typeof updater === "function" ? updater(globalFilter) : updater;
+      onGlobalFilterChange(String(nextValue));
+    },
+    onSortingChange,
     state: { globalFilter, sorting },
   });
 
@@ -186,13 +200,13 @@ export function MemoryDataTable({
         <div className="table-filters">
           <Input
             aria-label="Search memory records"
-            onChange={(event) => setGlobalFilter(event.target.value)}
+            onChange={(event) => onGlobalFilterChange(event.target.value)}
             placeholder="Filter memories"
             value={globalFilter}
           />
           <Select
             aria-label="Filter memories by type"
-            onChange={(event) => setTypeFilter(event.target.value)}
+            onChange={(event) => onTypeFilterChange(event.target.value)}
             value={typeFilter}
           >
             <option value="all">All types</option>
