@@ -230,9 +230,17 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.getByLabel("Selected memory relationships")).toContainText(
     "supports",
   );
-  await expect(page.locator(".memory.compact").first()).toContainText(
+  await expect(page.getByLabel("Graph neighbor relationships")).toContainText(
     "supports",
   );
+  await expect(page.getByLabel("Graph neighbor relationships")).toContainText(
+    "Recall combines graph traversal",
+  );
+  const neighborInspectButtons = page
+    .getByLabel("Graph neighbor relationships")
+    .getByRole("button", { name: "Inspect" });
+  await expect(neighborInspectButtons).toHaveCount(2);
+  await expect(neighborInspectButtons.first()).toBeVisible();
 
   expect(errors).toEqual([]);
 });

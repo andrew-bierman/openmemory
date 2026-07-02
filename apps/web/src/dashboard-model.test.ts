@@ -5,6 +5,7 @@ import {
   getDashboardMetrics,
   getKnowledgeMap,
   getMemoryLabel,
+  getMemoryNeighborDetails,
   getRecentActivity,
   getRelationshipDistribution,
   getSelectedNodeRelationships,
@@ -176,6 +177,32 @@ describe("dashboard model", () => {
         (relationship) => relationship.relationship,
       ),
     ).toEqual(["supports", "shared-signal"]);
+  });
+
+  test("resolves memory neighbor details without leaking raw edge ids first", () => {
+    const details = getMemoryNeighborDetails(memories[0], edges, memories);
+
+    expect(
+      details.map((detail) => ({
+        direction: detail.direction,
+        memoryId: detail.relatedMemory?.id ?? detail.relatedMemoryId,
+        relationship: detail.edge.relationship,
+        weight: detail.edge.weight,
+      })),
+    ).toEqual([
+      {
+        direction: "outgoing",
+        memoryId: "mem_rag",
+        relationship: "supports",
+        weight: 0.8,
+      },
+      {
+        direction: "outgoing",
+        memoryId: "mem_missing",
+        relationship: "ignored",
+        weight: 0.5,
+      },
+    ]);
   });
 
   test("truncates long memory labels for graph cards and canvas labels", () => {

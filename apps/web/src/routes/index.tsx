@@ -68,6 +68,7 @@ import {
   type DistributionPoint,
   getActivitySummary,
   getDashboardMetrics,
+  getMemoryNeighborDetails,
   getRecentActivity,
   getTypeDistribution,
   getTypeDistributionSummary,
@@ -790,8 +791,10 @@ function Home() {
                 </div>
                 <MemoryDetail
                   memory={selectedMemory}
+                  memories={memories}
                   neighbors={neighbors}
                   onForget={forget}
+                  onInspect={inspectMemory}
                 />
               </div>
             ) : view === "mcp" ? (
@@ -1092,16 +1095,21 @@ function DashboardOverview({
 
 function MemoryDetail({
   memory,
+  memories,
   neighbors,
   onForget,
+  onInspect,
 }: Readonly<{
   memory: Memory | null;
+  memories: Memory[];
   neighbors: GraphEdge[];
   onForget: (id: string) => Promise<void>;
+  onInspect: (id: string) => Promise<void>;
 }>) {
   if (!memory) {
     return <p className="muted">Select a memory to inspect its graph.</p>;
   }
+  const neighborDetails = getMemoryNeighborDetails(memory, neighbors, memories);
 
   return (
     <div className="stack">
@@ -1119,25 +1127,42 @@ function MemoryDetail({
         </Button>
       </article>
       <h2>Neighbors</h2>
-      {neighbors.length === 0 ? (
+      {neighborDetails.length === 0 ? (
         <p className="muted">No graph neighbors yet.</p>
       ) : (
-        <div className="memory-list">
-          {neighbors.map((edge) => (
-            <article
-              className="memory compact"
-              key={`${edge.sourceId}:${edge.relationship}:${edge.targetId}`}
+        <ul className="neighbor-list" aria-label="Graph neighbor relationships">
+          {neighborDetails.map((detail) => (
+            <li
+              className="neighbor-card"
+              key={`${detail.edge.sourceId}:${detail.edge.relationship}:${detail.edge.targetId}`}
             >
-              <div className="meta">
-                <span className="pill">{edge.relationship}</span>
-                <span>{edge.weight.toFixed(2)}</span>
+              <div className="neighbor-card-header">
+                <span className="pill">{detail.edge.relationship}</span>
+                <span>{detail.edge.weight.toFixed(2)}</span>
               </div>
-              <pre className="context">
-                {`${edge.sourceId} -> ${edge.targetId}`}
-              </pre>
-            </article>
+              <div>
+                <strong>
+                  {detail.direction === "outgoing" ? "To" : "From"} ·{" "}
+                  {detail.relatedMemory?.type ?? "External memory"}
+                </strong>
+                <p>
+                  {detail.relatedMemory?.content ??
+                    `Memory ${detail.relatedMemoryId}`}
+                </p>
+              </div>
+              {detail.relatedMemory ? (
+                <Button
+                  onClick={() => void onInspect(detail.relatedMemoryId)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Inspect
+                </Button>
+              ) : null}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

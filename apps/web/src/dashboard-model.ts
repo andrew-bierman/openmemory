@@ -171,6 +171,50 @@ export function getSelectedNodeRelationships(
   );
 }
 
+export function getMemoryNeighborDetails(
+  memory: Memory,
+  neighbors: GraphEdge[],
+  memories: Memory[],
+): MemoryNeighborDetail[] {
+  const memoryById = new Map(
+    memories.map((candidate) => [candidate.id, candidate]),
+  );
+  const details: MemoryNeighborDetail[] = [];
+
+  for (const edge of neighbors) {
+    if (edge.sourceId === memory.id) {
+      const relatedMemoryId = edge.targetId;
+      details.push({
+        direction: "outgoing",
+        edge,
+        relatedMemory: memoryById.get(relatedMemoryId) ?? null,
+        relatedMemoryId,
+      });
+    }
+
+    if (edge.targetId === memory.id) {
+      const relatedMemoryId = edge.sourceId;
+      details.push({
+        direction: "incoming",
+        edge,
+        relatedMemory: memoryById.get(relatedMemoryId) ?? null,
+        relatedMemoryId,
+      });
+    }
+  }
+
+  return details.sort(
+    (left, right) =>
+      getRelationshipPriority(left.edge.relationship) -
+        getRelationshipPriority(right.edge.relationship) ||
+      right.edge.weight - left.edge.weight ||
+      left.edge.relationship.localeCompare(right.edge.relationship) ||
+      (left.relatedMemory?.content ?? left.relatedMemoryId).localeCompare(
+        right.relatedMemory?.content ?? right.relatedMemoryId,
+      ),
+  );
+}
+
 export function getKnowledgeMap(
   memories: Memory[],
   neighbors: GraphEdge[],
@@ -358,6 +402,13 @@ export type SelectedNodeRelationship = {
   direction: "incoming" | "outgoing";
   relationship: string;
   memory: Memory;
+};
+
+export type MemoryNeighborDetail = {
+  direction: "incoming" | "outgoing";
+  edge: GraphEdge;
+  relatedMemory: Memory | null;
+  relatedMemoryId: string;
 };
 
 export type GraphFilters = {
