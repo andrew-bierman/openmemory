@@ -1,5 +1,4 @@
 import {
-  type ContextResult,
   createOpenMemoryClient,
   type GraphEdge,
   type GraphExportResult,
@@ -85,6 +84,7 @@ export const Route = createRoute({
     memorySearch: parseSearchTextParam(search.memorySearch),
     memorySort: parseMemorySortParam(search.memorySort),
     memoryType: parseMemoryTypeParam(search.memoryType),
+    recallQuery: parseSearchTextParam(search.recallQuery),
     view: parseView(search.view),
   }),
   component: Home,
@@ -119,6 +119,7 @@ function Home() {
     memorySearch,
     memorySort,
     memoryType,
+    recallQuery,
     view,
   } = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -142,8 +143,9 @@ function Home() {
   const [ingestSource, setIngestSource] = useState("conversation");
   const [tags, setTags] = useState("");
   const [type, setType] = useState("fact");
-  const [query, setQuery] = useState("recent project context");
-  const [context, setContext] = useState<ContextResult | null>(null);
+  const [recallDraft, setRecallDraft] = useState(
+    recallQuery ?? "recent project context",
+  );
   const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
   const [lastIndexRepair, setLastIndexRepair] =
     useState<IndexRepairResult | null>(null);
@@ -202,11 +204,17 @@ function Home() {
     queryKey: ["openmemory", "oauth-connections", ...queryScope],
     queryFn: () => api.listOAuthConnections().catch(() => []),
   });
+  const contextQuery = useQuery({
+    enabled: hasLoadedConnection && Boolean(recallQuery),
+    queryKey: ["openmemory", "context", recallQuery, ...queryScope],
+    queryFn: () => api.getContext(recallQuery ?? ""),
+  });
   const memories = memoriesQuery.data ?? [];
   const selectedMemory = selectedMemoryQuery.data ?? null;
   const neighbors = neighborsQuery.data ?? [];
   const graphStats = graphStatsQuery.data ?? null;
   const oauthConnections = oauthConnectionsQuery.data ?? [];
+  const context = contextQuery.data ?? null;
   const profile = profileQuery.data?.summary ?? "";
   const sessionUser = sessionQuery.data ?? null;
   const dashboardMetrics = useMemo(
@@ -235,6 +243,7 @@ function Home() {
         queryKey: ["openmemory", "oauth-connections"],
       }),
       queryClient.invalidateQueries({ queryKey: ["openmemory", "session"] }),
+      queryClient.invalidateQueries({ queryKey: ["openmemory", "context"] }),
     ]);
   }, [queryClient]);
 
@@ -250,6 +259,9 @@ function Home() {
   const refresh = useCallback(async () => {
     await run(invalidateDashboard);
   }, [invalidateDashboard, run]);
+  useEffect(() => {
+    setRecallDraft(recallQuery ?? "recent project context");
+  }, [recallQuery]);
   const selectView = useCallback(
     (nextView: View) => {
       void navigate({
@@ -352,6 +364,20 @@ function Home() {
     },
     [navigate],
   );
+  const submitRecallQuery = useCallback(
+    (nextQuery: string) => {
+      const trimmedQuery = nextQuery.trim();
+      void navigate({
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          recallQuery: trimmedQuery || undefined,
+          view: "recall",
+        }),
+      });
+    },
+    [navigate],
+  );
 
   const createMemoryMutation = useMutation({
     mutationFn: api.createMemory,
@@ -409,6 +435,7 @@ function Home() {
     selectedMemoryQuery.isFetching ||
     neighborsQuery.isFetching ||
     oauthConnectionsQuery.isFetching ||
+    contextQuery.isFetching ||
     createMemoryMutation.isPending ||
     ingestSourceMutation.isPending ||
     forgetMemoryMutation.isPending ||
@@ -430,9 +457,7 @@ function Home() {
 
   async function recall(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
-    await run(async () => {
-      setContext(await api.getContext(query));
-    });
+    submitRecallQuery(recallDraft);
   }
 
   async function ingest(event: FormEvent<HTMLFormElement>) {
@@ -493,7 +518,7 @@ function Home() {
       ["openmemory", "oauth-connections", ...queryScope],
       [],
     );
-    setContext(null);
+    queryClient.removeQueries({ queryKey: ["openmemory", "context"] });
   }
 
   async function revokeOAuthConnection(clientId: string) {
@@ -507,6 +532,10 @@ function Home() {
   async function repairIndex() {
     await repairIndexMutation.mutateAsync();
   }
+
+  const queryError = contextQuery.error
+    ? formatError(contextQuery.error)
+    : null;
 
   return (
     <main className="app-shell">
@@ -658,17 +687,19 @@ function Home() {
         <form className="toolbar" onSubmit={recall}>
           <Input
             aria-label="Recall query"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => setRecallDraft(event.target.value)}
             placeholder="Ask for context"
-            value={query}
+            value={recallDraft}
           />
-          <Button disabled={isLoading || !query.trim()} type="submit">
+          <Button disabled={isLoading || !recallDraft.trim()} type="submit">
             <Send aria-hidden="true" />
             Recall
           </Button>
         </form>
 
-        {error ? <div className="error">{error}</div> : null}
+        {error || queryError ? (
+          <div className="error">{error ?? queryError}</div>
+        ) : null}
 
         <div
           className={
@@ -820,7 +851,10 @@ function Home() {
                   <h2>Context</h2>
                 </div>
                 <pre className="context">
-                  {context?.context || "Run recall to assemble graph context."}
+                  {contextQuery.isFetching
+                    ? "Assembling graph context..."
+                    : context?.context ||
+                      "Run recall to assemble graph context."}
                 </pre>
               </div>
               <div className="panel">

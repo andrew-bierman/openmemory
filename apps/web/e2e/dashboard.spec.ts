@@ -46,6 +46,25 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.locator("tbody tr")).toHaveCount(4);
   await expect(page.getByText("4 of 4 rows")).toBeVisible();
 
+  await page.getByLabel("Recall query").fill("cloudflare graph");
+  await page
+    .locator(".toolbar")
+    .getByRole("button", { name: "Recall", exact: true })
+    .click();
+  await expect(page).toHaveURL(/recallQuery=cloudflare(?:%20|\+)graph/);
+  await expect(page.locator("pre.context").first()).toContainText(
+    "OpenMemory uses Durable Objects",
+  );
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByLabel("Recall query")).toHaveValue("cloudflare graph");
+  await expect(page.locator("pre.context").first()).toContainText(
+    "Recall combines graph traversal",
+  );
+
+  await page.goto("/?recallQuery=vectorize", { waitUntil: "networkidle" });
+  await expect(page.getByLabel("Recall query")).toHaveValue("vectorize");
+  await expect(page.locator("pre.context").first()).toContainText("Vectorize");
+
   await page.getByLabel("Search memory records").fill("graph");
   await expect(page).toHaveURL(/memorySearch=graph/);
   await expect(page.locator("tbody tr")).toHaveCount(3);
