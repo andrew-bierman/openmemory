@@ -14,6 +14,7 @@
     "@openmemory/ui": "workspace:*",
     "@tanstack/react-router": "^1.141.2",
     "@tanstack/react-start": "^1.141.2",
+    "lucide-react": "^0.561.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1"
   },

@@ -12,7 +12,22 @@ import {
 import { Button } from "@openmemory/ui";
 import { createRoute } from "@tanstack/react-router";
 import {
+  Activity,
+  Brain,
+  Database,
+  Eye,
+  FileText,
+  GitBranch,
+  KeyRound,
+  Network,
+  Plug,
+  RefreshCw,
+  Send,
+  Trash2,
+} from "lucide-react";
+import {
   type FormEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -411,6 +426,7 @@ function Home() {
               onClick={() => void refresh()}
               type="button"
             >
+              <RefreshCw aria-hidden="true" />
               Refresh
             </Button>
           </div>
@@ -443,6 +459,7 @@ function Home() {
             value={query}
           />
           <Button disabled={isLoading || !query.trim()} type="submit">
+            <Send aria-hidden="true" />
             Recall
           </Button>
         </form>
@@ -588,26 +605,31 @@ function SidebarNav({
     view: View;
     label: string;
     description: string;
+    icon: ReactNode;
   }> = [
     {
       view: "recall",
       label: "Dashboard",
       description: "Memories and recall context",
+      icon: <Database aria-hidden="true" />,
     },
     {
       view: "ingest",
       label: "Sources",
       description: "Documents and long-form context",
+      icon: <FileText aria-hidden="true" />,
     },
     {
       view: "graph",
       label: "Knowledge Map",
       description: "Graph inspection and repair",
+      icon: <Network aria-hidden="true" />,
     },
     {
       view: "mcp",
       label: "MCP",
       description: "Client setup and connections",
+      icon: <Plug aria-hidden="true" />,
     },
   ];
 
@@ -621,8 +643,11 @@ function SidebarNav({
           onClick={() => onSelect(item.view)}
           type="button"
         >
-          <span>{item.label}</span>
-          <small>{item.description}</small>
+          {item.icon}
+          <span>
+            <strong>{item.label}</strong>
+            <small>{item.description}</small>
+          </span>
         </button>
       ))}
     </nav>
@@ -641,21 +666,25 @@ function DashboardOverview({
   return (
     <section className="overview-grid" aria-label="Memory overview">
       <div className="metric-tile featured">
+        <Activity aria-hidden="true" />
         <span>Active memories</span>
         <strong>{metrics.activeMemories}</strong>
         <small>{metrics.totalMemories} total graph nodes</small>
       </div>
       <div className="metric-tile">
+        <GitBranch aria-hidden="true" />
         <span>Edges</span>
         <strong>{metrics.totalEdges}</strong>
         <small>{metrics.relationshipCount} relationship types</small>
       </div>
       <div className="metric-tile">
+        <Brain aria-hidden="true" />
         <span>Entities</span>
         <strong>{metrics.entityCount}</strong>
         <small>{metrics.tagCount} tags indexed</small>
       </div>
       <div className="metric-tile">
+        <KeyRound aria-hidden="true" />
         <span>MCP clients</span>
         <strong>{metrics.oauthConnections}</strong>
         <small>{metrics.recalledMemories} recalled in context</small>
@@ -786,6 +815,7 @@ function MemoryDataTable({
                       type="button"
                       variant="outline"
                     >
+                      <Eye aria-hidden="true" />
                       Inspect
                     </Button>
                     <Button
@@ -794,6 +824,7 @@ function MemoryDataTable({
                       type="button"
                       variant="outline"
                     >
+                      <Trash2 aria-hidden="true" />
                       Forget
                     </Button>
                   </div>

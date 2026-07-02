@@ -48,6 +48,10 @@ textarea {
 
 button {
   min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: linear-gradient(180deg, #ffffff, #eef2f6);
@@ -65,6 +69,12 @@ button {
     border-color 140ms ease,
     background-color 140ms ease,
     box-shadow 140ms ease;
+}
+
+button svg {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
 }
 
 button:hover:not(:disabled) {
@@ -169,11 +179,10 @@ button[class*="text-zinc-950"] {
 .nav-item {
   width: 100%;
   min-height: 54px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
   align-items: flex-start;
-  justify-content: center;
-  gap: 3px;
+  gap: 9px;
   border: 1px solid transparent;
   background: transparent;
   box-shadow: none;
@@ -193,7 +202,19 @@ button[class*="text-zinc-950"] {
   box-shadow: var(--shadow-sm);
 }
 
+.nav-item > svg {
+  width: 17px;
+  height: 17px;
+  margin-top: 3px;
+  color: var(--muted-foreground);
+}
+
 .nav-item span {
+  display: grid;
+  gap: 3px;
+}
+
+.nav-item strong {
   font-size: 13px;
   font-weight: 760;
 }
@@ -390,6 +411,7 @@ button[class*="text-zinc-950"] {
 }
 
 .metric-tile {
+  position: relative;
   min-height: 104px;
   border-radius: var(--radius-lg);
   padding: 15px;
@@ -397,6 +419,15 @@ button[class*="text-zinc-950"] {
   flex-direction: column;
   justify-content: flex-end;
   gap: 4px;
+}
+
+.metric-tile > svg {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 18px;
+  height: 18px;
+  color: var(--muted-foreground);
 }
 
 .metric-tile.featured {
