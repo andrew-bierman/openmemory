@@ -315,19 +315,23 @@ export function MemoryDataTable({
 }
 
 export function KnowledgeMap({
+  graphRelationship,
   graphSearch,
   graphType,
   memories,
   neighbors,
+  onGraphRelationshipChange,
   onGraphSearchChange,
   onGraphTypeChange,
   onInspect,
   selectedMemoryId,
 }: Readonly<{
+  graphRelationship: string;
   graphSearch: string;
   graphType: string;
   memories: Memory[];
   neighbors: GraphEdge[];
+  onGraphRelationshipChange: (value: string) => void;
   onGraphSearchChange: (value: string) => void;
   onGraphTypeChange: (value: string) => void;
   onInspect: (id: string) => Promise<void>;
@@ -346,20 +350,46 @@ export function KnowledgeMap({
       ),
     [memories],
   );
-  const graph = useMemo(
+  const baseGraph = useMemo(
     () =>
       getKnowledgeMap(memories, neighbors, selectedMemoryId, {
+        relationship: "all",
         search: graphSearch,
         type: graphType,
       }),
     [graphSearch, graphType, memories, neighbors, selectedMemoryId],
   );
+  const relationshipTypes = useMemo(
+    () =>
+      Array.from(
+        new Set(baseGraph.links.map((link) => link.relationship)),
+      ).sort((left, right) => left.localeCompare(right)),
+    [baseGraph.links],
+  );
+  const graph = useMemo(
+    () =>
+      getKnowledgeMap(memories, neighbors, selectedMemoryId, {
+        relationship: graphRelationship,
+        search: graphSearch,
+        type: graphType,
+      }),
+    [
+      graphRelationship,
+      graphSearch,
+      graphType,
+      memories,
+      neighbors,
+      selectedMemoryId,
+    ],
+  );
   const graphData = useMemo(
     () => ({
       nodes: graph.nodes.map((node) => ({
         ...node,
-        x: undefined,
-        y: undefined,
+        fx: getResponsiveGraphX(node.x ?? 0, graphWidth),
+        fy: node.y,
+        x: getResponsiveGraphX(node.x ?? 0, graphWidth),
+        y: node.y,
       })),
       links: graph.links.map((link) => ({
         source: link.source.id,
@@ -367,7 +397,7 @@ export function KnowledgeMap({
         relationship: link.relationship,
       })),
     }),
-    [graph],
+    [graph, graphWidth],
   );
   const visibleRelationshipCount = new Set(
     graph.links.map((link) => link.relationship),
@@ -442,12 +472,15 @@ export function KnowledgeMap({
     return (
       <section className="knowledge-map" aria-label="Knowledge map">
         <GraphExplorerControls
+          graphRelationship={graphRelationship}
           graphSearch={graphSearch}
           graphType={graphType}
           memoryTypes={memoryTypes}
           onFit={fitGraph}
+          onRelationshipChange={onGraphRelationshipChange}
           onSearchChange={onGraphSearchChange}
           onTypeChange={onGraphTypeChange}
+          relationshipTypes={relationshipTypes}
         />
         <div className="empty-map">
           <p className="muted">
@@ -468,12 +501,15 @@ export function KnowledgeMap({
         </strong>
       </div>
       <GraphExplorerControls
+        graphRelationship={graphRelationship}
         graphSearch={graphSearch}
         graphType={graphType}
         memoryTypes={memoryTypes}
         onFit={fitGraph}
+        onRelationshipChange={onGraphRelationshipChange}
         onSearchChange={onGraphSearchChange}
         onTypeChange={onGraphTypeChange}
+        relationshipTypes={relationshipTypes}
       />
       <div className="graph-explorer-grid">
         <div className="force-graph-frame" ref={frameRef}>
@@ -633,19 +669,25 @@ export function KnowledgeMap({
 }
 
 function GraphExplorerControls({
+  graphRelationship,
   graphSearch,
   graphType,
   memoryTypes,
   onFit,
+  onRelationshipChange,
   onSearchChange,
   onTypeChange,
+  relationshipTypes,
 }: Readonly<{
+  graphRelationship: string;
   graphSearch: string;
   graphType: string;
   memoryTypes: string[];
   onFit: () => void;
+  onRelationshipChange: (value: string) => void;
   onSearchChange: (value: string) => void;
   onTypeChange: (value: string) => void;
+  relationshipTypes: string[];
 }>) {
   return (
     <div className="graph-controls">
@@ -664,6 +706,18 @@ function GraphExplorerControls({
         {memoryTypes.map((type) => (
           <option key={type} value={type}>
             {type}
+          </option>
+        ))}
+      </Select>
+      <Select
+        aria-label="Filter graph by relationship"
+        onChange={(event) => onRelationshipChange(event.target.value)}
+        value={graphRelationship}
+      >
+        <option value="all">All relationships</option>
+        {relationshipTypes.map((relationship) => (
+          <option key={relationship} value={relationship}>
+            {relationship}
           </option>
         ))}
       </Select>
@@ -687,7 +741,16 @@ function formatShortDate(value: string) {
 }
 
 function truncateGraphLabel(label: string) {
-  return label.length > 22 ? `${label.slice(0, 21)}...` : label;
+  return label.length > 16 ? `${label.slice(0, 15)}...` : label;
+}
+
+function getResponsiveGraphX(x: number, width: number) {
+  if (width < 720) {
+    const padding = width < 420 ? 40 : 128;
+    return Math.round(padding + x * ((width - padding * 2) / 720));
+  }
+
+  return Math.round(x + (width - 720) / 2);
 }
 
 function getCompactMemoryText(content: string) {

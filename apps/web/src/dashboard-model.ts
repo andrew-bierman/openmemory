@@ -290,9 +290,10 @@ export function getKnowledgeMap(
   memories: Memory[],
   neighbors: GraphEdge[],
   selectedMemoryId: string | null,
-  filters: GraphFilters = { search: "", type: "all" },
+  filters: GraphFilters = { search: "", type: "all", relationship: "all" },
 ): KnowledgeGraph {
   const search = filters.search.trim().toLowerCase();
+  const relationship = filters.relationship ?? "all";
   const visibleMemories = memories
     .filter((memory) => {
       if (memory.status === "forgotten") {
@@ -384,7 +385,13 @@ export function getKnowledgeMap(
     }
   }
 
-  return { nodes, links };
+  return {
+    nodes,
+    links:
+      relationship === "all"
+        ? links
+        : links.filter((link) => link.relationship === relationship),
+  };
 }
 
 export function getMemoryLabel(memory: Pick<Memory, "content">) {
@@ -503,6 +510,7 @@ export type MemoryNeighborDetail = {
 };
 
 export type GraphFilters = {
+  relationship?: string;
   search: string;
   type: string;
 };

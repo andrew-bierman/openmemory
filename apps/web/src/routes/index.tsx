@@ -85,6 +85,7 @@ export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
   validateSearch: (search: Record<string, unknown>) => ({
+    graphRelationship: parseRelationshipParam(search.graphRelationship),
     graphSearch: parseSearchTextParam(search.graphSearch),
     graphType: parseMemoryTypeParam(search.graphType),
     memoryId: parseMemoryId(search.memoryId),
@@ -120,6 +121,7 @@ const MEMORY_SORT_COLUMNS = new Set([
 
 function Home() {
   const {
+    graphRelationship,
     graphSearch,
     graphType,
     memoryId,
@@ -239,6 +241,7 @@ function Home() {
   const tableTypeFilter = memoryType ?? "all";
   const tableSorting = useMemo(() => parseMemorySort(memorySort), [memorySort]);
   const graphGlobalFilter = graphSearch ?? "";
+  const graphRelationshipFilter = graphRelationship ?? "all";
   const graphTypeFilter = graphType ?? "all";
 
   const invalidateDashboard = useCallback(async () => {
@@ -367,6 +370,21 @@ function Home() {
         search: (previous) => ({
           ...previous,
           graphType: nextType === "all" ? undefined : nextType,
+          view: "graph",
+        }),
+      });
+    },
+    [navigate],
+  );
+  const updateGraphRelationship = useCallback(
+    (nextRelationship: string) => {
+      void navigate({
+        replace: true,
+        to: "/",
+        search: (previous) => ({
+          ...previous,
+          graphRelationship:
+            nextRelationship === "all" ? undefined : nextRelationship,
           view: "graph",
         }),
       });
@@ -767,10 +785,12 @@ function Home() {
                 </div>
                 <GraphStatsPanel stats={graphStats} />
                 <KnowledgeMap
+                  graphRelationship={graphRelationshipFilter}
                   graphSearch={graphGlobalFilter}
                   graphType={graphTypeFilter}
                   memories={memories}
                   neighbors={neighbors}
+                  onGraphRelationshipChange={updateGraphRelationship}
                   onGraphSearchChange={updateGraphSearch}
                   onGraphTypeChange={updateGraphType}
                   onInspect={inspectMemory}
@@ -1492,6 +1512,12 @@ function parseSearchTextParam(value: unknown) {
 }
 
 function parseMemoryTypeParam(value: unknown) {
+  return typeof value === "string" && value.trim() && value !== "all"
+    ? value
+    : undefined;
+}
+
+function parseRelationshipParam(value: unknown) {
   return typeof value === "string" && value.trim() && value !== "all"
     ? value
     : undefined;

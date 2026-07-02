@@ -194,6 +194,21 @@ describe("dashboard model", () => {
     ).toBe(true);
   });
 
+  test("filters knowledge map links by relationship while preserving visible nodes", () => {
+    const graph = getKnowledgeMap(memories, edges, null, {
+      relationship: "supports",
+      search: "",
+      type: "all",
+    });
+
+    expect(graph.nodes.map((node) => node.id)).toEqual([
+      "mem_ui",
+      "mem_rag",
+      "mem_arch",
+    ]);
+    expect(graph.links.map((link) => link.relationship)).toEqual(["supports"]);
+  });
+
   test("summarizes visible graph relationships by count", () => {
     const graph = getKnowledgeMap(memories, edges, null);
 

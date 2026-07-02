@@ -1056,7 +1056,7 @@ textarea:focus-visible,
 
 .graph-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px auto;
+  grid-template-columns: minmax(0, 1fr) 150px 190px auto;
   gap: 8px;
   margin-bottom: 12px;
 }

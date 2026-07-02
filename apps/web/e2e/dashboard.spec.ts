@@ -118,13 +118,21 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     .getByRole("button", { name: "Knowledge Map", exact: true })
     .click();
   await expect(page.locator(".graph-controls input")).toBeVisible();
-  await expect(page.locator(".graph-controls select")).toBeVisible();
+  await expect(page.locator(".graph-controls select")).toHaveCount(2);
   await expect(page.locator(".force-graph-frame canvas")).toHaveCount(1);
   await expect(page.getByLabel("Graph relationship summary")).toBeVisible();
   await expect(page.getByLabel("Visible relationship types")).toContainText(
     "shared-signal",
   );
   await expect(page.locator(".graph-node-card")).toHaveCount(4);
+  await page
+    .getByLabel("Filter graph by relationship")
+    .selectOption("shared-signal");
+  await expect(page).toHaveURL(/graphRelationship=shared-signal/);
+  await expect(page.getByLabel("Visible relationship types")).toContainText(
+    "shared-signal",
+  );
+  await page.getByLabel("Filter graph by relationship").selectOption("all");
 
   await page.getByLabel("Filter graph memories").fill("cloudflare");
   await expect(page).toHaveURL(/graphSearch=cloudflare/);
@@ -238,6 +246,16 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     "OpenMemory uses Durable Objects",
   );
   await expect(page.getByLabel("Selected memory relationships")).toContainText(
+    "supports",
+  );
+  await page
+    .getByLabel("Filter graph by relationship")
+    .selectOption("supports");
+  await expect(page).toHaveURL(/graphRelationship=supports/);
+  await expect(page.getByLabel("Filter graph by relationship")).toHaveValue(
+    "supports",
+  );
+  await expect(page.getByLabel("Visible relationship types")).toContainText(
     "supports",
   );
   await expect(page.getByLabel("Graph neighbor relationships")).toContainText(
