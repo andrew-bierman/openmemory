@@ -22,6 +22,7 @@
     "test": "turbo run test",
     "test:integration:local": "bun run --cwd apps/api test:integration",
     "test:integration:docker": "docker compose -f docker-compose.test.yml run --rm local-wrangler-integration",
+    "test:e2e:local": "playwright test -c playwright.local.config.ts",
     "test:e2e:ui": "OPENMEMORY_LIVE_E2E=true playwright test -c playwright.config.ts"
   },
   "devDependencies": {

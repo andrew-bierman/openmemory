@@ -1527,17 +1527,21 @@ function formatShortDate(value: string) {
 }
 
 function useLocalStorage(key: string, initialValue: string) {
-  const [value, setValue] = useState(() => {
-    if (typeof window === "undefined") {
-      return initialValue;
-    }
-
-    return window.localStorage.getItem(key) ?? initialValue;
-  });
+  const [value, setValue] = useState(initialValue);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   useEffect(() => {
+    setValue(window.localStorage.getItem(key) ?? initialValue);
+    setHasLoaded(true);
+  }, [initialValue, key]);
+
+  useEffect(() => {
+    if (!hasLoaded) {
+      return;
+    }
+
     window.localStorage.setItem(key, value);
-  }, [key, value]);
+  }, [hasLoaded, key, value]);
 
   return [value, setValue] as const;
 }
