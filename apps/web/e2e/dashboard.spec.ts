@@ -54,6 +54,10 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.getByLabel("Memory type ranking")).toBeVisible();
   await expect(page.locator("tbody tr")).toHaveCount(4);
   await expect(page.getByText("4 of 4 rows")).toBeVisible();
+  await expect(page.getByLabel("Rows per page")).toHaveValue("5");
+  await expect(page.getByText("Page 1 of 1")).toBeVisible();
+  await page.getByLabel("Rows per page").selectOption("10");
+  await expect(page.getByLabel("Rows per page")).toHaveValue("10");
 
   await page.getByLabel("Recall query").fill("cloudflare graph");
   await page

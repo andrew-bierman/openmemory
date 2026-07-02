@@ -16,6 +16,7 @@ import {
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
+  getPaginationRowModel,
   getSortedRowModel,
   type SortingState,
   type Updater,
@@ -154,6 +155,7 @@ export function MemoryDataTable({
     data: filteredMemories,
     getFilteredRowModel: getFilteredRowModel(),
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     globalFilterFn: (row, _columnId, filterValue) => {
       const needle = String(filterValue).trim().toLowerCase();
@@ -173,6 +175,9 @@ export function MemoryDataTable({
         .toLowerCase()
         .includes(needle);
     },
+    initialState: {
+      pagination: { pageIndex: 0, pageSize: 5 },
+    },
     onGlobalFilterChange: (updater) => {
       const nextValue =
         typeof updater === "function" ? updater(globalFilter) : updater;
@@ -181,6 +186,9 @@ export function MemoryDataTable({
     onSortingChange,
     state: { globalFilter, sorting },
   });
+  const filteredRowCount = table.getFilteredRowModel().rows.length;
+  const currentPage = table.getState().pagination.pageIndex + 1;
+  const pageCount = Math.max(1, table.getPageCount());
 
   if (memories.length === 0) {
     return (
@@ -199,7 +207,7 @@ export function MemoryDataTable({
         <div>
           <strong>Memory records</strong>
           <span>
-            {table.getRowModel().rows.length} of {memories.length} rows
+            {filteredRowCount} of {memories.length} rows
           </span>
         </div>
         <div className="table-filters">
@@ -262,6 +270,45 @@ export function MemoryDataTable({
             ))}
           </TableBody>
         </Table>
+      </div>
+      <div className="data-table-pagination">
+        <div>
+          <span>Rows per page</span>
+          <Select
+            aria-label="Rows per page"
+            onChange={(event) => table.setPageSize(Number(event.target.value))}
+            value={String(table.getState().pagination.pageSize)}
+          >
+            {[5, 10, 20].map((pageSize) => (
+              <option key={pageSize} value={pageSize}>
+                {pageSize}
+              </option>
+            ))}
+          </Select>
+        </div>
+        <span>
+          Page {currentPage} of {pageCount}
+        </span>
+        <div>
+          <Button
+            disabled={!table.getCanPreviousPage()}
+            onClick={() => table.previousPage()}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Previous
+          </Button>
+          <Button
+            disabled={!table.getCanNextPage()}
+            onClick={() => table.nextPage()}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );
