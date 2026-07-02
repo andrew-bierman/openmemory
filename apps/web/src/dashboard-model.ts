@@ -80,6 +80,40 @@ export function getTypeDistribution(memories: Memory[]): DistributionPoint[] {
   );
 }
 
+export function getActivitySummary(activity: ActivityPoint[]): ActivitySummary {
+  const total = activity.reduce((sum, point) => sum + point.count, 0);
+  const activeDays = activity.filter((point) => point.count > 0).length;
+  const peak = activity.reduce<ActivityPoint | null>((currentPeak, point) => {
+    if (!currentPeak || point.count > currentPeak.count) {
+      return point;
+    }
+
+    return currentPeak;
+  }, null);
+
+  return {
+    activeDays,
+    peakCount: peak?.count ?? 0,
+    peakLabel: peak?.label ?? "None",
+    total,
+  };
+}
+
+export function getTypeDistributionSummary(
+  distribution: DistributionPoint[],
+): TypeDistributionSummary {
+  const total = distribution.reduce((sum, point) => sum + point.count, 0);
+  const leading = distribution[0] ?? null;
+
+  return {
+    leadingCount: leading?.count ?? 0,
+    leadingLabel: leading?.label ?? "None",
+    leadingShare:
+      leading && total > 0 ? Math.round((leading.count / total) * 100) : 0,
+    total,
+  };
+}
+
 export function getKnowledgeMap(
   memories: Memory[],
   neighbors: GraphEdge[],
@@ -219,6 +253,20 @@ export type DistributionPoint = {
   label: string;
   count: number;
   percent: number;
+};
+
+export type ActivitySummary = {
+  activeDays: number;
+  peakCount: number;
+  peakLabel: string;
+  total: number;
+};
+
+export type TypeDistributionSummary = {
+  leadingCount: number;
+  leadingLabel: string;
+  leadingShare: number;
+  total: number;
 };
 
 export type KnowledgeNode = {

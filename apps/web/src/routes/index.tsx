@@ -66,9 +66,11 @@ import {
   type ActivityPoint,
   type DashboardMetrics,
   type DistributionPoint,
+  getActivitySummary,
   getDashboardMetrics,
   getRecentActivity,
   getTypeDistribution,
+  getTypeDistributionSummary,
 } from "../dashboard-model";
 import { Route as rootRoute } from "./__root";
 
@@ -946,6 +948,9 @@ function DashboardOverview({
   recentActivity: ActivityPoint[];
   typeDistribution: DistributionPoint[];
 }>) {
+  const activitySummary = getActivitySummary(recentActivity);
+  const typeSummary = getTypeDistributionSummary(typeDistribution);
+
   return (
     <section className="overview-grid" aria-label="Memory overview">
       <div className="metric-tile featured">
@@ -977,28 +982,42 @@ function DashboardOverview({
           <span>Capture cadence</span>
           <strong>Last 7 days</strong>
         </div>
-        <div
-          className="chart-frame"
-          role="img"
-          aria-label="Memory capture activity"
-        >
-          <ResponsiveContainer height={150} width="100%">
-            <BarChart data={recentActivity} margin={{ left: 0, right: 6 }}>
-              <CartesianGrid stroke="#e4e4e7" vertical={false} />
-              <XAxis
-                axisLine={false}
-                dataKey="label"
-                tickLine={false}
-                tickMargin={8}
-              />
-              <YAxis allowDecimals={false} axisLine={false} tickLine={false} />
-              <Tooltip
-                cursor={{ fill: "rgba(37, 99, 235, 0.08)" }}
-                formatter={(value) => [value, "Memories"]}
-              />
-              <Bar dataKey="count" fill="#2563eb" radius={[6, 6, 2, 2]} />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="chart-panel-grid">
+          <div className="chart-summary">
+            <span>Total captures</span>
+            <strong>{activitySummary.total}</strong>
+            <small>
+              {activitySummary.activeDays} active days · peak{" "}
+              {activitySummary.peakLabel} ({activitySummary.peakCount})
+            </small>
+          </div>
+          <div
+            className="chart-frame"
+            role="img"
+            aria-label="Memory capture activity"
+          >
+            <ResponsiveContainer height={150} width="100%">
+              <BarChart data={recentActivity} margin={{ left: 0, right: 6 }}>
+                <CartesianGrid stroke="#e4e4e7" vertical={false} />
+                <XAxis
+                  axisLine={false}
+                  dataKey="label"
+                  tickLine={false}
+                  tickMargin={8}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  cursor={{ fill: "rgba(37, 99, 235, 0.08)" }}
+                  formatter={(value) => [value, "Memories"]}
+                />
+                <Bar dataKey="count" fill="#2563eb" radius={[6, 6, 2, 2]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
       <div className="chart-panel type-panel">
@@ -1006,40 +1025,65 @@ function DashboardOverview({
           <span>Memory mix</span>
           <strong>{typeDistribution.length} types</strong>
         </div>
-        <div className="chart-frame">
-          {typeDistribution.length === 0 ? (
-            <p className="muted">No typed memories yet.</p>
-          ) : (
-            <ResponsiveContainer height={150} width="100%">
-              <BarChart
-                data={typeDistribution}
-                layout="vertical"
-                margin={{ bottom: 0, left: 10, right: 12, top: 0 }}
-              >
-                <CartesianGrid horizontal={false} stroke="#e4e4e7" />
-                <XAxis allowDecimals={false} axisLine={false} type="number" />
-                <YAxis
-                  axisLine={false}
-                  dataKey="label"
-                  tickLine={false}
-                  type="category"
-                  width={92}
-                />
-                <Tooltip
-                  cursor={{ fill: "rgba(15, 118, 110, 0.08)" }}
-                  formatter={(value) => [value, "Memories"]}
-                />
-                <Bar dataKey="count" radius={[0, 6, 6, 0]}>
-                  {typeDistribution.map((point, index) => (
-                    <Cell
-                      fill={index % 2 === 0 ? "#2563eb" : "#0f766e"}
-                      key={point.label}
+        <div className="chart-panel-grid">
+          <div className="chart-summary">
+            <span>Leading type</span>
+            <strong>{typeSummary.leadingLabel}</strong>
+            <small>
+              {typeSummary.leadingCount} of {typeSummary.total} memories ·{" "}
+              {typeSummary.leadingShare}%
+            </small>
+            <ul aria-label="Memory type ranking" className="distribution-list">
+              {typeDistribution.slice(0, 4).map((point) => (
+                <li className="distribution-row" key={point.label}>
+                  <span>{point.label}</span>
+                  <div aria-hidden="true">
+                    <i
+                      style={{
+                        inlineSize: `${Math.max(8, point.percent)}%`,
+                      }}
                     />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+                  </div>
+                  <strong>{point.count}</strong>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="chart-frame">
+            {typeDistribution.length === 0 ? (
+              <p className="muted">No typed memories yet.</p>
+            ) : (
+              <ResponsiveContainer height={150} width="100%">
+                <BarChart
+                  data={typeDistribution}
+                  layout="vertical"
+                  margin={{ bottom: 0, left: 10, right: 12, top: 0 }}
+                >
+                  <CartesianGrid horizontal={false} stroke="#e4e4e7" />
+                  <XAxis allowDecimals={false} axisLine={false} type="number" />
+                  <YAxis
+                    axisLine={false}
+                    dataKey="label"
+                    tickLine={false}
+                    type="category"
+                    width={92}
+                  />
+                  <Tooltip
+                    cursor={{ fill: "rgba(15, 118, 110, 0.08)" }}
+                    formatter={(value) => [value, "Memories"]}
+                  />
+                  <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                    {typeDistribution.map((point, index) => (
+                      <Cell
+                        fill={index % 2 === 0 ? "#2563eb" : "#0f766e"}
+                        key={point.label}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
       </div>
     </section>

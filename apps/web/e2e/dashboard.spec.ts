@@ -43,6 +43,9 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     page.getByRole("heading", { name: "Memory Dashboard" }),
   ).toBeVisible();
   await expect(page.locator(".recharts-wrapper")).toHaveCount(2);
+  await expect(page.getByText("Total captures")).toBeVisible();
+  await expect(page.getByText("Leading type")).toBeVisible();
+  await expect(page.getByLabel("Memory type ranking")).toBeVisible();
   await expect(page.locator("tbody tr")).toHaveCount(4);
   await expect(page.getByText("4 of 4 rows")).toBeVisible();
 

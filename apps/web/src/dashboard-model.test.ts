@@ -1,11 +1,13 @@
 import type { GraphEdge, GraphStats, Memory } from "@openmemory/client";
 import { describe, expect, test } from "vitest";
 import {
+  getActivitySummary,
   getDashboardMetrics,
   getKnowledgeMap,
   getMemoryLabel,
   getRecentActivity,
   getTypeDistribution,
+  getTypeDistributionSummary,
 } from "./dashboard-model";
 
 describe("dashboard model", () => {
@@ -66,6 +68,20 @@ describe("dashboard model", () => {
     expect(activity.at(-1)?.percent).toBe(33);
   });
 
+  test("summarizes capture cadence for chart sidebars", () => {
+    const activity = getRecentActivity(
+      memories,
+      new Date("2026-07-01T12:00:00.000Z"),
+    );
+
+    expect(getActivitySummary(activity)).toEqual({
+      activeDays: 2,
+      peakCount: 3,
+      peakLabel: "Tue",
+      total: 4,
+    });
+  });
+
   test("sorts type distribution by count then label", () => {
     expect(getTypeDistribution(memories)).toEqual([
       { label: "decision", count: 1, percent: 100 },
@@ -73,6 +89,15 @@ describe("dashboard model", () => {
       { label: "insight", count: 1, percent: 100 },
       { label: "preference", count: 1, percent: 100 },
     ]);
+  });
+
+  test("summarizes type distribution for chart sidebars", () => {
+    expect(getTypeDistributionSummary(getTypeDistribution(memories))).toEqual({
+      leadingCount: 1,
+      leadingLabel: "decision",
+      leadingShare: 25,
+      total: 4,
+    });
   });
 
   test("filters knowledge map by content, tags, entities, and memory type", () => {

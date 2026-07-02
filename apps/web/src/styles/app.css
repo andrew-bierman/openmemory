@@ -453,6 +453,92 @@ textarea:focus-visible,
   min-width: 0;
 }
 
+.chart-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.42fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 14px;
+}
+
+.chart-summary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--secondary);
+  padding: 12px;
+}
+
+.chart-summary > span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.chart-summary > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font-size: 24px;
+  line-height: 1.1;
+  font-weight: 780;
+}
+
+.chart-summary > small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.distribution-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+  margin-bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.distribution-row {
+  display: grid;
+  grid-template-columns: minmax(58px, 0.9fr) minmax(50px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.distribution-row span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.distribution-row div {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.distribution-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-2);
+}
+
+.distribution-row strong {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
 .tabs {
   display: flex;
   flex-wrap: wrap;
@@ -932,6 +1018,10 @@ textarea:focus-visible,
   .activity-panel,
   .type-panel {
     grid-column: span 2;
+  }
+
+  .chart-panel-grid {
+    grid-template-columns: 1fr;
   }
 }
 
