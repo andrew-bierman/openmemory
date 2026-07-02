@@ -72,6 +72,16 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  type ActivityPoint,
+  type DashboardMetrics,
+  type DistributionPoint,
+  getDashboardMetrics,
+  getKnowledgeMap,
+  getRecentActivity,
+  getTypeDistribution,
+  type KnowledgeNode,
+} from "../dashboard-model";
 import { Route as rootRoute } from "./__root";
 
 const DEFAULT_API_URL = "http://127.0.0.1:54150";
@@ -1497,196 +1507,6 @@ function McpSetup({
   );
 }
 
-function getDashboardMetrics(
-  memories: Memory[],
-  graphStats: GraphStats | null,
-  oauthConnections: OAuthConnection[],
-): DashboardMetrics {
-  const activeMemories =
-    graphStats?.activeMemories ??
-    memories.filter((memory) => memory.status === "active").length;
-
-  return {
-    activeMemories,
-    totalMemories: graphStats?.totalMemories ?? memories.length,
-    totalEdges: graphStats?.totalEdges ?? 0,
-    relationshipCount: graphStats?.relationshipCount ?? 0,
-    entityCount:
-      graphStats?.entityCount ??
-      new Set(memories.flatMap((memory) => memory.entityIds)).size,
-    tagCount:
-      graphStats?.tagCount ??
-      new Set(memories.flatMap((memory) => memory.tags)).size,
-    oauthConnections: oauthConnections.length,
-    recalledMemories: memories.filter((memory) => memory.isLatest).length,
-  };
-}
-
-function getRecentActivity(memories: Memory[]): ActivityPoint[] {
-  const now = new Date();
-  const days = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date(now);
-    date.setDate(now.getDate() - (6 - index));
-    return {
-      key: date.toISOString().slice(0, 10),
-      label: date
-        .toLocaleDateString(undefined, { weekday: "short" })
-        .slice(0, 3),
-      count: 0,
-      percent: 0,
-    };
-  });
-  const dayByKey = new Map(days.map((day) => [day.key, day]));
-
-  for (const memory of memories) {
-    const key = new Date(memory.createdAt).toISOString().slice(0, 10);
-    const day = dayByKey.get(key);
-    if (day) {
-      day.count += 1;
-    }
-  }
-
-  const max = Math.max(1, ...days.map((day) => day.count));
-  return days.map((day) => ({
-    ...day,
-    percent: Math.round((day.count / max) * 100),
-  }));
-}
-
-function getTypeDistribution(memories: Memory[]): DistributionPoint[] {
-  const counts = new Map<string, number>();
-  for (const memory of memories) {
-    counts.set(memory.type, (counts.get(memory.type) ?? 0) + 1);
-  }
-  const max = Math.max(1, ...counts.values());
-
-  return Array.from(counts, ([label, count]) => ({
-    label,
-    count,
-    percent: Math.round((count / max) * 100),
-  })).sort(
-    (left, right) =>
-      right.count - left.count || left.label.localeCompare(right.label),
-  );
-}
-
-function getKnowledgeMap(
-  memories: Memory[],
-  neighbors: GraphEdge[],
-  selectedMemoryId: string | null,
-  filters: GraphFilters = { search: "", type: "all" },
-): KnowledgeGraph {
-  const search = filters.search.trim().toLowerCase();
-  const visibleMemories = memories
-    .filter((memory) => {
-      if (memory.status === "forgotten") {
-        return false;
-      }
-
-      if (filters.type !== "all" && memory.type !== filters.type) {
-        return false;
-      }
-
-      if (!search) {
-        return true;
-      }
-
-      return [
-        memory.content,
-        memory.type,
-        memory.status,
-        ...memory.tags,
-        ...memory.entityIds,
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(search);
-    })
-    .slice()
-    .sort(
-      (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
-    )
-    .slice(0, 18);
-  const selectedMemory = selectedMemoryId
-    ? memories.find((memory) => memory.id === selectedMemoryId)
-    : null;
-
-  if (
-    selectedMemory &&
-    !visibleMemories.some((memory) => memory.id === selectedMemory.id)
-  ) {
-    visibleMemories.unshift(selectedMemory);
-  }
-
-  const centerX = 360;
-  const centerY = 178;
-  const radiusX = 260;
-  const radiusY = 112;
-  const nodes = visibleMemories.map((memory, index) => {
-    const angle =
-      (index / Math.max(1, visibleMemories.length)) * Math.PI * 2 - Math.PI / 2;
-    const isSelected = memory.id === selectedMemoryId;
-    return {
-      id: memory.id,
-      label: getMemoryLabel(memory),
-      title: memory.content,
-      x: Math.round(centerX + Math.cos(angle) * radiusX),
-      y: Math.round(centerY + Math.sin(angle) * radiusY),
-      size: isSelected
-        ? 13
-        : Math.min(10, 6 + memory.tags.length + memory.entityIds.length),
-      isSelected,
-      memory,
-    };
-  });
-  const nodeById = new Map(nodes.map((node) => [node.id, node]));
-  const links: KnowledgeLink[] = [];
-  const linkKeys = new Set<string>();
-
-  for (const edge of neighbors) {
-    const source = nodeById.get(edge.sourceId);
-    const target = nodeById.get(edge.targetId);
-    if (source && target) {
-      const key = [source.id, target.id, edge.relationship].join(":");
-      linkKeys.add(key);
-      links.push({ source, target, relationship: edge.relationship });
-    }
-  }
-
-  for (let index = 0; index < nodes.length; index += 1) {
-    const source = nodes[index];
-    for (let nextIndex = index + 1; nextIndex < nodes.length; nextIndex += 1) {
-      const target = nodes[nextIndex];
-      if (!sharesMemorySignal(source.memory, target.memory)) {
-        continue;
-      }
-      const key = [source.id, target.id, "shared-signal"].join(":");
-      if (!linkKeys.has(key) && links.length < 34) {
-        linkKeys.add(key);
-        links.push({ source, target, relationship: "shared-signal" });
-      }
-    }
-  }
-
-  return { nodes, links };
-}
-
-function sharesMemorySignal(left: Memory, right: Memory) {
-  const leftSignals = new Set([...left.tags, ...left.entityIds, left.type]);
-  return [...right.tags, ...right.entityIds, right.type].some((signal) =>
-    leftSignals.has(signal),
-  );
-}
-
-function getMemoryLabel(memory: Memory) {
-  const clean = memory.content.replace(/\s+/g, " ").trim();
-  if (clean.length <= 18) {
-    return clean;
-  }
-
-  return `${clean.slice(0, 17)}...`;
-}
-
 function parseTags(value: string) {
   return value
     .split(",")
@@ -1779,57 +1599,6 @@ type AuthUser = {
   id: string;
   email: string;
   name?: string;
-};
-
-type DashboardMetrics = {
-  activeMemories: number;
-  totalMemories: number;
-  totalEdges: number;
-  relationshipCount: number;
-  entityCount: number;
-  tagCount: number;
-  oauthConnections: number;
-  recalledMemories: number;
-};
-
-type ActivityPoint = {
-  key: string;
-  label: string;
-  count: number;
-  percent: number;
-};
-
-type DistributionPoint = {
-  label: string;
-  count: number;
-  percent: number;
-};
-
-type KnowledgeNode = {
-  id: string;
-  label: string;
-  title: string;
-  x?: number;
-  y?: number;
-  size: number;
-  isSelected: boolean;
-  memory: Memory;
-};
-
-type KnowledgeLink = {
-  source: KnowledgeNode;
-  target: KnowledgeNode;
-  relationship: string;
-};
-
-type KnowledgeGraph = {
-  nodes: KnowledgeNode[];
-  links: KnowledgeLink[];
-};
-
-type GraphFilters = {
-  search: string;
-  type: string;
 };
 
 type ForceGraph2DComponent = ComponentType<{
