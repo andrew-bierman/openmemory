@@ -110,6 +110,10 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.locator(".graph-controls input")).toBeVisible();
   await expect(page.locator(".graph-controls select")).toBeVisible();
   await expect(page.locator(".force-graph-frame canvas")).toHaveCount(1);
+  await expect(page.getByLabel("Graph relationship summary")).toBeVisible();
+  await expect(page.getByLabel("Visible relationship types")).toContainText(
+    "shared-signal",
+  );
   await expect(page.locator(".graph-node-card")).toHaveCount(4);
 
   await page.getByLabel("Filter graph memories").fill("cloudflare");
@@ -220,7 +224,9 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.locator(".memory").first()).toContainText(
     "OpenMemory uses Durable Objects",
   );
-  await expect(page.getByText("supports")).toBeVisible();
+  await expect(page.locator(".memory.compact").first()).toContainText(
+    "supports",
+  );
 
   expect(errors).toEqual([]);
 });

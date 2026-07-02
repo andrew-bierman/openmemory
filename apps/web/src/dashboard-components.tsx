@@ -31,7 +31,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { getKnowledgeMap, type KnowledgeNode } from "./dashboard-model";
+import {
+  getKnowledgeMap,
+  getRelationshipDistribution,
+  type KnowledgeNode,
+} from "./dashboard-model";
 
 export type MemoryTableSorting = SortingState;
 
@@ -320,6 +324,11 @@ export function KnowledgeMap({
   const visibleRelationshipCount = new Set(
     graph.links.map((link) => link.relationship),
   ).size;
+  const relationshipDistribution = useMemo(
+    () => getRelationshipDistribution(graph.links),
+    [graph.links],
+  );
+  const selectedNode = graph.nodes.find((node) => node.isSelected) ?? null;
 
   const fitGraph = useCallback(() => {
     if (graph.nodes.length <= 1) {
@@ -406,49 +415,90 @@ export function KnowledgeMap({
         onSearchChange={onGraphSearchChange}
         onTypeChange={onGraphTypeChange}
       />
-      <div className="force-graph-frame" ref={frameRef}>
-        {ForceGraph ? (
-          <ForceGraph
-            cooldownTicks={80}
-            ref={graphRef}
-            graphData={graphData}
-            height={420}
-            linkColor={() => "rgba(63, 63, 70, 0.28)"}
-            linkDirectionalParticles={1}
-            linkDirectionalParticleSpeed={0.004}
-            nodeCanvasObject={(node, ctx, globalScale) => {
-              const graphNode = node as KnowledgeNode;
-              const label = truncateGraphLabel(graphNode.label);
-              const radius = graphNode.size;
-              const x = graphNode.x ?? 0;
-              const y = graphNode.y ?? 0;
-              ctx.beginPath();
-              ctx.arc(x, y, radius, 0, 2 * Math.PI);
-              ctx.fillStyle = graphNode.isSelected ? "#2563eb" : "#ffffff";
-              ctx.fill();
-              ctx.lineWidth = graphNode.isSelected ? 3 : 2;
-              ctx.strokeStyle = graphNode.isSelected ? "#1d4ed8" : "#2563eb";
-              ctx.stroke();
-              const fontSize = 11 / globalScale;
-              ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui`;
-              ctx.textAlign = "center";
-              ctx.textBaseline = "top";
-              ctx.fillStyle = "#3f3f46";
-              ctx.fillText(label, x, y + radius + 5 / globalScale);
-            }}
-            nodeColor={(node) =>
-              (node as KnowledgeNode).isSelected ? "#2563eb" : "#ffffff"
-            }
-            nodeId="id"
-            nodeLabel={(node) => (node as KnowledgeNode).title}
-            nodeVal={(node) => (node as KnowledgeNode).size}
-            onEngineStop={fitGraph}
-            onNodeClick={(node) => void onInspect((node as KnowledgeNode).id)}
-            width={graphWidth}
-          />
-        ) : (
-          <p className="muted">Loading graph explorer...</p>
-        )}
+      <div className="graph-explorer-grid">
+        <div className="force-graph-frame" ref={frameRef}>
+          {ForceGraph ? (
+            <ForceGraph
+              cooldownTicks={80}
+              ref={graphRef}
+              graphData={graphData}
+              height={420}
+              linkColor={() => "rgba(63, 63, 70, 0.28)"}
+              linkDirectionalParticles={1}
+              linkDirectionalParticleSpeed={0.004}
+              nodeCanvasObject={(node, ctx, globalScale) => {
+                const graphNode = node as KnowledgeNode;
+                const label = truncateGraphLabel(graphNode.label);
+                const radius = graphNode.size;
+                const x = graphNode.x ?? 0;
+                const y = graphNode.y ?? 0;
+                ctx.beginPath();
+                ctx.arc(x, y, radius, 0, 2 * Math.PI);
+                ctx.fillStyle = graphNode.isSelected ? "#2563eb" : "#ffffff";
+                ctx.fill();
+                ctx.lineWidth = graphNode.isSelected ? 3 : 2;
+                ctx.strokeStyle = graphNode.isSelected ? "#1d4ed8" : "#2563eb";
+                ctx.stroke();
+                const fontSize = 11 / globalScale;
+                ctx.font = `700 ${fontSize}px ui-sans-serif, system-ui`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top";
+                ctx.fillStyle = "#3f3f46";
+                ctx.fillText(label, x, y + radius + 5 / globalScale);
+              }}
+              nodeColor={(node) =>
+                (node as KnowledgeNode).isSelected ? "#2563eb" : "#ffffff"
+              }
+              nodeId="id"
+              nodeLabel={(node) => (node as KnowledgeNode).title}
+              nodeVal={(node) => (node as KnowledgeNode).size}
+              onEngineStop={fitGraph}
+              onNodeClick={(node) => void onInspect((node as KnowledgeNode).id)}
+              width={graphWidth}
+            />
+          ) : (
+            <p className="muted">Loading graph explorer...</p>
+          )}
+        </div>
+        <aside
+          className="graph-inspector"
+          aria-label="Graph relationship summary"
+        >
+          <div>
+            <span>Visible graph</span>
+            <strong>{graph.nodes.length}</strong>
+            <small>
+              {graph.links.length} links · {visibleRelationshipCount} types
+            </small>
+          </div>
+          <div>
+            <span>Selected node</span>
+            <strong>{selectedNode?.memory.type ?? "None"}</strong>
+            <small>{selectedNode?.label ?? "Choose a memory to inspect"}</small>
+          </div>
+          <ul
+            aria-label="Visible relationship types"
+            className="relationship-list"
+          >
+            {relationshipDistribution.length === 0 ? (
+              <li className="relationship-row empty">No visible links</li>
+            ) : (
+              relationshipDistribution.slice(0, 5).map((relationship) => (
+                <li className="relationship-row" key={relationship.label}>
+                  <span>{relationship.label}</span>
+                  <div aria-hidden="true">
+                    <i
+                      style={{
+                        inlineSize: `${Math.max(8, relationship.percent)}%`,
+                      }}
+                    />
+                  </div>
+                  <strong>{relationship.count}</strong>
+                </li>
+              ))
+            )}
+          </ul>
+        </aside>
       </div>
       <div className="graph-node-list">
         {graph.nodes.map((node) => (

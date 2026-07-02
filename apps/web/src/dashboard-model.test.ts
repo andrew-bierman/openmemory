@@ -6,6 +6,7 @@ import {
   getKnowledgeMap,
   getMemoryLabel,
   getRecentActivity,
+  getRelationshipDistribution,
   getTypeDistribution,
   getTypeDistributionSummary,
 } from "./dashboard-model";
@@ -131,6 +132,16 @@ describe("dashboard model", () => {
     expect(
       graph.links.some((link) => link.relationship === "shared-signal"),
     ).toBe(true);
+  });
+
+  test("summarizes visible graph relationships by count", () => {
+    const graph = getKnowledgeMap(memories, edges, null);
+
+    expect(getRelationshipDistribution(graph.links)).toEqual([
+      { label: "informs", count: 1, percent: 100 },
+      { label: "shared-signal", count: 1, percent: 100 },
+      { label: "supports", count: 1, percent: 100 },
+    ]);
   });
 
   test("truncates long memory labels for graph cards and canvas labels", () => {

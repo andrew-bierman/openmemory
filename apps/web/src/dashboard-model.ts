@@ -114,6 +114,25 @@ export function getTypeDistributionSummary(
   };
 }
 
+export function getRelationshipDistribution(
+  links: KnowledgeLink[],
+): DistributionPoint[] {
+  const counts = new Map<string, number>();
+  for (const link of links) {
+    counts.set(link.relationship, (counts.get(link.relationship) ?? 0) + 1);
+  }
+  const max = Math.max(1, ...counts.values());
+
+  return Array.from(counts, ([label, count]) => ({
+    label,
+    count,
+    percent: Math.round((count / max) * 100),
+  })).sort(
+    (left, right) =>
+      right.count - left.count || left.label.localeCompare(right.label),
+  );
+}
+
 export function getKnowledgeMap(
   memories: Memory[],
   neighbors: GraphEdge[],

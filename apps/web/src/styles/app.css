@@ -894,6 +894,13 @@ textarea:focus-visible,
   margin-bottom: 12px;
 }
 
+.graph-explorer-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+}
+
 .force-graph-frame {
   width: 100%;
   min-height: 420px;
@@ -912,6 +919,101 @@ textarea:focus-visible,
 
 .force-graph-frame canvas {
   display: block;
+}
+
+.graph-inspector {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--secondary);
+  padding: 12px;
+}
+
+.graph-inspector > div {
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 10px;
+}
+
+.graph-inspector span {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 820;
+  text-transform: uppercase;
+}
+
+.graph-inspector strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.graph-inspector small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relationship-list {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relationship-row {
+  display: grid;
+  grid-template-columns: minmax(70px, 1fr) minmax(48px, 0.8fr) auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.relationship-row.empty {
+  display: block;
+  color: var(--muted-foreground);
+}
+
+.relationship-row > span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-weight: 650;
+  text-overflow: ellipsis;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.relationship-row div {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.relationship-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.relationship-row > strong {
+  color: var(--muted-foreground);
+  font-size: 12px;
 }
 
 .graph-node-list {
@@ -1076,6 +1178,14 @@ textarea:focus-visible,
   }
 
   .graph-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-inspector {
+    grid-template-columns: 1fr;
+  }
+
+  .relationship-list {
     grid-template-columns: 1fr;
   }
 
