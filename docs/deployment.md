@@ -103,6 +103,14 @@ bun run test:integration:local
 
 That job is credential-free. It starts Wrangler locally on randomized ports, applies D1 migrations to isolated local state, and exercises the Worker through HTTP against local Durable Object and D1 bindings.
 
+CI also runs the local dashboard browser E2E suite:
+
+```sh
+bun run test:e2e:local
+```
+
+That job installs Playwright Chromium and starts the local API plus TanStack Start app on explicit non-default ports, then checks the dashboard, graph explorer, admin settings, ingest flow, and MCP setup panel.
+
 The manual `Live Smoke` workflow runs:
 
 ```sh

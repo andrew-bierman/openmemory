@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 
 const API_URL = "http://127.0.0.1:54150";
+const MCP_URL = `${API_URL}/mcp`;
+const OAUTH_ISSUER_URL = `${API_URL}/api/auth`;
+const AUTHORIZATION_METADATA_URL = `${API_URL}/.well-known/oauth-authorization-server/api/auth`;
+const PROTECTED_RESOURCE_METADATA_URL = `${API_URL}/.well-known/oauth-protected-resource/mcp`;
 
 test("local dashboard renders TanStack table, charts, and graph explorer", async ({
   page,
@@ -185,9 +189,21 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     .getByRole("button", { name: "MCP", exact: true })
     .click();
   await expect(page).toHaveURL(/view=mcp/);
-  await expect(page.locator("pre.context").first()).toContainText(
-    "/.well-known/oauth-authorization-server/api/auth",
+  await expect(page.getByLabel("Server URL")).toHaveValue(MCP_URL);
+  await expect(page.getByLabel("OAuth issuer")).toHaveValue(OAUTH_ISSUER_URL);
+  await expect(page.getByLabel("Authorization metadata")).toHaveValue(
+    AUTHORIZATION_METADATA_URL,
   );
+  await expect(page.getByLabel("Protected resource metadata")).toHaveValue(
+    PROTECTED_RESOURCE_METADATA_URL,
+  );
+  await expect(page.locator("pre.context").first()).toContainText(
+    AUTHORIZATION_METADATA_URL,
+  );
+  await expect(page.locator("pre.context").first()).toContainText(
+    PROTECTED_RESOURCE_METADATA_URL,
+  );
+  await expect(page.getByText("No authorized clients")).toBeVisible();
 
   await page.goto("/?view=admin");
   await expect(page.locator(".admin-grid")).toBeVisible();
@@ -203,9 +219,7 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
       .getByRole("button", { name: "Knowledge Map", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
 
-  await page.goto("/?view=graph&graphSearch=cloudflare&graphType=decision", {
-    waitUntil: "networkidle",
-  });
+  await page.goto("/?view=graph&graphSearch=cloudflare&graphType=decision");
   await expect(page.getByLabel("Filter graph memories")).toHaveValue(
     "cloudflare",
   );

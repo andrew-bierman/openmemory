@@ -99,6 +99,25 @@ export function handleOpenMemoryAuthRequest(env: Env, request: Request) {
     return oauthProviderOpenIdConfigMetadata(auth)(request);
   }
 
+  if (pathname === "/.well-known/oauth-protected-resource/mcp") {
+    const authBaseUrl = resolveAuthBaseUrl(env, request);
+    const resourceBaseUrl = resolveResourceBaseUrl(authBaseUrl);
+    return json(
+      {
+        resource: `${resourceBaseUrl}/mcp`,
+        authorization_servers: [
+          `${authBaseUrl}/.well-known/oauth-authorization-server/api/auth`,
+        ],
+        scopes_supported: ["openid", "profile", "memory:read", "memory:write"],
+        bearer_methods_supported: ["header"],
+      },
+      200,
+      {
+        "cache-control": "public, max-age=300",
+      },
+    );
+  }
+
   return auth.handler(request);
 }
 
@@ -140,8 +159,28 @@ export function isAuthRoute(pathname: string) {
   return (
     pathname.startsWith(AUTH_BASE_PATH) ||
     pathname.startsWith("/.well-known/oauth-authorization-server") ||
+    pathname.startsWith("/.well-known/oauth-protected-resource") ||
     pathname.startsWith("/.well-known/openid-configuration")
   );
+}
+
+function json(body: unknown, status = 200, headers?: Record<string, string>) {
+  const responseHeaders = new Headers();
+  for (const [key, value] of Object.entries(headers ?? {})) {
+    responseHeaders.set(key, value);
+  }
+  responseHeaders.set("content-type", "application/json");
+
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: responseHeaders,
+  });
+}
+
+function resolveResourceBaseUrl(authBaseURL: string) {
+  return authBaseURL.endsWith(AUTH_BASE_PATH)
+    ? authBaseURL.slice(0, -AUTH_BASE_PATH.length)
+    : authBaseURL;
 }
 
 function createAuthDatabase(env: Env): BetterAuthOptions["database"] {
