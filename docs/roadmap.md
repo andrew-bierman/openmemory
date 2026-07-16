@@ -81,6 +81,8 @@
 - Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
 - Repository public-launch operations are complete: Discussions, topics/about
   metadata, public visibility, and the first tagged alpha release are live.
+- Launch copy and first-feedback triage guidance live in
+  `docs/launch-announcement.md`.
 
 ## Next Implementation Tracks
 
@@ -123,6 +125,6 @@
    - Add a scoped `CLOUDFLARE_API_TOKEN` repository secret only if we keep the GitHub manual deploy fallback.
 
 6. Open-source launch operations
-   - Publish launch copy that sets alpha expectations clearly.
-   - Triage first public feedback into MCP compatibility, UI polish, recall
-     quality, and Cloudflare deployment friction.
+   - Use `docs/launch-announcement.md` for public launch copy and first-feedback
+     triage.
+   - Convert recurring public feedback into labeled issues and roadmap updates.

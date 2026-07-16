@@ -37,6 +37,8 @@ operations still need work before a larger public push.
   cover the alpha operations baseline.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
+- Public launch copy and first-feedback triage guidance are written in
+  `docs/launch-announcement.md`.
 
 ## Open-Source Repository Checklist
 
@@ -96,7 +98,6 @@ operations still need work before a larger public push.
 ## Recommended Launch Sequence
 
 1. Keep CI and live smoke green after each deploy.
-2. Publish a short launch note that clearly says alpha, Cloudflare-native, MCP,
-   graph memory, and self-hostable.
-3. Use the first public feedback cycle to prioritize MCP compatibility, UI
-   account polish, and async RAG pipeline work.
+2. Publish the launch note from `docs/launch-announcement.md`.
+3. Use the first public feedback cycle to prioritize MCP compatibility,
+   Cloudflare setup friction, recall quality, security, and dashboard UX.
