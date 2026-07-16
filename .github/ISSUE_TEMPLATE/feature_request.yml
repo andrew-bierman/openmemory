@@ -1,0 +1,42 @@
+name: Feature request
+description: Suggest a capability or improvement for OpenMemory.
+title: "feat: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or operator problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior, API, UI, MCP tool, or operational change.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Graph memory
+        - RAG and retrieval
+        - MCP
+        - Auth/OAuth
+        - Dashboard UI
+        - Cloudflare deployment
+        - Testing/benchmarks
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional, but useful for architecture-heavy requests.
+    validations:
+      required: false

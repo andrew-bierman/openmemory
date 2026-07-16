@@ -1,0 +1,58 @@
+name: Bug report
+description: Report reproducible OpenMemory behavior that should be fixed.
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not include secrets, bearer tokens,
+        private memory contents, or personal data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Include commands, routes, inputs, or UI steps.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - API
+        - MCP
+        - Auth/OAuth
+        - Dashboard UI
+        - Cloudflare deploy
+        - Tests/CI
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Local, Docker, Cloudflare account, browser, Bun/Wrangler versions, or deployed URL.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or request IDs
+      description: Include `x-openmemory-request-id`, Cloudflare ray ID, or sanitized logs when available.
+      render: text
+    validations:
+      required: false

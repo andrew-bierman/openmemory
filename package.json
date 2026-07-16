@@ -1,6 +1,16 @@
 {
   "name": "openmemory",
   "private": true,
+  "description": "Cloudflare-native open-source memory infrastructure for AI tools and MCP clients",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/andrew-bierman/openmemory.git"
+  },
+  "bugs": {
+    "url": "https://github.com/andrew-bierman/openmemory/issues"
+  },
+  "homepage": "https://github.com/andrew-bierman/openmemory#readme",
   "type": "module",
   "workspaces": [
     "apps/*",

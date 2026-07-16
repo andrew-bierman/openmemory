@@ -253,6 +253,7 @@ remaining implementation tracks.
 - [Deployment](docs/deployment.md)
 - [MCP setup](docs/mcp.md)
 - [Roadmap](docs/roadmap.md)
+- [Launch readiness](docs/launch-readiness.md)
 - [Testing strategy](docs/plans/testing-strategy.md)
 - [Cloudflare memory stack research](docs/research/cloudflare-memory-stack.md)
 - [Cloudflare RAG bottlenecks](docs/research/cloudflare-rag-bottlenecks.md)
@@ -260,3 +261,9 @@ remaining implementation tracks.
 - [Supermemory feature evaluation](docs/research/supermemory-feature-evaluation.md)
 - [Requirements brainstorm](docs/brainstorms/openmemory-requirements.md)
 - [Implementation plan](docs/plans/openmemory-plan.md)
+
+## Contributing
+
+OpenMemory is MIT licensed. See [CONTRIBUTING.md](CONTRIBUTING.md),
+[SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening issues or PRs.
