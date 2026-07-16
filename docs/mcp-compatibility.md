@@ -22,6 +22,15 @@ so protocol behavior can run in CI without external OAuth fixtures.
 | `prompts/list` | Not exposed | Integration tests verify the server returns a valid JSON-RPC response for optional prompt discovery. |
 | Server-sent streaming tool results | Not required today | Tools return JSON responses. Streaming can be added later for long-running ingest or recall. |
 
+## Named Client Dogfooding
+
+| Client | Status | Evidence | Notes |
+| --- | --- | --- | --- |
+| Official MCP TypeScript SDK `StreamableHTTPClientTransport` | Tested in CI | `bun run test:mcp:sdk` starts local Wrangler, connects to `/mcp`, lists tools, calls `remember`, and calls `recall`. | Uses the local tenant header because CI cannot complete browser OAuth. Production clients should use OAuth. |
+| MCP Inspector | Config-ready | Use the streamable HTTP URL and headers below. | Manual UI dogfooding remains useful before broad launch because Inspector OAuth and browser callback handling are interactive. |
+| Cursor | Config-ready | Generic streamable HTTP config below. | Requires the user/client OAuth flow against the deployed Worker. |
+| Claude remote MCP connector / Messages API MCP connector | Config-ready | Generic streamable HTTP config below. | Requires provider-side OAuth configuration and is not suitable for unattended CI. |
+
 ## Client Expectations
 
 Generic MCP clients should use:
@@ -47,9 +56,9 @@ Clients should run the normal MCP handshake:
 
 ## Known Gaps
 
-- Dedicated external-client dogfooding still needs named entries for clients
-  such as Claude Desktop, Cursor, ChatGPT connector flows, and the MCP
-  Inspector.
+- Dedicated manual external-client dogfooding remains before a broad public
+  launch for interactive clients such as MCP Inspector, Cursor, Claude, and
+  ChatGPT connector flows.
 - OpenMemory does not currently expose MCP resources or prompts.
 - MCP runs in the monolithic API Worker. Move to a dedicated `McpAgent` Worker
   only if session-specific state or independent scaling becomes necessary.

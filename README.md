@@ -204,13 +204,14 @@ compatibility dependency. OpenMemory's ORM path is Drizzle.
 ## Testing
 
 OpenMemory follows the testing trophy: targeted unit coverage, heavier
-integration coverage around runtime boundaries, and end-to-end browser/API smoke
-for the deployed product.
+integration coverage around runtime boundaries, named MCP client smoke, and
+end-to-end browser/API smoke for the deployed product.
 
 ```sh
 bun run check
 bun run build
 bun run test:integration:local
+bun run test:mcp:sdk
 bun run test:e2e:local
 ```
 
@@ -219,6 +220,9 @@ non-default ports, applies D1 migrations into isolated local persistence, and
 exercises Durable Objects, D1 auth storage, Better Auth sessions, OAuth
 metadata, MCP, graph edges, recall, sync and async source ingestion, extraction
 workers, Queues, Workflows, exports, index repair, and the dashboard API.
+
+The MCP SDK smoke starts local Wrangler and drives `/mcp` through the official
+TypeScript SDK `StreamableHTTPClientTransport`.
 
 The local browser E2E suite starts the API and TanStack Start app on explicit
 non-default ports and exercises the dashboard, charts, memory table, source

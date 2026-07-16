@@ -93,3 +93,12 @@ connection list and revoke actions.
 
 See [MCP compatibility](mcp-compatibility.md) for the protocol matrix, tested
 client request shapes, and known external-client dogfooding gaps.
+
+For a repeatable local named-client check, run:
+
+```sh
+bun run test:mcp:sdk
+```
+
+That starts local Wrangler and connects with the official MCP TypeScript SDK
+`StreamableHTTPClientTransport`.
