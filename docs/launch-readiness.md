@@ -51,9 +51,9 @@ operations still need work before a larger public push.
 - [x] Issue templates exist.
 - [x] Pull request template exists.
 - [x] GitHub Discussions enabled for support and design questions.
-- [ ] Repository visibility switched from private to public.
+- [x] Repository visibility switched from private to public.
 - [x] Repository topics set for discovery.
-- [x] First tagged alpha release draft created with release notes for
+- [x] First tagged alpha release published with release notes for
   `v0.1.0-alpha.1`.
 
 ## Product Readiness Checklist
@@ -95,12 +95,8 @@ operations still need work before a larger public push.
 
 ## Recommended Launch Sequence
 
-1. Keep the repo private until the launch scaffolding PR is merged and CI is
-   green.
-2. Add repository topics and enable Discussions.
-3. Create a tagged alpha release from `main`.
-4. Switch repository visibility to public.
-5. Publish a short launch note that clearly says alpha, Cloudflare-native, MCP,
+1. Keep CI and live smoke green after each deploy.
+2. Publish a short launch note that clearly says alpha, Cloudflare-native, MCP,
    graph memory, and self-hostable.
-6. Use the first public feedback cycle to prioritize MCP compatibility, UI
+3. Use the first public feedback cycle to prioritize MCP compatibility, UI
    account polish, and async RAG pipeline work.
