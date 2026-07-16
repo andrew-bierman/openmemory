@@ -151,3 +151,9 @@ bun run deploy
 ```
 
 Or run the `Deploy API` workflow from GitHub Actions after secrets are configured. Prefer Cloudflare Git deploys for normal production releases.
+
+## Operations
+
+See [docs/operations.md](operations.md) for rollback, Cloudflare WAF/global rate
+limit recommendations, saved log queries, alerting, and alpha data retention
+guidance.
