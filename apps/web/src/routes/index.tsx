@@ -1,4 +1,5 @@
 import {
+  type Account,
   createOpenMemoryClient,
   type GraphEdge,
   type GraphExportResult,
@@ -152,6 +153,9 @@ function Home() {
   const [content, setContent] = useState("");
   const [ingestContent, setIngestContent] = useState("");
   const [ingestSource, setIngestSource] = useState("conversation");
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [memberEmail, setMemberEmail] = useState("");
+  const [memberRole, setMemberRole] = useState<"admin" | "member">("member");
   const [tags, setTags] = useState("");
   const [type, setType] = useState("fact");
   const [recallDraft, setRecallDraft] = useState(
@@ -217,6 +221,11 @@ function Home() {
     queryKey: ["openmemory", "oauth-connections", ...queryScope],
     queryFn: () => api.listOAuthConnections().catch(() => []),
   });
+  const accountQuery = useQuery<Account | null>({
+    enabled: hasLoadedConnection && !usesLocalTenant,
+    queryKey: ["openmemory", "account", ...queryScope],
+    queryFn: () => api.getAccount().catch(() => null),
+  });
   const contextQuery = useQuery({
     enabled: hasLoadedConnection && Boolean(recallQuery),
     queryKey: ["openmemory", "context", recallQuery, ...queryScope],
@@ -227,6 +236,7 @@ function Home() {
   const neighbors = neighborsQuery.data ?? [];
   const graphStats = graphStatsQuery.data ?? null;
   const oauthConnections = oauthConnectionsQuery.data ?? [];
+  const account = accountQuery.data ?? null;
   const context = contextQuery.data ?? null;
   const profile = profileQuery.data?.summary ?? "";
   const sessionUser = sessionQuery.data ?? null;
@@ -260,6 +270,7 @@ function Home() {
       queryClient.invalidateQueries({
         queryKey: ["openmemory", "oauth-connections"],
       }),
+      queryClient.invalidateQueries({ queryKey: ["openmemory", "account"] }),
       queryClient.invalidateQueries({ queryKey: ["openmemory", "session"] }),
       queryClient.invalidateQueries({ queryKey: ["openmemory", "context"] }),
     ]);
@@ -451,6 +462,27 @@ function Home() {
     onMutate: () => setError(null),
     onSuccess: invalidateDashboard,
   });
+  const renameWorkspaceMutation = useMutation({
+    mutationFn: api.renameWorkspace,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
+  const inviteMemberMutation = useMutation({
+    mutationFn: api.inviteWorkspaceMember,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: async () => {
+      setMemberEmail("");
+      await invalidateDashboard();
+    },
+  });
+  const removeMemberMutation = useMutation({
+    mutationFn: api.removeWorkspaceMember,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
   const exportGraphMutation = useMutation({
     mutationFn: api.exportGraph,
     onError: (caught) => setError(formatError(caught)),
@@ -470,6 +502,7 @@ function Home() {
     graphStatsQuery.isFetching ||
     selectedMemoryQuery.isFetching ||
     neighborsQuery.isFetching ||
+    accountQuery.isFetching ||
     oauthConnectionsQuery.isFetching ||
     contextQuery.isFetching ||
     createMemoryMutation.isPending ||
@@ -477,6 +510,9 @@ function Home() {
     forgetMemoryMutation.isPending ||
     authMutation.isPending ||
     revokeOAuthMutation.isPending ||
+    renameWorkspaceMutation.isPending ||
+    inviteMemberMutation.isPending ||
+    removeMemberMutation.isPending ||
     exportGraphMutation.isPending ||
     repairIndexMutation.isPending;
 
@@ -554,11 +590,39 @@ function Home() {
       ["openmemory", "oauth-connections", ...queryScope],
       [],
     );
+    queryClient.setQueryData(["openmemory", "account", ...queryScope], null);
     queryClient.removeQueries({ queryKey: ["openmemory", "context"] });
   }
 
   async function revokeOAuthConnection(clientId: string) {
     await revokeOAuthMutation.mutateAsync(clientId);
+  }
+
+  async function renameCurrentWorkspace(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextName = workspaceName.trim() || account?.workspace.name;
+    if (!nextName) {
+      return;
+    }
+
+    await renameWorkspaceMutation.mutateAsync(nextName);
+  }
+
+  async function inviteCurrentMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const emailToInvite = memberEmail.trim();
+    if (!emailToInvite) {
+      return;
+    }
+
+    await inviteMemberMutation.mutateAsync({
+      email: emailToInvite,
+      role: memberRole,
+    });
+  }
+
+  async function removeCurrentMember(memberId: string) {
+    await removeMemberMutation.mutateAsync(memberId);
   }
 
   async function exportGraph() {
@@ -848,12 +912,18 @@ function Home() {
               />
             ) : view === "admin" ? (
               <AdminWorkspace
+                account={account}
                 apiUrl={apiUrl}
                 connections={oauthConnections}
                 email={email}
                 isLoading={isLoading}
+                memberEmail={memberEmail}
+                memberRole={memberRole}
                 name={name}
+                onInviteMember={inviteCurrentMember}
                 onRevoke={revokeOAuthConnection}
+                onRemoveMember={removeCurrentMember}
+                onRenameWorkspace={renameCurrentWorkspace}
                 onSignIn={signIn}
                 onSignOut={signOut}
                 onSignUp={signUp}
@@ -861,13 +931,21 @@ function Home() {
                 sessionUser={sessionUser}
                 setApiUrl={setApiUrl}
                 setEmail={setEmail}
+                setMemberEmail={setMemberEmail}
+                setMemberRole={setMemberRole}
                 setName={setName}
                 setPassword={setPassword}
                 setTenantId={setTenantId}
                 setToken={setToken}
+                setWorkspaceName={setWorkspaceName}
                 tenantId={tenantId}
                 token={token}
                 usesLocalTenant={usesLocalTenant}
+                workspaceName={
+                  workspaceName ||
+                  account?.workspace.name ||
+                  (usesLocalTenant ? "Local workspace" : "")
+                }
               />
             ) : (
               <>

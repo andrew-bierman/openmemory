@@ -184,6 +184,15 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(
     page.getByText("Header tenant for local development"),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Team and tenant" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Workspace name")).toHaveValue(
+    "Local workspace",
+  );
+  await expect(page.getByLabel("Member email")).toBeDisabled();
+  await expect(page.getByLabel("Role")).toBeDisabled();
+  await expect(page.getByText("No hosted workspace loaded")).toBeVisible();
 
   await page
     .locator(".tabs")

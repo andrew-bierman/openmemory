@@ -56,6 +56,33 @@ export type OAuthConnection = {
   updatedAt?: string;
 };
 
+export type Account = {
+  user: {
+    id: string;
+    email: string;
+    name: string;
+  };
+  workspace: {
+    id: string;
+    name: string;
+    tenantId: string;
+    ownerUserId: string;
+    createdAt: string;
+    updatedAt: string;
+  };
+  members: WorkspaceMember[];
+};
+
+export type WorkspaceMember = {
+  id: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+  status: "active" | "invited";
+  userId?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type GraphExportResult = {
   key: string;
   bytes: number;
@@ -148,6 +175,15 @@ export function createOpenMemoryClient(
     getNeighbors: (id: string) =>
       unwrap<GraphEdge[]>(client.v1.graph({ id }).neighbors.get()),
     getGraphStats: () => unwrap<GraphStats>(client.v1.graph.stats.get()),
+    getAccount: () => unwrap<Account>(client.v1.account.get()),
+    renameWorkspace: (name: string) =>
+      unwrap<Account>(client.v1.account.workspace.patch({ name })),
+    inviteWorkspaceMember: (input: {
+      email: string;
+      role?: "admin" | "member";
+    }) => unwrap<WorkspaceMember>(client.v1.account.members.post(input)),
+    removeWorkspaceMember: (memberId: string) =>
+      unwrap<Account>(client.v1.account.members({ memberId }).delete()),
     listOAuthConnections: () =>
       unwrap<OAuthConnection[]>(client.v1.oauth.connections.get()),
     revokeOAuthConnection: (clientId: string) =>
@@ -205,6 +241,17 @@ type EdenClient = {
     };
     profile: {
       get(): EdenResult;
+    };
+    account: {
+      get(): EdenResult;
+      workspace: {
+        patch(input: { name: string }): EdenResult;
+      };
+      members: {
+        post(input: { email: string; role?: "admin" | "member" }): EdenResult;
+      } & ((params: { memberId: string }) => {
+        delete(): EdenResult;
+      });
     };
     oauth: {
       connections: {

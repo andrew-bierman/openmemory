@@ -651,6 +651,92 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   expect(memories.map((item) => item.id)).toContain(memory.id);
 }, 45_000);
 
+test("worker API manages account workspace and team members", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+
+  const email = `workspace-${crypto.randomUUID()}@example.com`;
+  const signUp = await worker.fetch("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Workspace Owner",
+      email,
+      password: "password1234",
+    }),
+  });
+  await expectOk(signUp);
+  const cookie = getCookieHeader(signUp);
+
+  const account = await getJson<AccountResponse>(
+    await worker.fetch("/v1/account", {
+      headers: { cookie },
+    }),
+  );
+  expect(account.user.email).toBe(email);
+  expect(account.workspace.tenantId).toBe(account.user.id);
+  expect(account.members).toContainEqual(
+    expect.objectContaining({
+      email,
+      role: "owner",
+      status: "active",
+      userId: account.user.id,
+    }),
+  );
+
+  const renamed = await getJson<AccountResponse>(
+    await worker.fetch("/v1/account/workspace", {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ name: "Research Memory Team" }),
+    }),
+  );
+  expect(renamed.workspace.name).toBe("Research Memory Team");
+
+  const inviteEmail = `teammate-${crypto.randomUUID()}@example.com`;
+  const invited = await getJson<WorkspaceMemberResponse>(
+    await worker.fetch("/v1/account/members", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ email: inviteEmail, role: "admin" }),
+    }),
+  );
+  expect(invited).toMatchObject({
+    email: inviteEmail,
+    role: "admin",
+    status: "invited",
+  });
+
+  const withInvite = await getJson<AccountResponse>(
+    await worker.fetch("/v1/account", {
+      headers: { cookie },
+    }),
+  );
+  expect(withInvite.members.map((member) => member.email)).toContain(
+    inviteEmail,
+  );
+
+  const owner = withInvite.members.find((member) => member.role === "owner");
+  expect(owner).toBeTruthy();
+  const removeOwner = await worker.fetch(`/v1/account/members/${owner?.id}`, {
+    method: "DELETE",
+    headers: { cookie },
+  });
+  expect(removeOwner.status).toBe(403);
+
+  const afterRemove = await getJson<AccountResponse>(
+    await worker.fetch(`/v1/account/members/${invited.id}`, {
+      method: "DELETE",
+      headers: { cookie },
+    }),
+  );
+  expect(afterRemove.members.map((member) => member.id)).not.toContain(
+    invited.id,
+  );
+}, 45_000);
+
 test("ingestion extracts entities, links graph neighbors, and improves recall", async () => {
   const worker = await startWorker();
   workers.push(worker);
@@ -1519,6 +1605,27 @@ type OAuthConnectionResponse = {
 type OAuthRevokeResponse = {
   clientId: string;
   revoked: boolean;
+};
+
+type AccountResponse = {
+  user: {
+    id: string;
+    email: string;
+  };
+  workspace: {
+    id: string;
+    name: string;
+    tenantId: string;
+  };
+  members: WorkspaceMemberResponse[];
+};
+
+type WorkspaceMemberResponse = {
+  id: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+  status: "active" | "invited";
+  userId?: string;
 };
 
 type SessionResponse = {

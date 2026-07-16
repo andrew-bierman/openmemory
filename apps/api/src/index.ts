@@ -16,6 +16,12 @@ import {
 import { Elysia, t } from "elysia";
 import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
 import {
+  getAccount,
+  inviteWorkspaceMember,
+  removeWorkspaceMember,
+  renameWorkspace,
+} from "./account";
+import {
   getGraph,
   type HeaderSource,
   isLocalDevelopmentRequest,
@@ -186,6 +192,15 @@ const sourceBody = t.Object({
   overlap: t.Optional(t.Number({ minimum: 0, maximum: 800 })),
 });
 
+const workspaceBody = t.Object({
+  name: t.String({ minLength: 1, maxLength: 120 }),
+});
+
+const workspaceMemberBody = t.Object({
+  email: t.String({ minLength: 3, maxLength: 320 }),
+  role: t.Optional(t.Union([t.Literal("admin"), t.Literal("member")])),
+});
+
 async function withTenant(request: Request, headers: HeaderSource) {
   const auth = resolveAuth(env, headers);
   if (!auth.ok) {
@@ -260,6 +275,33 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     service: "openmemory-api",
     features: ["graph-memory", "profile", "context", "mcp-json-rpc"],
   }))
+  .get("/v1/account", async ({ request, status }) => {
+    const result = await getAccount(env, request);
+    return status(result.status, result.body);
+  })
+  .patch(
+    "/v1/account/workspace",
+    async ({ body, request, status }) => {
+      const result = await renameWorkspace(env, request, body);
+      return status(result.status, result.body);
+    },
+    { body: workspaceBody },
+  )
+  .post(
+    "/v1/account/members",
+    async ({ body, request, status }) => {
+      const result = await inviteWorkspaceMember(env, request, body);
+      return status(result.status, result.body);
+    },
+    { body: workspaceMemberBody },
+  )
+  .delete(
+    "/v1/account/members/:memberId",
+    async ({ params, request, status }) => {
+      const result = await removeWorkspaceMember(env, request, params.memberId);
+      return status(result.status, result.body);
+    },
+  )
   .post(
     "/v1/memories",
     async ({ body, headers, request, status }) => {
