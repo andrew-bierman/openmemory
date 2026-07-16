@@ -68,11 +68,13 @@ export function AdminWorkspace({
   onInviteMember,
   onRevoke,
   onRemoveMember,
+  onSaveProfile,
   onRenameWorkspace,
   onSignIn,
   onSignOut,
   onSignUp,
   password,
+  profileName,
   sessionUser,
   setApiUrl,
   setEmail,
@@ -80,6 +82,7 @@ export function AdminWorkspace({
   setMemberRole,
   setName,
   setPassword,
+  setProfileName,
   setTenantId,
   setToken,
   setWorkspaceName,
@@ -99,11 +102,13 @@ export function AdminWorkspace({
   onInviteMember: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onRevoke: (clientId: string) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
+  onSaveProfile: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onRenameWorkspace: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSignIn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSignOut: () => Promise<void>;
   onSignUp: () => Promise<void>;
   password: string;
+  profileName: string;
   sessionUser: AuthUser | null;
   setApiUrl: (value: string) => void;
   setEmail: (value: string) => void;
@@ -111,6 +116,7 @@ export function AdminWorkspace({
   setMemberRole: (value: "admin" | "member") => void;
   setName: (value: string) => void;
   setPassword: (value: string) => void;
+  setProfileName: (value: string) => void;
   setTenantId: (value: string) => void;
   setToken: (value: string) => void;
   setWorkspaceName: (value: string) => void;
@@ -201,6 +207,45 @@ export function AdminWorkspace({
               </Button>
             ) : null}
           </div>
+        </form>
+      </section>
+
+      <section className="admin-card">
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">Profile</p>
+            <h2>User profile</h2>
+          </div>
+          <UserRound aria-hidden="true" />
+        </div>
+        <form className="stack" onSubmit={onSaveProfile}>
+          <div className="status-strip">
+            <UserRound aria-hidden="true" />
+            <span>
+              <strong>
+                {account?.user.name ?? sessionUser?.name ?? "Local user"}
+              </strong>
+              <small>
+                {account?.user.email ?? sessionUser?.email ?? tenantId}
+              </small>
+            </span>
+          </div>
+          <div className="field">
+            <Label htmlFor="profile-name">Display name</Label>
+            <Input
+              disabled={!sessionUser}
+              id="profile-name"
+              onChange={(event) => setProfileName(event.target.value)}
+              value={profileName}
+            />
+          </div>
+          <Button
+            disabled={isLoading || !sessionUser || !profileName.trim()}
+            type="submit"
+            variant="outline"
+          >
+            Save profile
+          </Button>
         </form>
       </section>
 

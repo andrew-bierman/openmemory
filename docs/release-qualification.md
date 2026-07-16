@@ -19,8 +19,9 @@ bun run test:benchmark:local
 The benchmark command runs the focused recall and graph-scale cases from
 `apps/api/test/http.integration.test.ts`:
 
-- Golden recall ranking must keep mean reciprocal rank at or above `0.8`.
-- A 120-memory tenant graph must return bounded recall results in under
+- Golden recall ranking must keep mean reciprocal rank at or above `0.84`.
+- MemoryBench-style recall fixtures must keep Hit@3 at or above `0.9`.
+- A 220-memory tenant graph must return bounded recall results in under
   `7.5s` on the local Wrangler test runner.
 
 ## Optional Live Gate

@@ -94,6 +94,36 @@ export async function renameWorkspace(
   } satisfies AccountResult;
 }
 
+export async function updateAccountProfile(
+  env: Env,
+  request: Request,
+  input: { name: string },
+) {
+  const context = await getAccountContext(env, request);
+  if (!context.ok) {
+    return context.result;
+  }
+
+  const name = normalizeDisplayName(input.name);
+  const now = new Date();
+  const [updatedUser] = await context.db
+    .update(authUser)
+    .set({ name, updatedAt: now })
+    .where(eq(authUser.id, context.user.id))
+    .returning();
+
+  return {
+    status: 200,
+    body: await readAccount({
+      ...context,
+      user: {
+        ...context.user,
+        name: updatedUser?.name ?? name,
+      },
+    }),
+  } satisfies AccountResult;
+}
+
 export async function inviteWorkspaceMember(
   env: Env,
   request: Request,
@@ -358,6 +388,10 @@ function normalizeEmail(email: string) {
 }
 
 function normalizeWorkspaceName(name: string) {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+function normalizeDisplayName(name: string) {
   return name.trim().replace(/\s+/g, " ");
 }
 

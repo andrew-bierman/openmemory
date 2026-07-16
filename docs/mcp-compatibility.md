@@ -27,9 +27,9 @@ so protocol behavior can run in CI without external OAuth fixtures.
 | Client | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Official MCP TypeScript SDK `StreamableHTTPClientTransport` | Tested in CI | `bun run test:mcp:sdk` starts local Wrangler, connects to `/mcp`, lists tools, calls `remember`, and calls `recall`. | Uses the local tenant header because CI cannot complete browser OAuth. Production clients should use OAuth. |
-| MCP Inspector | Config-ready | Use the streamable HTTP URL and headers below. | Manual UI dogfooding remains useful before broad launch because Inspector OAuth and browser callback handling are interactive. |
-| Cursor | Config-ready | Generic streamable HTTP config below. | Requires the user/client OAuth flow against the deployed Worker. |
-| Claude remote MCP connector / Messages API MCP connector | Config-ready | Generic streamable HTTP config below. | Requires provider-side OAuth configuration and is not suitable for unattended CI. |
+| MCP Inspector | Config-shape smoke in CI | `bun run test:mcp:sdk` runs an `mcp-inspector-config-shape` request profile with Inspector-like headers through the official transport. | Manual UI OAuth callback dogfooding remains useful before broad hosted launch. |
+| Cursor | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `cursor-remote-mcp-config-shape` profile against `/mcp`. | Requires the user/client OAuth flow against the deployed Worker in real Cursor. |
+| Claude remote MCP connector / Messages API MCP connector | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `claude-remote-mcp-config-shape` profile against `/mcp`. | Requires provider-side OAuth configuration in real Claude surfaces. |
 
 ## Client Expectations
 
@@ -56,9 +56,9 @@ Clients should run the normal MCP handshake:
 
 ## Known Gaps
 
-- Dedicated manual external-client dogfooding remains before a broad public
-  launch for interactive clients such as MCP Inspector, Cursor, Claude, and
-  ChatGPT connector flows.
+- Manual external-client OAuth callback dogfooding remains recommended before a
+  high-volume hosted launch, but named streamable HTTP request shapes are now
+  smoke-tested in CI.
 - OpenMemory does not currently expose MCP resources or prompts.
 - MCP runs in the monolithic API Worker. Move to a dedicated `McpAgent` Worker
   only if session-specific state or independent scaling becomes necessary.

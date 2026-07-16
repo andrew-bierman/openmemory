@@ -676,6 +676,7 @@ test("worker API manages account workspace and team members", async () => {
     }),
   );
   expect(account.user.email).toBe(email);
+  expect(account.user.name).toBe("Workspace Owner");
   expect(account.workspace.tenantId).toBe(account.user.id);
   expect(account.members).toContainEqual(
     expect.objectContaining({
@@ -694,6 +695,15 @@ test("worker API manages account workspace and team members", async () => {
     }),
   );
   expect(renamed.workspace.name).toBe("Research Memory Team");
+
+  const updatedProfile = await getJson<AccountResponse>(
+    await worker.fetch("/v1/account/profile", {
+      method: "PATCH",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ name: "Research Lead" }),
+    }),
+  );
+  expect(updatedProfile.user.name).toBe("Research Lead");
 
   const inviteEmail = `teammate-${crypto.randomUUID()}@example.com`;
   const invited = await getJson<WorkspaceMemberResponse>(
@@ -965,46 +975,123 @@ test("async source ingestion queues a durable job and completes the graph pipeli
   ).toBe(true);
 }, 60_000);
 
-test("recall benchmark preserves ranking quality across direct and graph retrieval", async () => {
+test("recall benchmark preserves ranking quality across MemoryBench-style fixtures", async () => {
   const worker = await startWorker();
   workers.push(worker);
 
   const tenant = `tenant-benchmark-${crypto.randomUUID()}`;
-  const targets = [
-    await createMemory(worker, tenant, {
+  const targetSpecs = [
+    {
+      key: "maya-review",
+      query: "Maya TypeScript review preference",
       content: "Maya prefers concise TypeScript code reviews.",
       tags: ["people", "reviews"],
+      type: "preference",
       importance: 0.9,
-    }),
-    await createMemory(worker, tenant, {
+    },
+    {
+      key: "atlas-day",
+      query: "Atlas launch moved day",
       content: "The Atlas launch decision was moved to Tuesday.",
       tags: ["projects", "launch"],
+      type: "decision",
       importance: 0.85,
-    }),
-    await createMemory(worker, tenant, {
+    },
+    {
+      key: "boris-retrieval",
+      query: "Boris retrieval",
       content: "Boris maintains Graph Indexing for OpenMemory retrieval.",
       tags: ["architecture"],
+      type: "fact",
       importance: 0.8,
-    }),
-    await createMemory(worker, tenant, {
+    },
+    {
+      key: "nina-standup",
+      query: "Nina standup agenda preference",
       content: "Nina prefers morning standups with written agendas.",
       tags: ["people", "meetings"],
       type: "preference",
       importance: 0.82,
-    }),
-    await createMemory(worker, tenant, {
+    },
+    {
+      key: "hermes-export",
+      query: "Hermes graph backup export target",
       content: "The Hermes ingestion workflow exports graph backups to R2.",
       tags: ["projects", "ingestion"],
       type: "decision",
       importance: 0.88,
-    }),
-    await createMemory(worker, tenant, {
+    },
+    {
+      key: "chunk-metadata",
+      query: "source chunk title index metadata",
       content:
         "OpenMemory source chunks preserve title and chunk index metadata.",
       tags: ["docs", "sources"],
+      type: "insight",
       importance: 0.78,
-    }),
-  ];
+    },
+    {
+      key: "ada-timezone",
+      query: "Ada timezone planning",
+      content: "Ada plans retrospectives in Mountain time after lunch.",
+      tags: ["people", "calendar"],
+      type: "preference",
+      importance: 0.77,
+    },
+    {
+      key: "phoenix-owner",
+      query: "Phoenix search owner",
+      content: "Phoenix search relevance is owned by Priya.",
+      tags: ["projects", "search"],
+      type: "fact",
+      importance: 0.86,
+    },
+    {
+      key: "security-review",
+      query: "security review requirement before launch",
+      content: "Security review must pass before the public launch checklist.",
+      tags: ["launch", "security"],
+      type: "decision",
+      importance: 0.9,
+    },
+    {
+      key: "mcp-scope",
+      query: "MCP client write scope",
+      content: "MCP clients need memory:write scope to store new facts.",
+      tags: ["mcp", "oauth"],
+      type: "fact",
+      importance: 0.83,
+    },
+    {
+      key: "dashboard-theme",
+      query: "dashboard shadcn theme baseline",
+      content: "The hosted dashboard should keep shadcn defaults as baseline.",
+      tags: ["ui", "shadcn"],
+      type: "preference",
+      importance: 0.74,
+    },
+    {
+      key: "queue-dlq",
+      query: "failed source ingestion queue destination",
+      content:
+        "Failed source ingestion jobs retry before landing in the dead-letter queue.",
+      tags: ["queues", "operations"],
+      type: "insight",
+      importance: 0.79,
+    },
+  ] as const;
+  const targets = new Map<string, MemoryResponse>();
+  for (const spec of targetSpecs) {
+    targets.set(
+      spec.key,
+      await createMemory(worker, tenant, {
+        content: spec.content,
+        tags: [...spec.tags],
+        type: spec.type,
+        importance: spec.importance,
+      }),
+    );
+  }
 
   await getJson<IngestResponse>(
     await worker.fetch("/v1/ingest", {
@@ -1021,27 +1108,27 @@ test("recall benchmark preserves ranking quality across direct and graph retriev
     }),
   );
 
-  await createMemory(worker, tenant, {
-    content: "The coffee machine requires descaling every Friday.",
-    tags: ["ops"],
-  });
-  await createMemory(worker, tenant, {
-    content: "Atlas coffee chat moved to Thursday.",
-    tags: ["distractor"],
-  });
-  await createMemory(worker, tenant, {
-    content: "Hermes courier schedule is unrelated to graph exports.",
-    tags: ["distractor"],
-  });
+  for (const content of [
+    "The coffee machine requires descaling every Friday.",
+    "Atlas coffee chat moved to Thursday.",
+    "Hermes courier schedule is unrelated to graph exports.",
+    "Maya likes long-form prose in book club notes.",
+    "Phoenix office search badges are printed near reception.",
+    "OAuth client lunches do not require memory scopes.",
+    "The dashboard theme party uses confetti outside the app.",
+    "Queue trivia night starts after operations office hours.",
+  ]) {
+    await createMemory(worker, tenant, {
+      content,
+      tags: ["distractor"],
+    });
+  }
 
-  const cases = [
-    { query: "Maya TypeScript review preference", targetId: targets[0].id },
-    { query: "Atlas launch moved day", targetId: targets[1].id },
-    { query: "Boris retrieval", targetId: targets[2].id },
-    { query: "Nina standup agenda preference", targetId: targets[3].id },
-    { query: "Hermes graph backup export target", targetId: targets[4].id },
-    { query: "source chunk title index metadata", targetId: targets[5].id },
-  ];
+  const cases = targetSpecs.map((spec) => ({
+    key: spec.key,
+    query: spec.query,
+    targetId: targets.get(spec.key)?.id ?? "",
+  }));
 
   const reciprocalRanks = await Promise.all(
     cases.map(async (benchmarkCase) => {
@@ -1052,11 +1139,25 @@ test("recall benchmark preserves ranking quality across direct and graph retriev
       return reciprocalRank(results, benchmarkCase.targetId);
     }),
   );
+  const hitAt3 = await Promise.all(
+    cases.map(async (benchmarkCase) => {
+      const results = await search(worker, tenant, {
+        q: benchmarkCase.query,
+        limit: 3,
+      });
+      return results.some((result) => result.id === benchmarkCase.targetId)
+        ? 1
+        : 0;
+    }),
+  );
   const meanReciprocalRank =
     reciprocalRanks.reduce((total, rank) => total + rank, 0) /
     reciprocalRanks.length;
+  const hitAt3Rate =
+    hitAt3.reduce<number>((total, hit) => total + hit, 0) / hitAt3.length;
 
-  expect(meanReciprocalRank).toBeGreaterThanOrEqual(0.8);
+  expect(meanReciprocalRank).toBeGreaterThanOrEqual(0.84);
+  expect(hitAt3Rate).toBeGreaterThanOrEqual(0.9);
 }, 45_000);
 
 test("deterministic reranker prefers important and confident current memories", async () => {
@@ -1088,13 +1189,13 @@ test("deterministic reranker prefers important and confident current memories", 
   ]);
 }, 45_000);
 
-test("graph stats and recall stay bounded on a moderate local graph", async () => {
+test("graph stats and recall stay bounded on a larger local graph", async () => {
   const worker = await startWorker();
   workers.push(worker);
 
   const tenant = `tenant-scale-${crypto.randomUUID()}`;
   const topics = ["Atlas", "Borealis", "Cosmos", "Delta"];
-  const graphSize = 120;
+  const graphSize = 220;
   for (let index = 0; index < graphSize; index += 1) {
     const topic = topics[index % topics.length];
     await createMemory(worker, tenant, {
@@ -1123,7 +1224,7 @@ test("graph stats and recall stay bounded on a moderate local graph", async () =
   expect(results).toHaveLength(10);
   expect(results[0]?.content).toContain("Atlas");
   expect(elapsedMs).toBeLessThan(7_500);
-}, 45_000);
+}, 90_000);
 
 test("auth helpers keep tenant headers local-only", () => {
   const local = new Request("http://127.0.0.1:54150/v1/memories");
@@ -1611,6 +1712,7 @@ type AccountResponse = {
   user: {
     id: string;
     email: string;
+    name: string;
   };
   workspace: {
     id: string;

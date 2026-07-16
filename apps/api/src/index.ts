@@ -20,6 +20,7 @@ import {
   inviteWorkspaceMember,
   removeWorkspaceMember,
   renameWorkspace,
+  updateAccountProfile,
 } from "./account";
 import {
   getGraph,
@@ -196,6 +197,10 @@ const workspaceBody = t.Object({
   name: t.String({ minLength: 1, maxLength: 120 }),
 });
 
+const accountProfileBody = t.Object({
+  name: t.String({ minLength: 1, maxLength: 120 }),
+});
+
 const workspaceMemberBody = t.Object({
   email: t.String({ minLength: 3, maxLength: 320 }),
   role: t.Optional(t.Union([t.Literal("admin"), t.Literal("member")])),
@@ -279,6 +284,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     const result = await getAccount(env, request);
     return status(result.status, result.body);
   })
+  .patch(
+    "/v1/account/profile",
+    async ({ body, request, status }) => {
+      const result = await updateAccountProfile(env, request, body);
+      return status(result.status, result.body);
+    },
+    { body: accountProfileBody },
+  )
   .patch(
     "/v1/account/workspace",
     async ({ body, request, status }) => {

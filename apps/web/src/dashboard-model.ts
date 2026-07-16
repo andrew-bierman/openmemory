@@ -196,6 +196,36 @@ export function getRelationshipReadinessSummary(
   };
 }
 
+export function getGraphOperationsSummary(
+  metrics: DashboardMetrics,
+): GraphOperationsSummary {
+  const benchmarkSize = metrics.activeMemories;
+  const averageDegree =
+    benchmarkSize > 0
+      ? Number((metrics.totalEdges / benchmarkSize).toFixed(1))
+      : 0;
+  const traversalBudget =
+    benchmarkSize >= 200
+      ? "large fixture"
+      : benchmarkSize >= 100
+        ? "moderate fixture"
+        : "starter graph";
+  const status =
+    benchmarkSize >= 200 && averageDegree >= 2
+      ? "Benchmark ready"
+      : benchmarkSize >= 100
+        ? "Needs larger fixture"
+        : "Needs seed data";
+
+  return {
+    averageDegree,
+    benchmarkSize,
+    relationshipTypes: metrics.relationshipCount,
+    status,
+    traversalBudget,
+  };
+}
+
 export function getIndexReadinessSummary(
   memories: Memory[],
 ): IndexReadinessSummary {
@@ -517,6 +547,14 @@ export type GraphHealthSummary = {
 export type RelationshipReadinessSummary = {
   relationshipDiversity: number;
   status: "Basic graph" | "No relationships" | "Typed graph";
+};
+
+export type GraphOperationsSummary = {
+  averageDegree: number;
+  benchmarkSize: number;
+  relationshipTypes: number;
+  status: "Benchmark ready" | "Needs larger fixture" | "Needs seed data";
+  traversalBudget: "large fixture" | "moderate fixture" | "starter graph";
 };
 
 export type IndexReadinessSummary = {

@@ -176,6 +176,8 @@ export function createOpenMemoryClient(
       unwrap<GraphEdge[]>(client.v1.graph({ id }).neighbors.get()),
     getGraphStats: () => unwrap<GraphStats>(client.v1.graph.stats.get()),
     getAccount: () => unwrap<Account>(client.v1.account.get()),
+    updateAccountProfile: (name: string) =>
+      unwrap<Account>(client.v1.account.profile.patch({ name })),
     renameWorkspace: (name: string) =>
       unwrap<Account>(client.v1.account.workspace.patch({ name })),
     inviteWorkspaceMember: (input: {
@@ -244,6 +246,9 @@ type EdenClient = {
     };
     account: {
       get(): EdenResult;
+      profile: {
+        patch(input: { name: string }): EdenResult;
+      };
       workspace: {
         patch(input: { name: string }): EdenResult;
       };
