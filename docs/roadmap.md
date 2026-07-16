@@ -2,7 +2,7 @@
 
 ## Current Working Baseline
 
-- Private GitHub repo is live at `andrew-bierman/openmemory`.
+- Public GitHub repo is live at `andrew-bierman/openmemory`.
 - Open-source launch scaffolding exists: MIT license, contribution guide,
   security policy, support policy, code of conduct, changelog, issue templates,
   PR template, and launch-readiness checklist.
@@ -79,9 +79,8 @@
   performance dashboards.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the preferred deploy path; the manual GitHub deploy workflow remains a fallback and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
 - Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
-- Repository still needs final public-launch operations: enable Discussions,
-  confirm GitHub topics/about metadata, create the first tagged alpha release,
-  and switch visibility from private to public when ready.
+- Repository public-launch operations are complete: Discussions, topics/about
+  metadata, public visibility, and the first tagged alpha release are live.
 
 ## Next Implementation Tracks
 
@@ -124,8 +123,6 @@
    - Add a scoped `CLOUDFLARE_API_TOKEN` repository secret only if we keep the GitHub manual deploy fallback.
 
 6. Open-source launch operations
-   - Enable GitHub Discussions for support and architecture questions.
-   - Set repository topics for `cloudflare`, `mcp`, `ai-memory`, `rag`,
-     `durable-objects`, `vectorize`, `workers-ai`, and `typescript`.
-   - Create the first tagged alpha release with current validation evidence.
-   - Switch the repository from private to public after launch checklist review.
+   - Publish launch copy that sets alpha expectations clearly.
+   - Triage first public feedback into MCP compatibility, UI polish, recall
+     quality, and Cloudflare deployment friction.
