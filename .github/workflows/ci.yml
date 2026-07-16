@@ -48,6 +48,24 @@ jobs:
       - name: Run local Wrangler integration tests
         run: bun run test:integration:local
 
+  mcp-sdk-smoke:
+    name: MCP SDK smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run MCP SDK streamable HTTP smoke
+        run: bun run test:mcp:sdk
+
   local-web-e2e:
     name: Local web E2E
     runs-on: ubuntu-latest

@@ -28,6 +28,8 @@ still need work before a larger public push.
   and Workflows.
 - Entity and relationship extraction workers are covered by local Wrangler
   integration with Queues and Workflows.
+- The official MCP TypeScript SDK client is dogfooded in CI, and named
+  interactive MCP clients are documented for manual OAuth testing.
 - Operational headers and request IDs are live on `/health`.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
@@ -62,7 +64,7 @@ still need work before a larger public push.
 - [ ] First-party hosted web app has fully polished authenticated navigation,
   account settings, and team/tenant management.
 - [x] MCP protocol compatibility matrix is tested and documented.
-- [ ] Named external MCP clients are dogfooded and documented.
+- [x] Named external MCP clients are dogfooded and documented.
 - [x] Async source ingestion uses Queues and Workflows.
 - [x] Entity and relationship extraction workers are implemented.
 - [x] Larger recall and graph performance benchmarks run in CI or release

@@ -45,6 +45,8 @@
 - Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.
 - Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
+- `bun run test:mcp:sdk` dogfoods the MCP endpoint through the official
+  TypeScript SDK `StreamableHTTPClientTransport`.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
 - Local recall benchmark coverage includes multiple golden cases across people, decisions, preferences, source chunks, graph expansion, and distractors.
@@ -73,8 +75,10 @@
    - Keep `x-openmemory-user-id` only for local development and tests.
 
 2. MCP production flow
-   - Add external MCP client smoke with a real client once chosen.
-   - Expand OAuth lifecycle UI from connection revocation into full client registration/management if we need first-party clients.
+   - Manually test interactive OAuth clients such as MCP Inspector, Cursor,
+     Claude, and ChatGPT connector flows before broad launch.
+   - Expand OAuth lifecycle UI from connection revocation into full client
+     registration/management if we need first-party clients.
 
 3. RAG pipeline
    - Extend the Queue/Workflow pipeline from source chunks to conversation
