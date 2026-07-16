@@ -1471,33 +1471,66 @@ function McpSetup({
   onRevoke: (clientId: string) => Promise<void>;
 }>) {
   const baseUrl = cleanBaseUrl(apiUrl);
+  const mcpUrl = `${baseUrl}/mcp`;
+  const issuerUrl = `${baseUrl}/api/auth`;
   const authServerMetadataUrl = `${baseUrl}/.well-known/oauth-authorization-server/api/auth`;
+  const protectedResourceMetadataUrl = `${baseUrl}/.well-known/oauth-protected-resource/mcp`;
+  const clientConfig = {
+    transport: "streamable-http",
+    url: mcpUrl,
+    authorizationServer: authServerMetadataUrl,
+    protectedResource: protectedResourceMetadataUrl,
+    scopes: ["openid", "profile", "memory:read", "memory:write"],
+  };
   return (
     <div className="stack">
-      <h2>MCP</h2>
-      <div className="field">
-        <label htmlFor="mcpUrl">Server URL</label>
-        <input id="mcpUrl" readOnly value={`${baseUrl}/mcp`} />
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">Client setup</p>
+          <h2>MCP</h2>
+        </div>
       </div>
-      <div className="field">
-        <label htmlFor="issuer">OAuth issuer</label>
-        <input id="issuer" readOnly value={`${baseUrl}/api/auth`} />
+      <div className="settings-grid">
+        <div className="field">
+          <Label htmlFor="mcpUrl">Server URL</Label>
+          <Input id="mcpUrl" readOnly value={mcpUrl} />
+        </div>
+        <div className="field">
+          <Label htmlFor="issuer">OAuth issuer</Label>
+          <Input id="issuer" readOnly value={issuerUrl} />
+        </div>
+        <div className="field">
+          <Label htmlFor="authorizationMetadata">Authorization metadata</Label>
+          <Input
+            id="authorizationMetadata"
+            readOnly
+            value={authServerMetadataUrl}
+          />
+        </div>
+        <div className="field">
+          <Label htmlFor="resourceMetadata">Protected resource metadata</Label>
+          <Input
+            id="resourceMetadata"
+            readOnly
+            value={protectedResourceMetadataUrl}
+          />
+        </div>
       </div>
-      <pre className="context">
-        {JSON.stringify(
-          {
-            transport: "streamable-http",
-            url: `${baseUrl}/mcp`,
-            authorizationServer: authServerMetadataUrl,
-            scopes: ["openid", "profile", "memory:read", "memory:write"],
-          },
-          null,
-          2,
-        )}
-      </pre>
-      <h2>Connections</h2>
+      <pre className="context">{JSON.stringify(clientConfig, null, 2)}</pre>
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">OAuth grants</p>
+          <h2>Connections</h2>
+        </div>
+      </div>
       {connections.length === 0 ? (
-        <p className="muted">No OAuth MCP clients have been authorized.</p>
+        <div className="empty-state compact">
+          <h3>No authorized clients</h3>
+          <p>
+            Authorize an MCP client through OAuth and its grant will appear here
+            for revocation.
+          </p>
+        </div>
       ) : (
         <div className="memory-list">
           {connections.map((connection) => (

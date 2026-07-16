@@ -1,0 +1,49 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openmemory-api",
+  "main": "apps/api/src/index.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["MemoryGraph"]
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MEMORY_GRAPHS",
+        "class_name": "MemoryGraph"
+      }
+    ]
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "vectorize": [
+    {
+      "binding": "MEMORY_VECTORS",
+      "index_name": "openmemory-vectors"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEMORY_EXPORTS",
+      "bucket_name": "openmemory-exports"
+    }
+  ],
+  "vars": {
+    "EMBEDDING_MODEL": "@cf/baai/bge-small-en-v1.5"
+  },
+  "d1_databases": [
+    {
+      "binding": "AUTH_DB",
+      "database_name": "openmemory-auth",
+      "database_id": "c36373fd-bd51-4a56-9d8c-653a72d51fc9",
+      "migrations_dir": "apps/api/drizzle"
+    }
+  ]
+}

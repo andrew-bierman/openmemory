@@ -196,13 +196,18 @@ for the deployed product.
 bun run check
 bun run build
 bun run test:integration:local
+bun run test:e2e:local
 ```
 
 The local integration suite starts real Wrangler Workers on randomized
 non-default ports, applies D1 migrations into isolated local persistence, and
 exercises Durable Objects, D1 auth storage, Better Auth sessions, OAuth
 metadata, MCP, graph edges, recall, source ingestion, exports, index repair, and
-the dashboard.
+the dashboard API.
+
+The local browser E2E suite starts the API and TanStack Start app on explicit
+non-default ports and exercises the dashboard, charts, memory table, source
+ingest, graph explorer, admin settings, and MCP setup panel.
 
 Optional clean container reproduction:
 

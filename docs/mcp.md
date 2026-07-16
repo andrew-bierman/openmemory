@@ -18,6 +18,13 @@ OAuth authorization server metadata:
 https://openmemory-api.abbierman101.workers.dev/.well-known/oauth-authorization-server
 ```
 
+The TanStack dashboard also shows the Better Auth issuer-scoped metadata URL
+used by local and hosted clients:
+
+```txt
+https://openmemory-api.abbierman101.workers.dev/.well-known/oauth-authorization-server/api/auth
+```
+
 Protected resource metadata:
 
 ```txt
@@ -39,7 +46,8 @@ Use this shape for MCP clients that support streamable HTTP plus OAuth:
 {
   "transport": "streamable-http",
   "url": "https://openmemory-api.abbierman101.workers.dev/mcp",
-  "authorizationServer": "https://openmemory-api.abbierman101.workers.dev/.well-known/oauth-authorization-server",
+  "authorizationServer": "https://openmemory-api.abbierman101.workers.dev/.well-known/oauth-authorization-server/api/auth",
+  "protectedResource": "https://openmemory-api.abbierman101.workers.dev/.well-known/oauth-protected-resource/mcp",
   "scopes": ["openid", "profile", "memory:read", "memory:write"]
 }
 ```
@@ -79,4 +87,6 @@ curl -X DELETE -H "Cookie: better-auth.session_token=..." \
   https://openmemory-api.abbierman101.workers.dev/v1/oauth/connections/<client-id>
 ```
 
-The TanStack app MCP panel shows the same connection list and revoke actions.
+The TanStack app MCP panel shows the streamable HTTP URL, OAuth issuer,
+authorization metadata URL, protected resource metadata URL, and the same
+connection list and revoke actions.

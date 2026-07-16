@@ -13,6 +13,7 @@
 - `bun run check` passes across Biome, Turbo, TypeScript, Vitest, and Wrangler-backed API integration tests.
 - `bun run --cwd apps/web build` produces a production TanStack Start build.
 - CI, manual deploy, and manual live-smoke workflows are defined in `.github/workflows`.
+- CI runs local type/build checks, Wrangler-backed integration tests, and local browser E2E against the TanStack dashboard.
 - Cloudflare production resources are provisioned in the personal account:
   - D1 `openmemory-auth` bound as `AUTH_DB`
   - Vectorize `openmemory-vectors` bound as `MEMORY_VECTORS`
@@ -20,7 +21,7 @@
   - Worker secrets for `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
 - The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
 - Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
-- `apps/web` now has a polished hosted-dashboard direction with memory health metrics, capture cadence charts, memory-type distribution, and an Obsidian-style knowledge map over graph-shaped memory data.
+- `apps/web` now has a polished hosted-dashboard direction with memory health metrics, capture cadence charts, memory-type distribution, admin settings, MCP setup, and a library-backed Obsidian-style knowledge map over graph-shaped memory data.
 - Opt-in production API E2E covers hosted UI response, Better Auth session, graph recall, OAuth PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh, recall, and forget.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
@@ -38,8 +39,7 @@
 - Browser auth and dashboard need deeper product polish:
   - deployed API routes reject header tenant mode by design
   - local development still supports tenant headers for tests and fast iteration
-  - the Worker-hosted dashboard is functional but minimal
-  - the TanStack app still needs richer authenticated navigation and deployment wiring
+  - the TanStack app still needs richer authenticated navigation, hosted deployment wiring, and more refined user/account flows
 - RAG quality is still basic:
   - source/document ingestion is synchronous rather than Queue/Workflow-backed
   - no entity extraction worker
@@ -69,13 +69,12 @@
    - Add larger graph performance benchmarks and production telemetry.
 
 4. Web app expansion
-   - Add authenticated navigation, memory detail, graph neighbors, profile editor, source ingestion, and MCP connection views.
+   - Expand authenticated navigation, profile editing, account administration, and tenant/team management.
    - Keep the hosted TanStack Start UI as a companion dashboard/control plane; the API and MCP integrations remain the primary product surfaces.
    - Use shadcn dashboard templates, defaults, and theme tokens as the baseline; defer Apple/SwiftUI-specific styling until the product structure is stronger.
    - Expand charts for recall quality, memory growth, stale/superseded memories, indexing health, and MCP usage.
-   - Replace the first-pass SVG knowledge map with a proven graph visualization library when graph size and layout requirements justify it.
-   - Evaluate Sigma.js + Graphology, `react-force-graph`, Reagraph, and React Flow before writing any custom graph layout code.
-   - Expand browser tests for graph inspection, MCP connection revocation, and account settings.
+   - Continue hardening the `react-force-graph` explorer and evaluate Sigma.js + Graphology, Reagraph, or React Flow only if graph size and layout requirements outgrow the current approach.
+   - Expand browser tests for authenticated account flows, MCP connection revocation with seeded grants, and tenant/team administration.
 
 5. CI and deployment
    - Connect Cloudflare Git/Workers Builds to `main`.
