@@ -7,6 +7,8 @@ CONFIG="apps/api/wrangler.jsonc"
 DB_NAME="${OPENMEMORY_D1_NAME:-openmemory-auth}"
 VECTOR_INDEX="${OPENMEMORY_VECTOR_INDEX:-openmemory-vectors}"
 R2_BUCKET="${OPENMEMORY_R2_BUCKET:-openmemory-exports}"
+SOURCE_QUEUE="${OPENMEMORY_SOURCE_QUEUE:-openmemory-source-ingestion}"
+SOURCE_DLQ="${OPENMEMORY_SOURCE_DLQ:-openmemory-source-ingestion-dlq}"
 VECTOR_PRESET="${OPENMEMORY_VECTOR_PRESET:-@cf/baai/bge-small-en-v1.5}"
 
 echo "Checking Wrangler account access..."
@@ -25,6 +27,12 @@ bun --cwd apps/api wrangler vectorize create "${VECTOR_INDEX}" \
 
 echo "Creating R2 bucket ${R2_BUCKET}..."
 bun --cwd apps/api wrangler r2 bucket create "${R2_BUCKET}" \
+  --config wrangler.jsonc
+
+echo "Creating source ingestion Queues..."
+bun --cwd apps/api wrangler queues create "${SOURCE_QUEUE}" \
+  --config wrangler.jsonc
+bun --cwd apps/api wrangler queues create "${SOURCE_DLQ}" \
   --config wrangler.jsonc
 
 echo "Applying D1 migrations..."

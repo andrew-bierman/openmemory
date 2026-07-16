@@ -21,6 +21,10 @@
   - D1 `openmemory-auth` bound as `AUTH_DB`
   - Vectorize `openmemory-vectors` bound as `MEMORY_VECTORS`
   - R2 `openmemory-exports` bound as `MEMORY_EXPORTS`
+  - Queue `openmemory-source-ingestion` and dead-letter queue
+    `openmemory-source-ingestion-dlq`
+  - Workflow `openmemory-source-ingestion` bound as
+    `SOURCE_INGESTION_WORKFLOW`
   - Worker secrets for `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
 - The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
 - Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
@@ -28,6 +32,9 @@
 - Opt-in production API E2E covers hosted UI response, Better Auth session, graph recall, OAuth PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh, recall, and forget.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
+- `/v1/sources/async` creates durable ingestion jobs, buffers requests through
+  Cloudflare Queues, and runs the same graph/indexing pipeline through a
+  Cloudflare Workflow.
 - `/v1/graph/stats` exposes graph size counters, and local Wrangler integration includes a moderate graph-scale recall smoke.
 - Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.
 - Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
@@ -44,7 +51,6 @@
   - local development still supports tenant headers for tests and fast iteration
   - the TanStack app still needs richer authenticated navigation, hosted deployment wiring, and more refined user/account flows
 - RAG quality is still basic:
-  - source/document ingestion is synchronous rather than Queue/Workflow-backed
   - no entity extraction worker
   - no relationship extraction worker
   - no LLM/ML reranker
@@ -67,8 +73,9 @@
    - Expand OAuth lifecycle UI from connection revocation into full client registration/management if we need first-party clients.
 
 3. RAG pipeline
-   - Move source/document ingestion onto Queues and Workflows.
    - Extract richer entities and relationships into the graph.
+   - Extend the Queue/Workflow pipeline from source chunks to conversation
+     transcript extraction and enrichment.
    - Store embeddings in Vectorize for every chunk and add deeper stale-index diagnostics.
    - Tune deterministic reranking and evaluate an optional LLM/ML reranker.
    - Expand recall quality benchmarks with MemoryBench-style fixtures.

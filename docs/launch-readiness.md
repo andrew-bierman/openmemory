@@ -11,8 +11,8 @@ adopters who are comfortable with Cloudflare Workers, Durable Objects, D1,
 Vectorize, Workers AI, R2, OAuth, and MCP.
 
 It is not yet a broad self-serve SaaS launch. The backend is functional and
-well covered; the companion UI, async RAG pipeline, larger benchmarks, and
-production observability still need work before a larger public push.
+well covered; the companion UI, entity extraction pipeline, larger benchmarks,
+and production observability still need work before a larger public push.
 
 ## Proven Today
 
@@ -24,6 +24,8 @@ production observability still need work before a larger public push.
 - Live production smoke has passed against the deployed Worker.
 - Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, source
   ingestion, R2 export, and hosted UI smoke are covered by tests.
+- Async source ingestion is covered by local Wrangler integration with Queues
+  and Workflows.
 - Operational headers and request IDs are live on `/health`.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
@@ -59,15 +61,15 @@ production observability still need work before a larger public push.
   account settings, and team/tenant management.
 - [x] MCP protocol compatibility matrix is tested and documented.
 - [ ] Named external MCP clients are dogfooded and documented.
-- [ ] Async source ingestion uses Queues and Workflows.
+- [x] Async source ingestion uses Queues and Workflows.
 - [ ] Entity and relationship extraction workers are implemented.
 - [x] Larger recall and graph performance benchmarks run in CI or release
   qualification.
 
 ## Operational Readiness Checklist
 
-- [x] Cloudflare D1, Durable Object, Vectorize, Workers AI, and R2 bindings are
-  configured.
+- [x] Cloudflare D1, Durable Object, Vectorize, Workers AI, R2, Queues, and
+  Workflows bindings are configured.
 - [x] Root Wrangler dry-run validates upload shape and bindings.
 - [x] Request IDs and structured request logs exist.
 - [x] Cloudflare-native global rate limiter exists through a Durable Object.

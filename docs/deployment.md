@@ -42,10 +42,14 @@ The script creates:
 - D1 database bound as `AUTH_DB`
 - Vectorize index bound as `MEMORY_VECTORS`
 - R2 bucket bound as `MEMORY_EXPORTS`
+- Queue producer/consumer resources for async source ingestion
+- Dead-letter queue for failed source ingestion messages
 - Remote D1 migrations
 
-The Worker already has Durable Object migrations in `apps/api/wrangler.jsonc`
-and root `wrangler.jsonc` for `MemoryGraph`.
+The Worker already has Durable Object migrations and the
+`SOURCE_INGESTION_WORKFLOW` binding in `apps/api/wrangler.jsonc` and root
+`wrangler.jsonc`. Cloudflare creates the Workflow from that Worker config during
+deploy.
 
 ## Required Secrets
 

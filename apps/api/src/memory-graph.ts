@@ -28,6 +28,12 @@ type RateLimitInput = {
   now: number;
 };
 
+type IngestionJobInput = {
+  sourceId: string;
+  input: unknown;
+  metadata?: Record<string, unknown>;
+};
+
 type MemoryGraphEnv = Record<string, unknown>;
 type SqlState = {
   storage: {
@@ -104,6 +110,92 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       retryAfterSeconds,
       scope: "global",
     };
+  }
+
+  async createIngestionJob(input: IngestionJobInput) {
+    const now = new Date().toISOString();
+    const job = {
+      sourceId: input.sourceId,
+      status: "queued" as const,
+      input: input.input,
+      metadata: input.metadata ?? {},
+      result: undefined,
+      error: undefined,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: undefined,
+    };
+
+    this.sqlState.storage.sql.exec(
+      `insert into ingestion_jobs
+       (source_id, status, input_json, metadata_json, result_json, error_json, created_at, updated_at, completed_at)
+       values (?, ?, ?, ?, null, null, ?, ?, null)
+       on conflict(source_id) do update set
+         status = excluded.status,
+         input_json = excluded.input_json,
+         metadata_json = excluded.metadata_json,
+         result_json = null,
+         error_json = null,
+         updated_at = excluded.updated_at,
+         completed_at = null`,
+      job.sourceId,
+      job.status,
+      JSON.stringify(job.input),
+      JSON.stringify(job.metadata),
+      now,
+      now,
+    );
+
+    return job;
+  }
+
+  async startIngestionJob(sourceId: string) {
+    const now = new Date().toISOString();
+    this.sqlState.storage.sql.exec(
+      `update ingestion_jobs
+       set status = 'processing', updated_at = ?
+       where source_id = ? and status in ('queued', 'failed')`,
+      now,
+      sourceId,
+    );
+    return this.getIngestionJob(sourceId);
+  }
+
+  async completeIngestionJob(sourceId: string, result: unknown) {
+    const now = new Date().toISOString();
+    this.sqlState.storage.sql.exec(
+      `update ingestion_jobs
+       set status = 'completed', result_json = ?, error_json = null, updated_at = ?, completed_at = ?
+       where source_id = ?`,
+      JSON.stringify(summarizeIngestionResult(result)),
+      now,
+      now,
+      sourceId,
+    );
+    return this.getIngestionJob(sourceId);
+  }
+
+  async failIngestionJob(sourceId: string, error: unknown) {
+    const now = new Date().toISOString();
+    this.sqlState.storage.sql.exec(
+      `update ingestion_jobs
+       set status = 'failed', error_json = ?, updated_at = ?
+       where source_id = ?`,
+      JSON.stringify(error),
+      now,
+      sourceId,
+    );
+    return this.getIngestionJob(sourceId);
+  }
+
+  async getIngestionJob(sourceId: string) {
+    const row = this.sqlState.storage.sql
+      .exec<IngestionJobRow>(
+        `select * from ingestion_jobs where source_id = ? limit 1`,
+        sourceId,
+      )
+      .toArray()[0];
+    return row ? rowToIngestionJob(row) : undefined;
   }
 
   private get sqlState(): SqlState {
@@ -607,6 +699,20 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       );
 
       create index if not exists rate_limit_buckets_reset_idx on rate_limit_buckets(reset_at);
+
+      create table if not exists ingestion_jobs (
+        source_id text primary key,
+        status text not null,
+        input_json text not null,
+        metadata_json text not null,
+        result_json text,
+        error_json text,
+        created_at text not null,
+        updated_at text not null,
+        completed_at text
+      );
+
+      create index if not exists ingestion_jobs_status_updated_idx on ingestion_jobs(status, updated_at);
     `);
   }
 
@@ -750,6 +856,18 @@ type RateLimitBucketRow = {
   reset_at: number;
 };
 
+type IngestionJobRow = {
+  source_id: string;
+  status: string;
+  input_json: string;
+  metadata_json: string;
+  result_json: string | null;
+  error_json: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+};
+
 function rowToMemory(row: MemoryRow): MemoryRecord {
   return {
     id: row.id,
@@ -783,6 +901,55 @@ function rowToEdge(row: EdgeRow) {
     metadata: parseJson(row.metadata_json, {}),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+function rowToIngestionJob(row: IngestionJobRow) {
+  return {
+    sourceId: row.source_id,
+    status: parseIngestionStatus(row.status),
+    input: parseJson(row.input_json, {}),
+    metadata: parseJson(row.metadata_json, {}),
+    result: row.result_json ? parseJson(row.result_json, undefined) : undefined,
+    error: row.error_json ? parseJson(row.error_json, undefined) : undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at ?? undefined,
+  };
+}
+
+function parseIngestionStatus(value: string) {
+  if (
+    value === "queued" ||
+    value === "processing" ||
+    value === "completed" ||
+    value === "failed"
+  ) {
+    return value;
+  }
+  return "failed";
+}
+
+function summarizeIngestionResult(value: unknown) {
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const memories = Array.isArray(value.memories) ? value.memories : [];
+  const edges = Array.isArray(value.edges) ? value.edges : [];
+
+  return {
+    sourceId: typeof value.sourceId === "string" ? value.sourceId : undefined,
+    chunkCount:
+      typeof value.chunkCount === "number" ? value.chunkCount : memories.length,
+    memoryIds: memories
+      .map((memory) =>
+        isRecord(memory) && typeof memory.id === "string"
+          ? memory.id
+          : undefined,
+      )
+      .filter(Boolean),
+    edgeCount: edges.length,
   };
 }
 
@@ -917,6 +1084,10 @@ function parseJson<T>(value: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }
 
 function addColumn(
