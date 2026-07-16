@@ -166,8 +166,10 @@ Accept: application/json, text/event-stream
 Content-Type: application/json
 ```
 
-See [docs/mcp.md](docs/mcp.md) for OAuth discovery, generic client
-configuration, local development, tools, and connection revocation.
+See [docs/mcp.md](docs/mcp.md) and
+[docs/mcp-compatibility.md](docs/mcp-compatibility.md) for OAuth discovery,
+generic client configuration, tested client request shapes, local development,
+tools, and connection revocation.
 
 ## Auth
 
@@ -253,6 +255,7 @@ remaining implementation tracks.
 - [Deployment](docs/deployment.md)
 - [Operations runbook](docs/operations.md)
 - [MCP setup](docs/mcp.md)
+- [MCP compatibility](docs/mcp-compatibility.md)
 - [Roadmap](docs/roadmap.md)
 - [Launch readiness](docs/launch-readiness.md)
 - [Testing strategy](docs/plans/testing-strategy.md)

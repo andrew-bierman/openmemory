@@ -57,7 +57,8 @@ production observability still need work before a larger public push.
   setup, and admin settings.
 - [ ] First-party hosted web app has fully polished authenticated navigation,
   account settings, and team/tenant management.
-- [ ] External MCP client compatibility matrix is tested and documented.
+- [x] MCP protocol compatibility matrix is tested and documented.
+- [ ] Named external MCP clients are dogfooded and documented.
 - [ ] Async source ingestion uses Queues and Workflows.
 - [ ] Entity and relationship extraction workers are implemented.
 - [ ] Larger recall and graph performance benchmarks run in CI or release

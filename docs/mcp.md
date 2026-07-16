@@ -90,3 +90,6 @@ curl -X DELETE -H "Cookie: better-auth.session_token=..." \
 The TanStack app MCP panel shows the streamable HTTP URL, OAuth issuer,
 authorization metadata URL, protected resource metadata URL, and the same
 connection list and revoke actions.
+
+See [MCP compatibility](mcp-compatibility.md) for the protocol matrix, tested
+client request shapes, and known external-client dogfooding gaps.
