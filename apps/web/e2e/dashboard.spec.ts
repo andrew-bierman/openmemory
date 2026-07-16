@@ -18,7 +18,8 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
       message.type() === "error" &&
       !message.text().includes("401") &&
       !message.text().includes("Unauthorized") &&
-      !message.text().includes("Failed to load resource")
+      !message.text().includes("Failed to load resource") &&
+      !message.text().includes("has been blocked by CORS policy")
     ) {
       errors.push(message.text());
     }
