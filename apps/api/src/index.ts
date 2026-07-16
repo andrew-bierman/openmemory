@@ -39,6 +39,7 @@ import {
   listOAuthConnections,
   revokeOAuthConnection,
 } from "./oauth-connections";
+import { writeErrorAnalytics, writeRequestAnalytics } from "./observability";
 import {
   checkGlobalRateLimit,
   jsonResponse,
@@ -658,6 +659,10 @@ export async function handleMemoryExtractionQueue(
           message: error instanceof Error ? error.message : "unknown error",
         }),
       );
+      writeErrorAnalytics(requestEnv, {
+        event: "openmemory.memory_extraction_error",
+        message: error instanceof Error ? error.message : "unknown error",
+      });
       message.retry({ delaySeconds: Math.min(300, 10 * message.attempts) });
     }
   }
@@ -684,6 +689,10 @@ export async function handleSourceIngestionQueue(
           message: error instanceof Error ? error.message : "unknown error",
         }),
       );
+      writeErrorAnalytics(requestEnv, {
+        event: "openmemory.source_ingestion_error",
+        message: error instanceof Error ? error.message : "unknown error",
+      });
       message.retry({ delaySeconds: Math.min(300, 10 * message.attempts) });
     }
   }
@@ -799,6 +808,11 @@ async function handleWorkerFetch(
         message: error instanceof Error ? error.message : "unknown error",
       }),
     );
+    writeErrorAnalytics(requestEnv, {
+      event: "openmemory.request_error",
+      message: error instanceof Error ? error.message : "unknown error",
+      request,
+    });
   }
 
   const finalized = await withCors(response, request, {
@@ -806,6 +820,13 @@ async function handleWorkerFetch(
     rateLimit,
   });
   logRequest({
+    durationMs: Date.now() - startedAt,
+    rateLimited: rateLimit.limited,
+    request,
+    requestId,
+    response: finalized,
+  });
+  writeRequestAnalytics(requestEnv, {
     durationMs: Date.now() - startedAt,
     rateLimited: rateLimit.limited,
     request,

@@ -29,6 +29,8 @@
     `openmemory-memory-extraction-dlq`
   - Workflow `openmemory-memory-extraction` bound as
     `MEMORY_EXTRACTION_WORKFLOW`
+  - Workers Analytics Engine `openmemory_events` bound as
+    `OPENMEMORY_ANALYTICS`
   - Worker secrets for `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
 - The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
 - Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
@@ -47,6 +49,11 @@
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
 - `bun run test:mcp:sdk` dogfoods the MCP endpoint through the official
   TypeScript SDK `StreamableHTTPClientTransport`.
+- Workers Analytics Engine captures `openmemory.request`,
+  `openmemory.request_error`, rate-limit, 5xx, and async worker failure events,
+  with saved SQL in `docs/observability-queries.sql`.
+- The `Live Smoke` workflow runs hourly against production as the alpha alert
+  path for API, auth, MCP, and hosted UI regressions.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
 - Local recall benchmark coverage includes multiple golden cases across people, decisions, preferences, source chunks, graph expansion, and distractors.
@@ -61,7 +68,9 @@
 - RAG quality is still basic:
   - no LLM/ML reranker
 - recall benchmark coverage has useful golden cases, but still needs larger MemoryBench-style fixtures before public release confidence
-- Graph performance has a first moderate local smoke, but still needs larger volume benchmarks and production telemetry.
+- Graph performance has a first moderate local smoke and production request
+  telemetry, but still needs larger volume benchmarks and graph-specific
+  performance dashboards.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the preferred deploy path; the manual GitHub deploy workflow remains a fallback and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
 - Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
 - Repository still needs final public-launch operations: enable Discussions,
@@ -101,7 +110,9 @@
 5. CI and deployment
    - Connect Cloudflare Git/Workers Builds to `main`.
    - Keep GitHub CI as quality gate.
-   - Use the manual live-smoke workflow after deploys.
+   - Keep hourly live-smoke passing against production after deploys.
+   - Add Cloudflare Notifications or external paging before any higher-volume
+     hosted launch.
    - Add a scoped `CLOUDFLARE_API_TOKEN` repository secret only if we keep the GitHub manual deploy fallback.
 
 6. Open-source launch operations

@@ -73,6 +73,8 @@ Runtime services:
 - **D1 + Drizzle**: Better Auth and control-plane schema.
 - **Vectorize + Workers AI**: embedding generation and semantic retrieval.
 - **R2**: tenant graph exports and backup artifacts.
+- **Workers Analytics Engine**: request, error, rate-limit, and async worker
+  telemetry.
 - **Cloudflare Agents MCP**: streamable HTTP MCP surface.
 - **Queues + Workflows**: async source ingestion plus memory entity/relationship
   extraction.
@@ -265,6 +267,7 @@ remaining implementation tracks.
 
 - [Deployment](docs/deployment.md)
 - [Operations runbook](docs/operations.md)
+- [Observability](docs/observability.md)
 - [MCP setup](docs/mcp.md)
 - [MCP compatibility](docs/mcp-compatibility.md)
 - [Roadmap](docs/roadmap.md)

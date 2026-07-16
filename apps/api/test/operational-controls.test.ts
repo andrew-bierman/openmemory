@@ -1,6 +1,10 @@
 import { describe, expect, test } from "vitest";
 import type { Env } from "../src/env";
 import {
+  writeErrorAnalytics,
+  writeRequestAnalytics,
+} from "../src/observability";
+import {
   checkGlobalRateLimit,
   checkRateLimit,
   jsonResponse,
@@ -138,5 +142,72 @@ describe("operational controls", () => {
     expect(response.status).toBe(202);
     expect(response.headers.get("content-type")).toBe("application/json");
     await expect(response.json()).resolves.toEqual({ ok: true });
+  });
+
+  test("writes request datapoints to Analytics Engine", () => {
+    const datapoints: unknown[] = [];
+    const env = {
+      EMBEDDING_MODEL: "@cf/test/embedding",
+      OPENMEMORY_ANALYTICS: {
+        writeDataPoint: (event: unknown) => datapoints.push(event),
+      },
+    } as unknown as Env;
+    const request = new Request("https://openmemory.test/v1/memories", {
+      method: "POST",
+    }) as Request & { cf?: { colo?: string } };
+    request.cf = { colo: "DEN" };
+    const response = new Response("rate limited", { status: 429 });
+
+    writeRequestAnalytics(env, {
+      durationMs: 123,
+      rateLimited: true,
+      request,
+      requestId: "req_test",
+      response,
+    });
+
+    expect(datapoints).toEqual([
+      {
+        blobs: [
+          "openmemory.request",
+          "POST",
+          "/v1/memories",
+          "4xx",
+          "429",
+          "true",
+          "DEN",
+        ],
+        doubles: [429, 123, 1],
+        indexes: ["/v1/memories"],
+      },
+    ]);
+  });
+
+  test("writes error datapoints to Analytics Engine", () => {
+    const datapoints: unknown[] = [];
+    const env = {
+      EMBEDDING_MODEL: "@cf/test/embedding",
+      OPENMEMORY_ANALYTICS: {
+        writeDataPoint: (event: unknown) => datapoints.push(event),
+      },
+    } as unknown as Env;
+
+    writeErrorAnalytics(env, {
+      event: "openmemory.source_ingestion_error",
+      message: "source failed",
+      request: new Request("https://openmemory.test/v1/sources/async"),
+    });
+
+    expect(datapoints).toEqual([
+      {
+        blobs: [
+          "openmemory.source_ingestion_error",
+          "/v1/sources/async",
+          "source failed",
+        ],
+        doubles: [1],
+        indexes: ["openmemory.source_ingestion_error"],
+      },
+    ]);
   });
 });

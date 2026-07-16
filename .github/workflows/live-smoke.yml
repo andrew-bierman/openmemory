@@ -1,6 +1,8 @@
 name: Live Smoke
 
 on:
+  schedule:
+    - cron: "17 * * * *"
   workflow_dispatch:
     inputs:
       base_url:
@@ -13,7 +15,7 @@ jobs:
     name: Production API and UI smoke
     runs-on: ubuntu-latest
     env:
-      OPENMEMORY_LIVE_BASE_URL: ${{ inputs.base_url }}
+      OPENMEMORY_LIVE_BASE_URL: ${{ github.event.inputs.base_url || 'https://openmemory-api.abbierman101.workers.dev' }}
       OPENMEMORY_LIVE_E2E: "true"
       HAS_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
       HAS_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
