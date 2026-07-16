@@ -103,6 +103,9 @@ Run remote D1 migrations before deploying changes that add schema migrations:
 CLOUDFLARE_ACCOUNT_ID=<account-id> bun run db:migrate:remote
 ```
 
+The `0003_workspaces.sql` migration creates the account workspace and team
+member tables used by `/v1/account` and the hosted admin panel.
+
 ## GitHub Actions
 
 The default CI workflow runs:

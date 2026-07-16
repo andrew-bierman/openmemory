@@ -45,6 +45,7 @@ to provide the infrastructure layer behind a more portable experience:
   Cloudflare Vectorize.
 - Better Auth routes, OAuth 2.1/OIDC discovery, dynamic client registration,
   JWT/JWKS-backed resource tokens, and optional GitHub/Google login providers.
+- Session-backed workspace and team member management backed by Drizzle/D1.
 - Streamable HTTP MCP endpoint with `remember`, `recall`, `profile`, and
   `forget` tools.
 - Authenticated OAuth/MCP connection listing and revocation.
@@ -250,7 +251,7 @@ the target workflow.
 
 Current priorities:
 
-- Polish authenticated product UI and account flows.
+- Polish hosted onboarding and profile-editing flows.
 - Keep the hosted TanStack Start app as a companion dashboard/control plane
   while API and MCP integrations remain the primary product surfaces.
 - Expand charts and the knowledge map for graph health, recall quality, index

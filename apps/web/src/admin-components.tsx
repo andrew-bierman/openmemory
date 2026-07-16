@@ -1,6 +1,17 @@
-import type { OAuthConnection } from "@openmemory/client";
-import { Badge, Button, Card, Input, Label } from "@openmemory/ui";
-import { KeyRound, ShieldCheck, UserRound } from "lucide-react";
+import type {
+  Account,
+  OAuthConnection,
+  WorkspaceMember,
+} from "@openmemory/client";
+import { Badge, Button, Card, Input, Label, Select } from "@openmemory/ui";
+import {
+  Building2,
+  KeyRound,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  UsersRound,
+} from "lucide-react";
 import type { FormEvent } from "react";
 
 export type AuthUser = {
@@ -46,12 +57,18 @@ export function AccountStatus({
 }
 
 export function AdminWorkspace({
+  account,
   apiUrl,
   connections,
   email,
   isLoading,
+  memberEmail,
+  memberRole,
   name,
+  onInviteMember,
   onRevoke,
+  onRemoveMember,
+  onRenameWorkspace,
   onSignIn,
   onSignOut,
   onSignUp,
@@ -59,20 +76,30 @@ export function AdminWorkspace({
   sessionUser,
   setApiUrl,
   setEmail,
+  setMemberEmail,
+  setMemberRole,
   setName,
   setPassword,
   setTenantId,
   setToken,
+  setWorkspaceName,
   tenantId,
   token,
   usesLocalTenant,
+  workspaceName,
 }: Readonly<{
+  account: Account | null;
   apiUrl: string;
   connections: OAuthConnection[];
   email: string;
   isLoading: boolean;
+  memberEmail: string;
+  memberRole: "admin" | "member";
   name: string;
+  onInviteMember: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onRevoke: (clientId: string) => Promise<void>;
+  onRemoveMember: (memberId: string) => Promise<void>;
+  onRenameWorkspace: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSignIn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSignOut: () => Promise<void>;
   onSignUp: () => Promise<void>;
@@ -80,15 +107,22 @@ export function AdminWorkspace({
   sessionUser: AuthUser | null;
   setApiUrl: (value: string) => void;
   setEmail: (value: string) => void;
+  setMemberEmail: (value: string) => void;
+  setMemberRole: (value: "admin" | "member") => void;
   setName: (value: string) => void;
   setPassword: (value: string) => void;
   setTenantId: (value: string) => void;
   setToken: (value: string) => void;
+  setWorkspaceName: (value: string) => void;
   tenantId: string;
   token: string;
   usesLocalTenant: boolean;
+  workspaceName: string;
 }>) {
   const baseUrl = cleanBaseUrl(apiUrl);
+  const ownerMember = account?.members.find(
+    (member) => member.role === "owner",
+  );
   return (
     <div className="admin-grid">
       <section className="admin-card identity-card">
@@ -168,6 +202,109 @@ export function AdminWorkspace({
             ) : null}
           </div>
         </form>
+      </section>
+
+      <section className="admin-card admin-card-wide">
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">Workspace</p>
+            <h2>Team and tenant</h2>
+          </div>
+          <Building2 aria-hidden="true" />
+        </div>
+        <div className="workspace-admin-grid">
+          <form className="stack" onSubmit={onRenameWorkspace}>
+            <div className="status-strip">
+              <UsersRound aria-hidden="true" />
+              <span>
+                <strong>
+                  {account?.workspace.name ??
+                    (usesLocalTenant ? "Local workspace" : "Sign in required")}
+                </strong>
+                <small>
+                  {account
+                    ? `Tenant ${account.workspace.tenantId}`
+                    : usesLocalTenant
+                      ? tenantId
+                      : "Better Auth session creates your hosted workspace"}
+                </small>
+              </span>
+            </div>
+            <div className="settings-grid">
+              <div className="field settings-grid-wide">
+                <Label htmlFor="workspace-name">Workspace name</Label>
+                <Input
+                  disabled={!sessionUser}
+                  id="workspace-name"
+                  onChange={(event) => setWorkspaceName(event.target.value)}
+                  value={workspaceName}
+                />
+              </div>
+            </div>
+            <Button
+              disabled={isLoading || !sessionUser || !workspaceName.trim()}
+              type="submit"
+            >
+              Save workspace
+            </Button>
+          </form>
+
+          <form className="stack" onSubmit={onInviteMember}>
+            <div className="settings-grid">
+              <div className="field">
+                <Label htmlFor="member-email">Member email</Label>
+                <Input
+                  disabled={!sessionUser}
+                  id="member-email"
+                  onChange={(event) => setMemberEmail(event.target.value)}
+                  placeholder="teammate@example.com"
+                  type="email"
+                  value={memberEmail}
+                />
+              </div>
+              <div className="field">
+                <Label htmlFor="member-role">Role</Label>
+                <Select
+                  disabled={!sessionUser}
+                  id="member-role"
+                  onChange={(event) =>
+                    setMemberRole(
+                      event.target.value === "admin" ? "admin" : "member",
+                    )
+                  }
+                  value={memberRole}
+                >
+                  <option value="member">Member</option>
+                  <option value="admin">Admin</option>
+                </Select>
+              </div>
+            </div>
+            <Button
+              disabled={isLoading || !sessionUser || !memberEmail.trim()}
+              type="submit"
+              variant="outline"
+            >
+              Invite member
+            </Button>
+          </form>
+        </div>
+
+        <div className="member-list">
+          {(account?.members ?? []).map((member) => (
+            <MemberRow
+              key={member.id}
+              member={member}
+              onRemove={onRemoveMember}
+              ownerEmail={ownerMember?.email ?? ""}
+            />
+          ))}
+          {!account ? (
+            <div className="empty-state compact">
+              <h3>No hosted workspace loaded</h3>
+              <p>Sign in to manage account-level workspace members.</p>
+            </div>
+          ) : null}
+        </div>
       </section>
 
       <section className="admin-card">
@@ -265,6 +402,44 @@ export function AdminWorkspace({
         )}
       </section>
     </div>
+  );
+}
+
+function MemberRow({
+  member,
+  onRemove,
+  ownerEmail,
+}: Readonly<{
+  member: WorkspaceMember;
+  onRemove: (memberId: string) => Promise<void>;
+  ownerEmail: string;
+}>) {
+  const isOwner = member.role === "owner";
+  return (
+    <article className="member-row">
+      <div>
+        <strong>{member.email}</strong>
+        <small>
+          {isOwner ? `Owner ${ownerEmail ? `· ${ownerEmail}` : ""}` : member.id}
+        </small>
+      </div>
+      <div className="member-badges">
+        <Badge variant={isOwner ? "default" : "outline"}>{member.role}</Badge>
+        <Badge variant={member.status === "active" ? "default" : "outline"}>
+          {member.status}
+        </Badge>
+      </div>
+      <Button
+        disabled={isOwner}
+        onClick={() => void onRemove(member.id)}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        <Trash2 aria-hidden="true" />
+        Remove
+      </Button>
+    </article>
   );
 }
 

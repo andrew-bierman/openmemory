@@ -56,6 +56,11 @@
   path for API, auth, MCP, and hosted UI regressions.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
+- `/v1/account` exposes session-backed account, workspace, and team member
+  management backed by Drizzle/D1.
+- The TanStack admin panel can sign in, rename a hosted workspace, invite or
+  remove workspace members, manage runtime settings, and revoke MCP OAuth
+  grants.
 - Local recall benchmark coverage includes multiple golden cases across people, decisions, preferences, source chunks, graph expansion, and distractors.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
@@ -64,7 +69,8 @@
 - Browser auth and dashboard need deeper product polish:
   - deployed API routes reject header tenant mode by design
   - local development still supports tenant headers for tests and fast iteration
-  - the TanStack app still needs richer authenticated navigation, hosted deployment wiring, and more refined user/account flows
+  - the TanStack app now has real account and team management, but still needs
+    deeper hosted navigation polish and profile-editing niceties
 - RAG quality is still basic:
   - no LLM/ML reranker
 - recall benchmark coverage has useful golden cases, but still needs larger MemoryBench-style fixtures before public release confidence
@@ -80,7 +86,7 @@
 ## Next Implementation Tracks
 
 1. Auth hardening
-   - Expand authenticated navigation and account settings.
+   - Expand profile editing and hosted navigation polish.
    - Keep `x-openmemory-user-id` only for local development and tests.
 
 2. MCP production flow
@@ -100,12 +106,14 @@
    - Add larger graph performance benchmarks and production telemetry.
 
 4. Web app expansion
-   - Expand authenticated navigation, profile editing, account administration, and tenant/team management.
+   - Expand profile editing, onboarding empty states, and hosted navigation
+     polish.
    - Keep the hosted TanStack Start UI as a companion dashboard/control plane; the API and MCP integrations remain the primary product surfaces.
    - Use shadcn dashboard templates, defaults, and theme tokens as the baseline; defer Apple/SwiftUI-specific styling until the product structure is stronger.
    - Expand charts for recall quality, memory growth, stale/superseded memories, indexing health, and MCP usage.
    - Continue hardening the `react-force-graph` explorer and evaluate Sigma.js + Graphology, Reagraph, or React Flow only if graph size and layout requirements outgrow the current approach.
-   - Expand browser tests for authenticated account flows, MCP connection revocation with seeded grants, and tenant/team administration.
+   - Expand browser tests for authenticated account flows and MCP connection
+     revocation with seeded grants.
 
 5. CI and deployment
    - Connect Cloudflare Git/Workers Builds to `main`.

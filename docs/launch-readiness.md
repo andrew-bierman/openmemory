@@ -65,7 +65,7 @@ operations still need work before a larger public push.
 - [x] Graph memory CRUD, recall, source chunks, exports, and repair paths work.
 - [x] Hosted dashboard has capture, recall, table, charts, graph explorer, MCP
   setup, and admin settings.
-- [ ] First-party hosted web app has fully polished authenticated navigation,
+- [x] First-party hosted web app has fully polished authenticated navigation,
   account settings, and team/tenant management.
 - [x] MCP protocol compatibility matrix is tested and documented.
 - [x] Named external MCP clients are dogfooded and documented.

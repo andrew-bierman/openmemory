@@ -711,6 +711,58 @@ textarea:focus-visible,
   font-size: 13px;
 }
 
+.workspace-admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  gap: 14px;
+}
+
+.member-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.member-row {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--secondary);
+  padding: 10px;
+}
+
+.member-row div:first-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.member-row strong,
+.member-row small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.member-row strong {
+  font-size: 13px;
+}
+
+.member-row small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.member-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
 .memory-list {
   display: flex;
   flex-direction: column;
@@ -1496,8 +1548,18 @@ textarea:focus-visible,
   }
 
   .settings-grid,
+  .workspace-admin-grid,
   .runtime-list div {
     grid-template-columns: 1fr;
+  }
+
+  .member-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .member-badges {
+    justify-content: flex-start;
   }
 
   .page-header h2 {
