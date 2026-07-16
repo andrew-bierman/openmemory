@@ -11,8 +11,8 @@ MCP runtime for tool access.
 
 > Status: alpha. The core memory API, graph store, OAuth-backed MCP endpoint,
 > recall flow, exports, repair path, dashboard, and local integration suite are
-> working. The product UI, async extraction pipeline, larger recall benchmarks,
-> and production telemetry are still active roadmap items.
+> working. The product UI, async extraction pipeline, named external MCP client
+> dogfooding, and production telemetry are still active roadmap items.
 
 ## Why OpenMemory
 
@@ -64,6 +64,7 @@ Runtime services:
 - **Cloudflare Workers + Elysia**: HTTP API, dashboard, auth routes, and MCP
   transport.
 - **Durable Objects + SQLite**: isolated per-user memory graph databases.
+- **Durable Objects**: global application rate limiting.
 - **D1 + Drizzle**: Better Auth and control-plane schema.
 - **Vectorize + Workers AI**: embedding generation and semantic retrieval.
 - **R2**: tenant graph exports and backup artifacts.

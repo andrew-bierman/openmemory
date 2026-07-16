@@ -9,6 +9,11 @@ type RateLimitBucket = {
   resetAt: number;
 };
 
+type RateLimitOptions = {
+  enabled: boolean;
+  limit: number;
+};
+
 export type RateLimitResult = {
   enabled: boolean;
   headers: Record<string, string>;
@@ -16,6 +21,7 @@ export type RateLimitResult = {
   limited: boolean;
   remaining: number;
   retryAfterSeconds: number;
+  scope: "disabled" | "global" | "isolate";
 };
 
 export type RequestLogFields = {
@@ -31,25 +37,51 @@ export function checkRateLimit(
   env: Env,
   now = Date.now(),
 ): RateLimitResult {
-  const limit = parsePositiveInteger(
-    env.OPENMEMORY_RATE_LIMIT_PER_MINUTE,
-    DEFAULT_RATE_LIMIT_PER_MINUTE,
-  );
-  const disabled =
-    request.method === "OPTIONS" ||
-    env.OPENMEMORY_RATE_LIMIT_ENABLED === "false" ||
-    limit <= 0;
-
-  if (disabled) {
+  const options = rateLimitOptions(request, env);
+  if (!options.enabled) {
     return rateLimitResult({
       enabled: false,
       limited: false,
-      limit,
-      remaining: limit,
+      limit: options.limit,
+      remaining: options.limit,
       retryAfterSeconds: 0,
+      scope: "disabled",
     });
   }
 
+  return checkIsolateRateLimit(request, options.limit, now);
+}
+
+export async function checkGlobalRateLimit(
+  request: Request,
+  env: Env,
+  now = Date.now(),
+): Promise<RateLimitResult> {
+  const options = rateLimitOptions(request, env);
+  if (!options.enabled) {
+    return rateLimitResult({
+      enabled: false,
+      limited: false,
+      limit: options.limit,
+      remaining: options.limit,
+      retryAfterSeconds: 0,
+      scope: "disabled",
+    });
+  }
+
+  const id = env.MEMORY_GRAPHS.idFromName("__openmemory_global_rate_limiter");
+  return env.MEMORY_GRAPHS.get(id).checkRateLimit({
+    key: rateLimitKey(request),
+    limit: options.limit,
+    now,
+  });
+}
+
+function checkIsolateRateLimit(
+  request: Request,
+  limit: number,
+  now: number,
+): RateLimitResult {
   cleanupExpiredBuckets(now);
   const key = rateLimitKey(request);
   const bucket = buckets.get(key);
@@ -73,6 +105,7 @@ export function checkRateLimit(
     limit,
     remaining,
     retryAfterSeconds,
+    scope: "isolate",
   });
 }
 
@@ -123,6 +156,7 @@ function rateLimitResult({
   limit,
   remaining,
   retryAfterSeconds,
+  scope,
 }: Omit<RateLimitResult, "headers">): RateLimitResult {
   return {
     enabled,
@@ -132,12 +166,14 @@ function rateLimitResult({
           "x-ratelimit-limit": String(limit),
           "x-ratelimit-remaining": String(remaining),
           "x-ratelimit-reset": String(retryAfterSeconds),
+          "x-ratelimit-scope": scope,
         }
       : {},
     limit,
     limited,
     remaining,
     retryAfterSeconds,
+    scope,
   };
 }
 
@@ -187,4 +223,19 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function rateLimitOptions(request: Request, env: Env): RateLimitOptions {
+  const limit = parsePositiveInteger(
+    env.OPENMEMORY_RATE_LIMIT_PER_MINUTE,
+    DEFAULT_RATE_LIMIT_PER_MINUTE,
+  );
+
+  return {
+    enabled:
+      request.method !== "OPTIONS" &&
+      env.OPENMEMORY_RATE_LIMIT_ENABLED !== "false" &&
+      limit > 0,
+    limit,
+  };
 }

@@ -56,9 +56,23 @@ flows, data-write errors, or unacceptable latency.
 
 ## WAF and Global Rate Limiting
 
-The application-level limiter is an in-memory per-isolate safety valve. It is
-not a globally consistent quota and should be paired with Cloudflare edge
-controls before public launch.
+OpenMemory enforces application rate limits through a dedicated `MemoryGraph`
+Durable Object instance. That gives the Worker a Cloudflare-native global quota
+for each request bucket instead of relying on per-isolate memory. Responses
+include standard rate-limit headers plus `x-ratelimit-scope`; production should
+report `global`.
+
+Configuration:
+
+- `OPENMEMORY_RATE_LIMIT_PER_MINUTE` defaults to `600`.
+- `OPENMEMORY_RATE_LIMIT_ENABLED=false` disables the limiter for controlled
+  incident mitigation.
+- Unit tests still cover the isolate-local fallback, but normal Worker
+  deployments use the `MEMORY_GRAPHS` Durable Object binding and report
+  `x-ratelimit-scope: global`.
+
+Keep this application limiter paired with Cloudflare edge controls before a
+larger public launch.
 
 Recommended Cloudflare controls:
 
@@ -72,8 +86,8 @@ Recommended Cloudflare controls:
   - challenge obvious bursts from a single IP
   - avoid blocking normal MCP clients that perform repeated `tools/call`
   - keep `/health` inexpensive and separately rate limited if needed
-- Keep `OPENMEMORY_RATE_LIMIT_PER_MINUTE` as an application safety valve. Raise
-  it or set `OPENMEMORY_RATE_LIMIT_ENABLED=false` only during controlled
+- Keep `OPENMEMORY_RATE_LIMIT_PER_MINUTE` as the global application quota.
+  Raise it or set `OPENMEMORY_RATE_LIMIT_ENABLED=false` only during controlled
   incident mitigation.
 
 ## Logs and Saved Queries
@@ -109,6 +123,7 @@ Create saved Cloudflare log queries or dashboard filters for:
 Healthy signals:
 
 - `/health` returns 200 and includes `x-openmemory-request-id`
+- rate-limited responses include `x-ratelimit-scope: global`
 - 429s are rare under normal UI and MCP usage
 - auth failures are isolated to invalid sessions or denied clients
 - `openmemory.request_error` stays near zero

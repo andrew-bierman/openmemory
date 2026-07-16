@@ -13,10 +13,19 @@ import {
   SearchSchema,
   UpdateMemorySchema,
 } from "@openmemory/core";
+import type { RateLimitResult } from "./operational-controls";
+
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 type SearchWithSemanticIds = Partial<SearchInput> & {
   q: string;
   semanticIds?: string[];
+};
+
+type RateLimitInput = {
+  key: string;
+  limit: number;
+  now: number;
 };
 
 type MemoryGraphEnv = Record<string, unknown>;
@@ -45,6 +54,56 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     this.ctx.blockConcurrencyWhile(async () => {
       this.migrate();
     });
+  }
+
+  async checkRateLimit(input: RateLimitInput): Promise<RateLimitResult> {
+    const limit = Math.max(0, input.limit);
+    const key = input.key.slice(0, 512);
+    this.sqlState.storage.sql.exec(
+      `delete from rate_limit_buckets where reset_at <= ?`,
+      input.now,
+    );
+
+    const existing = this.sqlState.storage.sql
+      .exec<RateLimitBucketRow>(
+        `select key, count, reset_at from rate_limit_buckets where key = ? limit 1`,
+        key,
+      )
+      .toArray()[0];
+    const count = existing ? existing.count + 1 : 1;
+    const resetAt = existing?.reset_at ?? input.now + RATE_LIMIT_WINDOW_MS;
+
+    this.sqlState.storage.sql.exec(
+      `insert into rate_limit_buckets (key, count, reset_at, updated_at)
+       values (?, ?, ?, ?)
+       on conflict(key) do update set count = excluded.count, reset_at = excluded.reset_at, updated_at = excluded.updated_at`,
+      key,
+      count,
+      resetAt,
+      input.now,
+    );
+
+    const retryAfterSeconds = Math.max(
+      1,
+      Math.ceil((resetAt - input.now) / 1_000),
+    );
+    const remaining = Math.max(0, limit - count);
+
+    return {
+      enabled: true,
+      headers: {
+        "retry-after": String(count > limit ? retryAfterSeconds : 0),
+        "x-ratelimit-limit": String(limit),
+        "x-ratelimit-remaining": String(remaining),
+        "x-ratelimit-reset": String(retryAfterSeconds),
+        "x-ratelimit-scope": "global",
+      },
+      limit,
+      limited: count > limit,
+      remaining,
+      retryAfterSeconds,
+      scope: "global",
+    };
   }
 
   private get sqlState(): SqlState {
@@ -539,6 +598,15 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       );
 
       create index if not exists memory_entities_entity_idx on memory_entities(entity_id);
+
+      create table if not exists rate_limit_buckets (
+        key text primary key,
+        count integer not null,
+        reset_at integer not null,
+        updated_at integer not null
+      );
+
+      create index if not exists rate_limit_buckets_reset_idx on rate_limit_buckets(reset_at);
     `);
   }
 
@@ -674,6 +742,12 @@ type EdgeRow = {
   metadata_json: string;
   created_at: string;
   updated_at: string;
+};
+
+type RateLimitBucketRow = {
+  key: string;
+  count: number;
+  reset_at: number;
 };
 
 function rowToMemory(row: MemoryRow): MemoryRecord {
