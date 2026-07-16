@@ -146,6 +146,10 @@ Useful endpoints:
 During local development, pass `x-openmemory-user-id: local-user`. If
 `OPENMEMORY_API_TOKEN` is configured, also pass `Authorization: Bearer <token>`.
 Production rejects tenant headers by design and uses OAuth-backed identity.
+Every response includes `x-openmemory-request-id` and rate-limit headers for
+supportability. Configure the per-isolate safety valve with
+`OPENMEMORY_RATE_LIMIT_PER_MINUTE` or disable it with
+`OPENMEMORY_RATE_LIMIT_ENABLED=false` for controlled environments.
 
 ## MCP
 

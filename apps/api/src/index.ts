@@ -27,6 +27,12 @@ import {
   listOAuthConnections,
   revokeOAuthConnection,
 } from "./oauth-connections";
+import {
+  checkRateLimit,
+  jsonResponse,
+  logRequest,
+  type RateLimitResult,
+} from "./operational-controls";
 import { indexMemory, semanticSearch } from "./semantic-index";
 
 export { MemoryGraph };
@@ -542,30 +548,79 @@ const mcpHandler = createOpenMemoryMcpHandler();
 
 export default {
   fetch(request: Request, requestEnv: Env, ctx: ExecutionContext) {
+    return handleWorkerFetch(request, requestEnv, ctx);
+  },
+} satisfies ExportedHandler<Env>;
+
+async function handleWorkerFetch(
+  request: Request,
+  requestEnv: Env,
+  ctx: ExecutionContext,
+) {
+  const startedAt = Date.now();
+  const requestId = crypto.randomUUID();
+  const rateLimit = checkRateLimit(request, requestEnv, startedAt);
+  let response: Response;
+
+  try {
     const pathname = new URL(request.url).pathname;
 
     if (request.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders(request) });
-    }
-
-    if (isAuthRoute(pathname)) {
-      return withCors(
-        handleOpenMemoryAuthRequest(requestEnv, request),
-        request,
+      response = new Response(null);
+    } else if (rateLimit.limited) {
+      response = jsonResponse(
+        {
+          error: "rate_limited",
+          message: "Too many requests. Try again after the retry window.",
+          requestId,
+          retryAfterSeconds: rateLimit.retryAfterSeconds,
+        },
+        { status: 429 },
       );
+    } else if (isAuthRoute(pathname)) {
+      response = await handleOpenMemoryAuthRequest(requestEnv, request);
+    } else if (pathname === "/mcp") {
+      response = await mcpHandler(request, requestEnv, ctx);
+    } else {
+      response = await apiWorker.fetch(request);
     }
+  } catch (error) {
+    response = jsonResponse(
+      {
+        error: "internal_error",
+        message: "OpenMemory could not complete the request.",
+        requestId,
+      },
+      { status: 500 },
+    );
+    console.error(
+      JSON.stringify({
+        event: "openmemory.request_error",
+        requestId,
+        message: error instanceof Error ? error.message : "unknown error",
+      }),
+    );
+  }
 
-    if (pathname === "/mcp") {
-      return withCors(mcpHandler(request, requestEnv, ctx), request);
-    }
+  const finalized = await withCors(response, request, {
+    requestId,
+    rateLimit,
+  });
+  logRequest({
+    durationMs: Date.now() - startedAt,
+    rateLimited: rateLimit.limited,
+    request,
+    requestId,
+    response: finalized,
+  });
 
-    return withCors(apiWorker.fetch(request), request);
-  },
-} satisfies ExportedHandler<Env>;
+  return finalized;
+}
 
 async function withCors(
   response: Response | Promise<Response>,
   request: Request,
+  options: { requestId: string; rateLimit: RateLimitResult },
 ) {
   const resolved = await response;
   const headers = new Headers(resolved.headers);
@@ -573,6 +628,13 @@ async function withCors(
   for (const [key, value] of corsHeaders(request)) {
     headers.set(key, value);
   }
+
+  for (const [key, value] of Object.entries(options.rateLimit.headers)) {
+    if (options.rateLimit.enabled) {
+      headers.set(key, value);
+    }
+  }
+  headers.set("x-openmemory-request-id", options.requestId);
 
   return new Response(resolved.body, {
     status: resolved.status,

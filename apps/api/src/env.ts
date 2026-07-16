@@ -14,6 +14,8 @@ export type Env = {
   MEMORY_EXPORTS?: R2Bucket;
   EMBEDDING_MODEL: string;
   OPENMEMORY_API_TOKEN?: string;
+  OPENMEMORY_RATE_LIMIT_ENABLED?: string;
+  OPENMEMORY_RATE_LIMIT_PER_MINUTE?: string;
   BETTER_AUTH_SECRET?: string;
   BETTER_AUTH_URL?: string;
   GITHUB_CLIENT_ID?: string;
