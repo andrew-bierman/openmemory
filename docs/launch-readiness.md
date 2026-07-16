@@ -61,7 +61,7 @@ production observability still need work before a larger public push.
 - [ ] Named external MCP clients are dogfooded and documented.
 - [ ] Async source ingestion uses Queues and Workflows.
 - [ ] Entity and relationship extraction workers are implemented.
-- [ ] Larger recall and graph performance benchmarks run in CI or release
+- [x] Larger recall and graph performance benchmarks run in CI or release
   qualification.
 
 ## Operational Readiness Checklist

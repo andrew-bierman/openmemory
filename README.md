@@ -258,6 +258,7 @@ remaining implementation tracks.
 - [MCP compatibility](docs/mcp-compatibility.md)
 - [Roadmap](docs/roadmap.md)
 - [Launch readiness](docs/launch-readiness.md)
+- [Release qualification](docs/release-qualification.md)
 - [Testing strategy](docs/plans/testing-strategy.md)
 - [Cloudflare memory stack research](docs/research/cloudflare-memory-stack.md)
 - [Cloudflare RAG bottlenecks](docs/research/cloudflare-rag-bottlenecks.md)
