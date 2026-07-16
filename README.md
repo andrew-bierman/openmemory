@@ -269,6 +269,7 @@ remaining implementation tracks.
 - [Deployment](docs/deployment.md)
 - [Operations runbook](docs/operations.md)
 - [Observability](docs/observability.md)
+- [Launch announcement](docs/launch-announcement.md)
 - [MCP setup](docs/mcp.md)
 - [MCP compatibility](docs/mcp-compatibility.md)
 - [Roadmap](docs/roadmap.md)
