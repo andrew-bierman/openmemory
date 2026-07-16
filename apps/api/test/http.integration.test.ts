@@ -383,6 +383,89 @@ test("worker API supports memory lifecycle, profile context, MCP, and dashboard"
   expect(await dashboard.text()).toContain("OpenMemory");
 }, 45_000);
 
+test("MCP streamable HTTP compatibility covers handshake and optional surfaces", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `mcp-compat-${crypto.randomUUID()}`;
+  const headers = {
+    ...tenantHeaders(tenant),
+    accept: "application/json, text/event-stream",
+    "content-type": "application/json",
+  };
+
+  const initialized = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "init",
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: {
+            name: "openmemory-vitest-client",
+            version: "0.0.0",
+          },
+        },
+      }),
+    }),
+  );
+  expect(initialized.error).toBeUndefined();
+  expect(initialized.result).toMatchObject({
+    serverInfo: {
+      name: "openmemory",
+    },
+  });
+  expect(JSON.stringify(initialized.result)).toContain("tools");
+
+  const initializedNotification = await worker.fetch("/mcp", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      method: "notifications/initialized",
+      params: {},
+    }),
+  });
+  expect(initializedNotification.status).toBeGreaterThanOrEqual(200);
+  expect(initializedNotification.status).toBeLessThan(300);
+
+  const tools = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "tools",
+        method: "tools/list",
+      }),
+    }),
+  );
+  expect(tools.error).toBeUndefined();
+  expect(JSON.stringify(tools.result)).toContain("remember");
+  expect(JSON.stringify(tools.result)).toContain("recall");
+  expect(JSON.stringify(tools.result)).toContain("profile");
+  expect(JSON.stringify(tools.result)).toContain("forget");
+
+  for (const method of ["resources/list", "prompts/list"]) {
+    const response = await getJson<JsonRpcResponse>(
+      await worker.fetch("/mcp", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: method,
+          method,
+        }),
+      }),
+    );
+    expect(response.result ?? response.error).toBeTruthy();
+  }
+}, 45_000);
+
 test("worker emits operational headers and rate limits repeated requests", async () => {
   const worker = await startWorker({
     OPENMEMORY_RATE_LIMIT_PER_MINUTE: "2",
@@ -1228,7 +1311,8 @@ type ContextResponse = {
 };
 
 type JsonRpcResponse = {
-  result: unknown;
+  result?: unknown;
+  error?: unknown;
 };
 
 type OAuthMetadataResponse = {
