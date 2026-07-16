@@ -5,6 +5,7 @@ import type {
   R2Bucket,
   VectorizeIndex,
 } from "@cloudflare/workers-types";
+import type { MemoryExtractionMessage } from "./extraction-worker";
 import type { MemoryGraph } from "./memory-graph";
 import type { SourceIngestionMessage } from "./source-ingestion";
 
@@ -14,6 +15,8 @@ export type Env = {
   MEMORY_VECTORS?: VectorizeIndex;
   AI?: Ai;
   MEMORY_EXPORTS?: R2Bucket;
+  MEMORY_EXTRACTION_QUEUE?: Queue<MemoryExtractionMessage>;
+  MEMORY_EXTRACTION_WORKFLOW?: WorkflowBinding<MemoryExtractionMessage>;
   SOURCE_INGESTION_QUEUE?: Queue<SourceIngestionMessage>;
   SOURCE_INGESTION_WORKFLOW?: WorkflowBinding<SourceIngestionMessage>;
   EMBEDDING_MODEL: string;

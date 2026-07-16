@@ -23,6 +23,7 @@ export function enrichMemoryInput<
       extraction: {
         strategy: "deterministic-v1",
         entityIds: extracted.entityIds,
+        relationships: extracted.relationships,
         tags: extracted.tags,
       },
     },
@@ -32,6 +33,7 @@ export function enrichMemoryInput<
 export function extractMemorySignals(content: string) {
   const entityIds = new Set<string>();
   const tags = new Set<string>();
+  const relationships = new Map<string, ExtractedRelationship>();
 
   for (const match of content.matchAll(
     /\b[A-Z][a-z0-9]+(?:\s+[A-Z][a-z0-9]+){0,3}\b/g,
@@ -60,8 +62,18 @@ export function extractMemorySignals(content: string) {
     }
   }
 
+  for (const relationship of extractRelationships(content)) {
+    entityIds.add(relationship.sourceEntityId);
+    entityIds.add(relationship.targetEntityId);
+    relationships.set(
+      `${relationship.sourceEntityId}:${relationship.relationship}:${relationship.targetEntityId}`,
+      relationship,
+    );
+  }
+
   return {
     entityIds: [...entityIds].slice(0, 30),
+    relationships: [...relationships.values()].slice(0, 20),
     tags: [...tags].slice(0, 20),
   };
 }
@@ -93,6 +105,104 @@ function stripLeadingCommonTitleWords(value: string) {
   }
   return words.join(" ");
 }
+
+function extractRelationships(content: string) {
+  const relationships: ExtractedRelationship[] = [];
+  for (const pattern of RELATIONSHIP_PATTERNS) {
+    for (const match of content.matchAll(pattern.regex)) {
+      const source = stripLeadingCommonTitleWords((match[1] ?? "").trim());
+      const target = stripLeadingCommonTitleWords((match[2] ?? "").trim());
+      const sourceEntityId = entityId(source);
+      const targetEntityId = entityId(target);
+      if (
+        sourceEntityId &&
+        targetEntityId &&
+        sourceEntityId !== targetEntityId
+      ) {
+        relationships.push({
+          source,
+          sourceEntityId,
+          target,
+          targetEntityId,
+          relationship: pattern.relationship,
+        });
+      }
+    }
+  }
+  return relationships;
+}
+
+export type ExtractedRelationship = {
+  source: string;
+  sourceEntityId: string;
+  target: string;
+  targetEntityId: string;
+  relationship:
+    | "blocks"
+    | "depends_on"
+    | "extends"
+    | "improves"
+    | "replaces"
+    | "supports"
+    | "uses";
+};
+
+const ENTITY_PHRASE = String.raw`([A-Z][A-Za-z0-9]+(?:\s+[A-Z][A-Za-z0-9]+){0,4}|[A-Z]{2,})`;
+
+const RELATIONSHIP_PATTERNS: Array<{
+  relationship: ExtractedRelationship["relationship"];
+  regex: RegExp;
+}> = [
+  {
+    relationship: "depends_on",
+    regex: new RegExp(
+      `${ENTITY_PHRASE}\\s+(?:depends on|needs|requires)\\s+${ENTITY_PHRASE}`,
+      "g",
+    ),
+  },
+  {
+    relationship: "supports",
+    regex: new RegExp(
+      `${ENTITY_PHRASE}\\s+(?:supports|enables|backs)\\s+${ENTITY_PHRASE}`,
+      "g",
+    ),
+  },
+  {
+    relationship: "blocks",
+    regex: new RegExp(
+      `${ENTITY_PHRASE}\\s+(?:blocks|prevents)\\s+${ENTITY_PHRASE}`,
+      "g",
+    ),
+  },
+  {
+    relationship: "replaces",
+    regex: new RegExp(
+      `${ENTITY_PHRASE}\\s+(?:replaces|supersedes)\\s+${ENTITY_PHRASE}`,
+      "g",
+    ),
+  },
+  {
+    relationship: "extends",
+    regex: new RegExp(
+      `${ENTITY_PHRASE}\\s+(?:extends|builds on)\\s+${ENTITY_PHRASE}`,
+      "g",
+    ),
+  },
+  {
+    relationship: "uses",
+    regex: new RegExp(
+      `${ENTITY_PHRASE}\\s+(?:uses|calls)\\s+${ENTITY_PHRASE}`,
+      "g",
+    ),
+  },
+  {
+    relationship: "improves",
+    regex: new RegExp(
+      `${ENTITY_PHRASE}\\s+(?:improves|optimizes)\\s+${ENTITY_PHRASE}`,
+      "g",
+    ),
+  },
+];
 
 const COMMON_TITLE_WORDS = new Set([
   "The",

@@ -25,6 +25,13 @@ import {
 } from "./auth";
 import { handleOpenMemoryAuthRequest, isAuthRoute } from "./better-auth";
 import type { Env } from "./env";
+import {
+  enqueueMemoryExtraction,
+  MEMORY_EXTRACTION_QUEUE_NAME,
+  type MemoryExtractionMessage,
+  parseMemoryExtractionMessage,
+  processMemoryExtractionMessage,
+} from "./extraction-worker";
 import { createOpenMemoryMcpHandler } from "./mcp";
 import { MemoryGraph } from "./memory-graph";
 import { enrichMemoryInput } from "./memory-signals";
@@ -43,6 +50,7 @@ import {
   getGraphForTenant,
   ingestSourceDocument,
   processSourceIngestionMessage,
+  SOURCE_INGESTION_QUEUE_NAME,
   type SourceIngestionMessage,
 } from "./source-ingestion";
 
@@ -71,6 +79,22 @@ export class SourceIngestionWorkflow extends WorkflowEntrypoint<
           edgeCount: result.edges.length,
         };
       },
+    );
+  }
+}
+
+export class MemoryExtractionWorkflow extends WorkflowEntrypoint<
+  Env,
+  MemoryExtractionMessage
+> {
+  async run(
+    event: Readonly<WorkflowEvent<MemoryExtractionMessage>>,
+    step: WorkflowStep,
+  ) {
+    return step.do(
+      "extract memory entities and relationships",
+      { retries: { limit: 3, delay: "10 seconds", backoff: "exponential" } },
+      async () => processMemoryExtractionMessage(this.env, event.payload),
     );
   }
 }
@@ -256,6 +280,11 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
       await indexMemory(env, tenantId, memory);
       await graph.linkRelatedMemories(memory.id);
+      await enqueueMemoryExtraction(env, {
+        memoryId: memory.id,
+        reason: "create",
+        tenantId,
+      });
       return status(201, memory);
     },
     { body: memoryBody },
@@ -281,6 +310,11 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
       await indexMemory(env, tenantId, memory);
       const edges = await graph.linkRelatedMemories(memory.id);
+      await enqueueMemoryExtraction(env, {
+        memoryId: memory.id,
+        reason: "create",
+        tenantId,
+      });
       return status(201, { memory, edges });
     },
     { body: memoryBody },
@@ -309,6 +343,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           input,
           sourceId,
           tenantId,
+          extractionReason: "source",
         }),
       );
     },
@@ -340,7 +375,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         input,
         metadata: {
           strategy: "queue-workflow-source-ingestion-v1",
-          queue: "openmemory-source-ingestion",
+          queue: SOURCE_INGESTION_QUEUE_NAME,
         },
       });
       await env.SOURCE_INGESTION_QUEUE.send(
@@ -417,6 +452,11 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
       await indexMemory(env, tenantId, memory);
       await graph.linkRelatedMemories(memory.id);
+      await enqueueMemoryExtraction(env, {
+        memoryId: memory.id,
+        reason: "update",
+        tenantId,
+      });
       return memory;
     },
     { body: updateBody },
@@ -587,9 +627,41 @@ export default {
     return handleWorkerFetch(request, requestEnv, ctx);
   },
   queue(batch: MessageBatch<unknown>, requestEnv: Env) {
+    if (batch.queue === MEMORY_EXTRACTION_QUEUE_NAME) {
+      return handleMemoryExtractionQueue(batch, requestEnv);
+    }
+    if (batch.queue === SOURCE_INGESTION_QUEUE_NAME) {
+      return handleSourceIngestionQueue(batch, requestEnv);
+    }
     return handleSourceIngestionQueue(batch, requestEnv);
   },
 } satisfies ExportedHandler<Env>;
+
+export async function handleMemoryExtractionQueue(
+  batch: MessageBatch<unknown>,
+  requestEnv: Env,
+) {
+  for (const message of batch.messages) {
+    try {
+      const body = parseMemoryExtractionMessage(message.body);
+      if (requestEnv.MEMORY_EXTRACTION_WORKFLOW) {
+        await startMemoryExtractionWorkflow(requestEnv, body);
+      } else {
+        await processMemoryExtractionMessage(requestEnv, body);
+      }
+      message.ack();
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "openmemory.memory_extraction_error",
+          memoryId: isRecord(message.body) ? message.body.memoryId : undefined,
+          message: error instanceof Error ? error.message : "unknown error",
+        }),
+      );
+      message.retry({ delaySeconds: Math.min(300, 10 * message.attempts) });
+    }
+  }
+}
 
 export async function handleSourceIngestionQueue(
   batch: MessageBatch<unknown>,
@@ -613,6 +685,26 @@ export async function handleSourceIngestionQueue(
         }),
       );
       message.retry({ delaySeconds: Math.min(300, 10 * message.attempts) });
+    }
+  }
+}
+
+async function startMemoryExtractionWorkflow(
+  requestEnv: Env,
+  message: MemoryExtractionMessage,
+) {
+  try {
+    await requestEnv.MEMORY_EXTRACTION_WORKFLOW?.create({
+      id: message.memoryId.slice(0, 100),
+      params: message,
+      retention: {
+        successRetention: "7 days",
+        errorRetention: "14 days",
+      },
+    });
+  } catch (error) {
+    if (!String(error).toLowerCase().includes("already")) {
+      throw error;
     }
   }
 }

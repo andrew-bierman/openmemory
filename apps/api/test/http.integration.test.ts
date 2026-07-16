@@ -696,6 +696,43 @@ test("ingestion extracts entities, links graph neighbors, and improves recall", 
   );
 }, 45_000);
 
+test("memory extraction worker enriches relationships into graph edges", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-extraction-${crypto.randomUUID()}`;
+  const anchor = await createMemory(worker, tenant, {
+    content: "RAG recall uses Vectorize semantic candidates.",
+    tags: ["retrieval"],
+  });
+  const source = await createMemory(worker, tenant, {
+    content:
+      "Graph Indexing depends on RAG. Vectorize supports Graph Indexing.",
+    tags: ["architecture"],
+  });
+
+  const enriched = await waitForExtractedMemory(worker, tenant, source.id);
+  expect(enriched.entityIds).toEqual(
+    expect.arrayContaining(["graph-indexing", "rag", "vectorize"]),
+  );
+  expect(enriched.metadata.extraction).toMatchObject({
+    strategy: "deterministic-worker-v1",
+  });
+
+  const neighbors = await getJson<EdgeResponse[]>(
+    await worker.fetch(`/v1/graph/${source.id}/neighbors`, {
+      headers: tenantHeaders(tenant),
+    }),
+  );
+  expect(neighbors).toContainEqual(
+    expect.objectContaining({
+      sourceId: source.id,
+      targetId: anchor.id,
+      relationship: "depends_on",
+    }),
+  );
+}, 45_000);
+
 test("source ingestion chunks documents, preserves provenance, and links chunk graph", async () => {
   const worker = await startWorker();
   workers.push(worker);
@@ -1187,6 +1224,39 @@ async function waitForSourceJob(
 
   throw new Error(
     `Timed out waiting for source ingestion job: ${JSON.stringify(latest)}`,
+  );
+}
+
+async function waitForExtractedMemory(
+  worker: WorkerProcess,
+  tenantId: string,
+  memoryId: string,
+) {
+  const startedAt = Date.now();
+  let latest: MemoryResponse | undefined;
+
+  while (Date.now() - startedAt < 20_000) {
+    latest = await getJson<MemoryResponse>(
+      await worker.fetch(`/v1/memories/${memoryId}`, {
+        headers: tenantHeaders(tenantId),
+      }),
+    );
+    const extraction = latest.metadata.extraction as
+      | Record<string, unknown>
+      | undefined;
+    if (
+      typeof extraction === "object" &&
+      extraction !== null &&
+      "relationships" in extraction &&
+      extraction.strategy === "deterministic-worker-v1"
+    ) {
+      return latest;
+    }
+    await sleep(500);
+  }
+
+  throw new Error(
+    `Timed out waiting for memory extraction: ${JSON.stringify(latest)}`,
   );
 }
 

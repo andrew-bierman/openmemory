@@ -36,6 +36,27 @@ describe("memory signal extraction", () => {
     expect(signals.entityIds).toContain("graph-indexing");
   });
 
+  test("extracts deterministic relationship candidates", () => {
+    const signals = extractMemorySignals(
+      "Graph Indexing depends on RAG. Vectorize supports Graph Indexing.",
+    );
+
+    expect(signals.relationships).toContainEqual(
+      expect.objectContaining({
+        sourceEntityId: "graph-indexing",
+        targetEntityId: "rag",
+        relationship: "depends_on",
+      }),
+    );
+    expect(signals.relationships).toContainEqual(
+      expect.objectContaining({
+        sourceEntityId: "vectorize",
+        targetEntityId: "graph-indexing",
+        relationship: "supports",
+      }),
+    );
+  });
+
   test("merges unique values while preserving first occurrence order", () => {
     expect(mergeUnique([" graph ", "rag", "graph", "", "mcp"])).toEqual([
       "graph",

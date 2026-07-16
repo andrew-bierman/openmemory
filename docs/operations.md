@@ -116,10 +116,17 @@ Async source ingestion failures emit:
 - `sourceId`
 - `message`
 
+Async memory extraction failures emit:
+
+- `event: "openmemory.memory_extraction_error"`
+- `memoryId`
+- `message`
+
 Create saved Cloudflare log queries or dashboard filters for:
 
 - `openmemory.request_error`
 - `openmemory.source_ingestion_error`
+- `openmemory.memory_extraction_error`
 - `openmemory.request` with `status >= 500`
 - `openmemory.request` with `status = 429`
 - `openmemory.request` with `status = 401 OR status = 403`
@@ -135,10 +142,13 @@ Healthy signals:
 - rate-limited responses include `x-ratelimit-scope: global`
 - async source ingestion jobs transition from `queued` to `processing` to
   `completed`
+- memory extraction updates memory metadata with
+  `extraction.strategy = deterministic-worker-v1`
 - 429s are rare under normal UI and MCP usage
 - auth failures are isolated to invalid sessions or denied clients
 - `openmemory.request_error` stays near zero
 - `openmemory.source_ingestion_error` stays near zero
+- `openmemory.memory_extraction_error` stays near zero
 
 ## Alerting
 
@@ -147,6 +157,7 @@ Create alerts before broader public launch for:
 - sustained 5xx responses for 5 minutes
 - sustained `openmemory.request_error`
 - sustained `openmemory.source_ingestion_error`
+- sustained `openmemory.memory_extraction_error`
 - sudden 429 spikes
 - sustained 401/403 spikes on OAuth or MCP routes
 - live smoke failure after deploy

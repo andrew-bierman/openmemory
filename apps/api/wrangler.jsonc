@@ -38,11 +38,22 @@
   "queues": {
     "producers": [
       {
+        "binding": "MEMORY_EXTRACTION_QUEUE",
+        "queue": "openmemory-memory-extraction"
+      },
+      {
         "binding": "SOURCE_INGESTION_QUEUE",
         "queue": "openmemory-source-ingestion"
       }
     ],
     "consumers": [
+      {
+        "queue": "openmemory-memory-extraction",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "openmemory-memory-extraction-dlq"
+      },
       {
         "queue": "openmemory-source-ingestion",
         "max_batch_size": 4,
@@ -53,6 +64,11 @@
     ]
   },
   "workflows": [
+    {
+      "binding": "MEMORY_EXTRACTION_WORKFLOW",
+      "name": "openmemory-memory-extraction",
+      "class_name": "MemoryExtractionWorkflow"
+    },
     {
       "binding": "SOURCE_INGESTION_WORKFLOW",
       "name": "openmemory-source-ingestion",

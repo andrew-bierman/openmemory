@@ -11,8 +11,8 @@ adopters who are comfortable with Cloudflare Workers, Durable Objects, D1,
 Vectorize, Workers AI, R2, OAuth, and MCP.
 
 It is not yet a broad self-serve SaaS launch. The backend is functional and
-well covered; the companion UI, entity extraction pipeline, larger benchmarks,
-and production observability still need work before a larger public push.
+well covered; the companion UI, larger benchmarks, and production observability
+still need work before a larger public push.
 
 ## Proven Today
 
@@ -26,6 +26,8 @@ and production observability still need work before a larger public push.
   ingestion, R2 export, and hosted UI smoke are covered by tests.
 - Async source ingestion is covered by local Wrangler integration with Queues
   and Workflows.
+- Entity and relationship extraction workers are covered by local Wrangler
+  integration with Queues and Workflows.
 - Operational headers and request IDs are live on `/health`.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
@@ -62,7 +64,7 @@ and production observability still need work before a larger public push.
 - [x] MCP protocol compatibility matrix is tested and documented.
 - [ ] Named external MCP clients are dogfooded and documented.
 - [x] Async source ingestion uses Queues and Workflows.
-- [ ] Entity and relationship extraction workers are implemented.
+- [x] Entity and relationship extraction workers are implemented.
 - [x] Larger recall and graph performance benchmarks run in CI or release
   qualification.
 

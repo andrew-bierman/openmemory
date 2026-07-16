@@ -4,6 +4,10 @@ import {
   IngestSourceSchema,
 } from "@openmemory/core";
 import type { Env } from "./env";
+import {
+  enqueueMemoryExtraction,
+  type MemoryExtractionMessage,
+} from "./extraction-worker";
 import type { MemoryGraph } from "./memory-graph";
 import { enrichMemoryInput } from "./memory-signals";
 import { indexMemory } from "./semantic-index";
@@ -29,6 +33,7 @@ export async function ingestSourceDocument(options: {
   env: Env;
   graph: MemoryGraph;
   input: IngestSourceInput;
+  extractionReason?: MemoryExtractionMessage["reason"];
   sourceId: string;
   tenantId: string;
 }): Promise<SourceIngestionResult> {
@@ -67,6 +72,11 @@ export async function ingestSourceDocument(options: {
       ),
     );
     await indexMemory(options.env, options.tenantId, memory);
+    await enqueueMemoryExtraction(options.env, {
+      memoryId: memory.id,
+      reason: options.extractionReason ?? "source",
+      tenantId: options.tenantId,
+    });
     memories.push(memory);
     edges.push(...(await options.graph.linkRelatedMemories(memory.id)));
 
