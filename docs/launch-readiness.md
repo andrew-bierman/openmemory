@@ -76,7 +76,7 @@ production observability still need work before a larger public push.
 - [ ] Log dashboard or saved queries exist for `openmemory.request`,
   `openmemory.request_error`, 429s, and 5xxs.
 - [ ] Alerting exists for sustained errors, missing bindings, or auth failures.
-- [ ] GitHub secret scanning or an equivalent secret-detection control is
+- [x] GitHub secret scanning or an equivalent secret-detection control is
   enabled for public contributions.
 - [ ] Documented rollback procedure includes Worker version rollback and D1
   migration precautions.

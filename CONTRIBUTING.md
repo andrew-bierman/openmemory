@@ -21,6 +21,7 @@ Run the baseline checks:
 
 ```sh
 bun run format
+bun run security:secrets
 bun run check
 bun run build
 bun run test:integration:local
@@ -75,3 +76,10 @@ Use focused PRs with:
 - Screenshots for visible UI changes.
 
 Gitmoji commit messages are preferred for this repository.
+
+## Secrets
+
+Never commit `.dev.vars`, `.env`, OAuth client secrets, API tokens, private
+keys, exported memory data, or live bearer tokens. CI runs
+`bun run security:secrets` on every PR as an equivalent secret-detection control
+when GitHub Advanced Security is unavailable.
