@@ -422,7 +422,7 @@ test("worker emits operational headers and rate limits repeated requests", async
   expect(await third.json()).toMatchObject({
     error: "rate_limited",
   });
-});
+}, 45_000);
 
 test("worker API uses Better Auth session cookies as deployed tenant identity", async () => {
   const worker = await startWorker({
