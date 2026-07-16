@@ -70,9 +70,9 @@ production observability still need work before a larger public push.
   configured.
 - [x] Root Wrangler dry-run validates upload shape and bindings.
 - [x] Request IDs and structured request logs exist.
-- [x] Per-isolate rate-limit safety valve exists.
+- [x] Cloudflare-native global rate limiter exists through a Durable Object.
 - [x] Live smoke workflow exists.
-- [ ] Cloudflare WAF or global rate limiting is configured for production abuse
+- [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
 - [ ] Log dashboard or saved queries exist for `openmemory.request`,
   `openmemory.request_error`, 429s, and 5xxs.

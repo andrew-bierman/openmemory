@@ -28,7 +28,7 @@ import {
   revokeOAuthConnection,
 } from "./oauth-connections";
 import {
-  checkRateLimit,
+  checkGlobalRateLimit,
   jsonResponse,
   logRequest,
   type RateLimitResult,
@@ -559,7 +559,7 @@ async function handleWorkerFetch(
 ) {
   const startedAt = Date.now();
   const requestId = crypto.randomUUID();
-  const rateLimit = checkRateLimit(request, requestEnv, startedAt);
+  const rateLimit = await checkGlobalRateLimit(request, requestEnv, startedAt);
   let response: Response;
 
   try {

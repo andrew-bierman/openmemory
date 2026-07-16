@@ -7,6 +7,7 @@ The API is deployed to Cloudflare Workers:
 - `https://openmemory-api.abbierman101.workers.dev`
 - HTTP API, Better Auth routes, the hosted dashboard, and `/mcp` currently deploy as one Worker.
 - D1 `openmemory-auth` is bound as `AUTH_DB`.
+- Durable Object `MemoryGraph` is bound as `MEMORY_GRAPHS`.
 - Vectorize `openmemory-vectors` is bound as `MEMORY_VECTORS`.
 - R2 `openmemory-exports` is bound as `MEMORY_EXPORTS`.
 - `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` are set as Worker secrets.
@@ -43,7 +44,8 @@ The script creates:
 - R2 bucket bound as `MEMORY_EXPORTS`
 - Remote D1 migrations
 
-The Worker already has Durable Object migrations in `apps/api/wrangler.jsonc`.
+The Worker already has Durable Object migrations in `apps/api/wrangler.jsonc`
+and root `wrangler.jsonc` for `MemoryGraph`.
 
 ## Required Secrets
 
@@ -72,10 +74,12 @@ bun --cwd apps/api wrangler secret put OPENMEMORY_API_TOKEN
 ```
 
 Optional operational controls can be set as Cloudflare environment variables or
-dashboard-managed secrets. `OPENMEMORY_RATE_LIMIT_PER_MINUTE` defaults to `600`.
-Set `OPENMEMORY_RATE_LIMIT_ENABLED=false` only for trusted controlled
-environments. Responses include `x-openmemory-request-id`, `x-ratelimit-limit`,
-`x-ratelimit-remaining`, and `x-ratelimit-reset`.
+dashboard-managed secrets. `OPENMEMORY_RATE_LIMIT_PER_MINUTE` defaults to `600`
+and is enforced globally through a dedicated `MemoryGraph` Durable Object
+instance. Set `OPENMEMORY_RATE_LIMIT_ENABLED=false` only for trusted controlled
+environments.
+Responses include `x-openmemory-request-id`, `x-ratelimit-limit`,
+`x-ratelimit-remaining`, `x-ratelimit-reset`, and `x-ratelimit-scope`.
 
 ## Cloudflare Git Deploys
 

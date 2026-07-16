@@ -498,6 +498,7 @@ test("worker emits operational headers and rate limits repeated requests", async
   );
   expect(first.headers.get("x-ratelimit-limit")).toBe("2");
   expect(first.headers.get("x-ratelimit-remaining")).toBe("1");
+  expect(first.headers.get("x-ratelimit-scope")).toBe("global");
   expect(second.status).toBe(200);
   expect(second.headers.get("x-ratelimit-remaining")).toBe("0");
   expect(third.status).toBe(429);
