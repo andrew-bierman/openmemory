@@ -40,10 +40,11 @@ production observability still need work before a larger public push.
 - [x] Changelog exists.
 - [x] Issue templates exist.
 - [x] Pull request template exists.
-- [ ] GitHub Discussions enabled for support and design questions.
+- [x] GitHub Discussions enabled for support and design questions.
 - [ ] Repository visibility switched from private to public.
 - [x] Repository topics set for discovery.
-- [ ] First tagged alpha release created with release notes.
+- [x] First tagged alpha release draft created with release notes for
+  `v0.1.0-alpha.1`.
 
 ## Product Readiness Checklist
 
@@ -75,6 +76,8 @@ production observability still need work before a larger public push.
 - [ ] Log dashboard or saved queries exist for `openmemory.request`,
   `openmemory.request_error`, 429s, and 5xxs.
 - [ ] Alerting exists for sustained errors, missing bindings, or auth failures.
+- [ ] GitHub secret scanning or an equivalent secret-detection control is
+  enabled for public contributions.
 - [ ] Documented rollback procedure includes Worker version rollback and D1
   migration precautions.
 - [ ] Production data retention and export/delete policy is written.
