@@ -78,9 +78,9 @@ production observability still need work before a larger public push.
 - [ ] Alerting exists for sustained errors, missing bindings, or auth failures.
 - [x] GitHub secret scanning or an equivalent secret-detection control is
   enabled for public contributions.
-- [ ] Documented rollback procedure includes Worker version rollback and D1
+- [x] Documented rollback procedure includes Worker version rollback and D1
   migration precautions.
-- [ ] Production data retention and export/delete policy is written.
+- [x] Production data retention and export/delete policy is written.
 
 ## Recommended Launch Sequence
 

@@ -251,6 +251,7 @@ remaining implementation tracks.
 ## Docs
 
 - [Deployment](docs/deployment.md)
+- [Operations runbook](docs/operations.md)
 - [MCP setup](docs/mcp.md)
 - [Roadmap](docs/roadmap.md)
 - [Launch readiness](docs/launch-readiness.md)

@@ -33,6 +33,9 @@ privately through GitHub and request a secure reporting channel.
 - MCP tool authorization and streamable HTTP transport.
 - Rate limiting, request logging, and operational controls.
 
+Operational rollback, alerting, WAF/rate-limit recommendations, and alpha data
+retention guidance live in [docs/operations.md](docs/operations.md).
+
 ## Disclosure
 
 We aim to acknowledge valid reports quickly, fix high-impact issues before
