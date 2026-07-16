@@ -902,7 +902,8 @@ test("graph stats and recall stay bounded on a moderate local graph", async () =
 
   const tenant = `tenant-scale-${crypto.randomUUID()}`;
   const topics = ["Atlas", "Borealis", "Cosmos", "Delta"];
-  for (let index = 0; index < 60; index += 1) {
+  const graphSize = 120;
+  for (let index = 0; index < graphSize; index += 1) {
     const topic = topics[index % topics.length];
     await createMemory(worker, tenant, {
       content: `${topic} project memory ${index}: Graph Indexing connects source chunks, decisions, and retrieval notes.`,
@@ -916,8 +917,8 @@ test("graph stats and recall stay bounded on a moderate local graph", async () =
       headers: tenantHeaders(tenant),
     }),
   );
-  expect(stats.activeMemories).toBe(60);
-  expect(stats.totalMemories).toBe(60);
+  expect(stats.activeMemories).toBe(graphSize);
+  expect(stats.totalMemories).toBe(graphSize);
   expect(stats.tagCount).toBeGreaterThanOrEqual(5);
 
   const startedAt = performance.now();
@@ -929,7 +930,7 @@ test("graph stats and recall stay bounded on a moderate local graph", async () =
 
   expect(results).toHaveLength(10);
   expect(results[0]?.content).toContain("Atlas");
-  expect(elapsedMs).toBeLessThan(5_000);
+  expect(elapsedMs).toBeLessThan(7_500);
 }, 45_000);
 
 test("auth helpers keep tenant headers local-only", () => {
