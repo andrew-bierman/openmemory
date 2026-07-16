@@ -71,13 +71,20 @@ Optional machine-token fallback:
 bun --cwd apps/api wrangler secret put OPENMEMORY_API_TOKEN
 ```
 
+Optional operational controls can be set as Cloudflare environment variables or
+dashboard-managed secrets. `OPENMEMORY_RATE_LIMIT_PER_MINUTE` defaults to `600`.
+Set `OPENMEMORY_RATE_LIMIT_ENABLED=false` only for trusted controlled
+environments. Responses include `x-openmemory-request-id`, `x-ratelimit-limit`,
+`x-ratelimit-remaining`, and `x-ratelimit-reset`.
+
 ## Cloudflare Git Deploys
 
 Preferred production deploy path:
 
 1. Connect the GitHub repo to Cloudflare Workers Builds from the Cloudflare dashboard.
 2. Use `main` as the production branch.
-3. Keep `apps/api/wrangler.jsonc` as the Worker source of truth.
+3. Keep root `wrangler.jsonc` as the Cloudflare Builds deploy entrypoint, and
+   keep `apps/api/wrangler.jsonc` aligned for app-local Wrangler commands.
 4. Use the dashboard integration for deploy auth instead of storing a deploy token in GitHub.
 
 Run remote D1 migrations before deploying changes that add schema migrations:

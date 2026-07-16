@@ -33,6 +33,10 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     ok: true,
     service: "openmemory-api",
   });
+  expect(health.headers.get("x-openmemory-request-id")).toMatch(
+    /^[\da-f-]{36}$/,
+  );
+  expect(health.headers.get("x-ratelimit-limit")).toBeTruthy();
 
   const oauthMetadata = await getJson<OAuthMetadataResponse>(
     await worker.fetch("/.well-known/oauth-authorization-server"),
@@ -311,6 +315,24 @@ test("worker API supports memory lifecycle, profile context, MCP, and dashboard"
   });
   expect(afterForget.map((memory) => memory.id)).not.toContain(updated.id);
 
+  const mcpTools = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenant),
+        accept: "application/json, text/event-stream",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 0,
+        method: "tools/list",
+      }),
+    }),
+  );
+  expect(JSON.stringify(mcpTools.result)).toContain("remember");
+  expect(JSON.stringify(mcpTools.result)).toContain("recall");
+
   const mcpRemember = await getJson<JsonRpcResponse>(
     await worker.fetch("/mcp", {
       method: "POST",
@@ -360,6 +382,47 @@ test("worker API supports memory lifecycle, profile context, MCP, and dashboard"
   expect(dashboard.status).toBe(200);
   expect(await dashboard.text()).toContain("OpenMemory");
 }, 45_000);
+
+test("worker emits operational headers and rate limits repeated requests", async () => {
+  const worker = await startWorker({
+    OPENMEMORY_RATE_LIMIT_PER_MINUTE: "2",
+  });
+  workers.push(worker);
+
+  const tenant = `rate-limit-${crypto.randomUUID()}`;
+  const first = await worker.fetch("/v1/memories", {
+    headers: {
+      ...tenantHeaders(tenant),
+      authorization: "Bearer rate-limit-token",
+    },
+  });
+  const second = await worker.fetch("/v1/memories", {
+    headers: {
+      ...tenantHeaders(tenant),
+      authorization: "Bearer rate-limit-token",
+    },
+  });
+  const third = await worker.fetch("/v1/memories", {
+    headers: {
+      ...tenantHeaders(tenant),
+      authorization: "Bearer rate-limit-token",
+    },
+  });
+
+  expect(first.status).toBe(200);
+  expect(first.headers.get("x-openmemory-request-id")).toMatch(
+    /^[\da-f-]{36}$/,
+  );
+  expect(first.headers.get("x-ratelimit-limit")).toBe("2");
+  expect(first.headers.get("x-ratelimit-remaining")).toBe("1");
+  expect(second.status).toBe(200);
+  expect(second.headers.get("x-ratelimit-remaining")).toBe("0");
+  expect(third.status).toBe(429);
+  expect(third.headers.get("retry-after")).not.toBe("0");
+  expect(await third.json()).toMatchObject({
+    error: "rate_limited",
+  });
+});
 
 test("worker API uses Better Auth session cookies as deployed tenant identity", async () => {
   const worker = await startWorker({

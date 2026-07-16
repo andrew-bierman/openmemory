@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "wrangler dev --local --port 54150",
     "dev:remote": "wrangler dev --remote",
-    "deploy": "wrangler deploy",
+    "deploy": "wrangler deploy --keep-vars",
     "check-types": "cd ../.. && node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit && node_modules/.bin/tsc -p apps/api/test/tsconfig.json --noEmit",
     "test": "vitest run test",
     "test:integration": "vitest run test/http.integration.test.ts",
