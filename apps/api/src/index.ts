@@ -1,4 +1,9 @@
-import { env as workerEnv } from "cloudflare:workers";
+import {
+  WorkflowEntrypoint,
+  type WorkflowEvent,
+  type WorkflowStep,
+  env as workerEnv,
+} from "cloudflare:workers";
 import {
   ContextSchema,
   CreateMemorySchema,
@@ -34,8 +39,41 @@ import {
   type RateLimitResult,
 } from "./operational-controls";
 import { indexMemory, semanticSearch } from "./semantic-index";
+import {
+  getGraphForTenant,
+  ingestSourceDocument,
+  processSourceIngestionMessage,
+  type SourceIngestionMessage,
+} from "./source-ingestion";
 
 export { MemoryGraph };
+
+export class SourceIngestionWorkflow extends WorkflowEntrypoint<
+  Env,
+  SourceIngestionMessage
+> {
+  async run(
+    event: Readonly<WorkflowEvent<SourceIngestionMessage>>,
+    step: WorkflowStep,
+  ) {
+    return step.do(
+      "ingest source document",
+      { retries: { limit: 3, delay: "10 seconds", backoff: "exponential" } },
+      async () => {
+        const result = await processSourceIngestionMessage(
+          this.env,
+          event.payload,
+        );
+        return {
+          sourceId: result.sourceId,
+          chunkCount: result.chunkCount,
+          memoryIds: result.memories.map((memory) => memory.id),
+          edgeCount: result.edges.length,
+        };
+      },
+    );
+  }
+}
 
 const env = workerEnv as unknown as Env;
 
@@ -262,80 +300,78 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         ...body,
       });
       const sourceId = createSourceId();
-      const chunks = chunkSourceContent(input.content, {
-        chunkSize: input.chunkSize,
-        overlap: input.overlap,
-      });
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
-      const memories = [];
-      const edges = [];
-
-      for (const chunk of chunks) {
-        const memory = await graph.createMemory(
-          CreateMemorySchema.parse(
-            enrichMemoryInput({
-              content: chunk.content,
-              source: input.source,
-              tags: input.tags,
-              metadata: {
-                ...input.metadata,
-                sourceId,
-                title: input.title,
-                chunkIndex: chunk.index,
-                chunkCount: chunks.length,
-                chunkStart: chunk.start,
-                chunkEnd: chunk.end,
-                ingestion: {
-                  strategy: "chunked-source-v1",
-                  chunkSize: input.chunkSize,
-                  overlap: input.overlap,
-                },
-              },
-              type: "insight",
-            }),
-          ),
-        );
-        await indexMemory(env, tenantId, memory);
-        memories.push(memory);
-        edges.push(...(await graph.linkRelatedMemories(memory.id)));
-
-        const previous = memories.at(-2);
-        if (previous) {
-          edges.push(
-            await graph.addEdge({
-              sourceId: previous.id,
-              targetId: memory.id,
-              relationship: "next_chunk",
-              weight: 0.9,
-              metadata: {
-                sourceId,
-                createdBy: "ingestSource",
-              },
-            }),
-          );
-          edges.push(
-            await graph.addEdge({
-              sourceId: memory.id,
-              targetId: previous.id,
-              relationship: "previous_chunk",
-              weight: 0.9,
-              metadata: {
-                sourceId,
-                createdBy: "ingestSource",
-              },
-            }),
-          );
-        }
-      }
-
-      return status(201, {
-        sourceId,
-        chunkCount: memories.length,
-        memories,
-        edges,
-      });
+      return status(
+        201,
+        await ingestSourceDocument({
+          env,
+          graph,
+          input,
+          sourceId,
+          tenantId,
+        }),
+      );
     },
     { body: sourceBody },
+  )
+  .post(
+    "/v1/sources/async",
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+      if (!env.SOURCE_INGESTION_QUEUE) {
+        return status(503, {
+          error: "source_ingestion_queue_unavailable" as const,
+        });
+      }
+
+      const input = IngestSourceSchema.parse({
+        source: "document",
+        tags: [],
+        metadata: {},
+        ...body,
+      });
+      const sourceId = createSourceId();
+      const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+      const job = await graph.createIngestionJob({
+        sourceId,
+        input,
+        metadata: {
+          strategy: "queue-workflow-source-ingestion-v1",
+          queue: "openmemory-source-ingestion",
+        },
+      });
+      await env.SOURCE_INGESTION_QUEUE.send(
+        {
+          version: 1,
+          sourceId,
+          tenantId,
+          input,
+          requestedAt: job.createdAt,
+        },
+        { contentType: "json" },
+      );
+
+      return status(202, job);
+    },
+    { body: sourceBody },
+  )
+  .get(
+    "/v1/sources/:sourceId",
+    async ({ headers, params, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+
+      const job = await graph.getIngestionJob(params.sourceId);
+      if (!job) {
+        return status(404, { error: "not_found" as const });
+      }
+      return job;
+    },
   )
   .get("/v1/memories", async ({ headers, query, request, status }) => {
     const { tenant, graph } = await withTenant(request, headers);
@@ -550,7 +586,78 @@ export default {
   fetch(request: Request, requestEnv: Env, ctx: ExecutionContext) {
     return handleWorkerFetch(request, requestEnv, ctx);
   },
+  queue(batch: MessageBatch<unknown>, requestEnv: Env) {
+    return handleSourceIngestionQueue(batch, requestEnv);
+  },
 } satisfies ExportedHandler<Env>;
+
+export async function handleSourceIngestionQueue(
+  batch: MessageBatch<unknown>,
+  requestEnv: Env,
+) {
+  for (const message of batch.messages) {
+    try {
+      const body = parseSourceIngestionMessage(message.body);
+      if (requestEnv.SOURCE_INGESTION_WORKFLOW) {
+        await startSourceIngestionWorkflow(requestEnv, body);
+      } else {
+        await processSourceIngestionMessage(requestEnv, body);
+      }
+      message.ack();
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "openmemory.source_ingestion_error",
+          sourceId: isRecord(message.body) ? message.body.sourceId : undefined,
+          message: error instanceof Error ? error.message : "unknown error",
+        }),
+      );
+      message.retry({ delaySeconds: Math.min(300, 10 * message.attempts) });
+    }
+  }
+}
+
+function parseSourceIngestionMessage(value: unknown): SourceIngestionMessage {
+  if (!isRecord(value)) {
+    throw new Error("Invalid source ingestion queue message.");
+  }
+  return {
+    version: 1,
+    sourceId: String(value.sourceId),
+    tenantId: String(value.tenantId),
+    input: IngestSourceSchema.parse(value.input),
+    requestedAt:
+      typeof value.requestedAt === "string"
+        ? value.requestedAt
+        : new Date().toISOString(),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+async function startSourceIngestionWorkflow(
+  requestEnv: Env,
+  message: SourceIngestionMessage,
+) {
+  const graph = getGraphForTenant(requestEnv, message.tenantId);
+  await graph.startIngestionJob(message.sourceId);
+  try {
+    await requestEnv.SOURCE_INGESTION_WORKFLOW?.create({
+      id: message.sourceId.slice(0, 100),
+      params: message,
+      retention: {
+        successRetention: "7 days",
+        errorRetention: "14 days",
+      },
+    });
+  } catch (error) {
+    if (!String(error).toLowerCase().includes("already")) {
+      throw error;
+    }
+  }
+}
 
 async function handleWorkerFetch(
   request: Request,
@@ -654,64 +761,6 @@ function corsHeaders(request: Request) {
     "access-control-allow-origin": origin,
     vary: "Origin",
   });
-}
-
-function chunkSourceContent(
-  content: string,
-  options: { chunkSize: number; overlap: number },
-) {
-  const normalized = content.replace(/\s+/g, " ").trim();
-  if (normalized.length <= options.chunkSize) {
-    return [
-      {
-        content: normalized,
-        index: 0,
-        start: 0,
-        end: normalized.length,
-      },
-    ];
-  }
-
-  const chunks: Array<{
-    content: string;
-    index: number;
-    start: number;
-    end: number;
-  }> = [];
-  const step = Math.max(1, options.chunkSize - options.overlap);
-  let start = 0;
-
-  while (start < normalized.length) {
-    const hardEnd = Math.min(start + options.chunkSize, normalized.length);
-    const end =
-      hardEnd === normalized.length
-        ? hardEnd
-        : findChunkBoundary(normalized, start, hardEnd);
-    chunks.push({
-      content: normalized.slice(start, end).trim(),
-      index: chunks.length,
-      start,
-      end,
-    });
-
-    if (end === normalized.length) {
-      break;
-    }
-
-    start = Math.max(end - options.overlap, start + step);
-  }
-
-  return chunks.filter((chunk) => chunk.content.length > 0);
-}
-
-function findChunkBoundary(content: string, start: number, hardEnd: number) {
-  const minEnd = start + Math.floor((hardEnd - start) * 0.65);
-  const candidate = Math.max(
-    content.lastIndexOf(". ", hardEnd),
-    content.lastIndexOf("\n", hardEnd),
-    content.lastIndexOf(" ", hardEnd),
-  );
-  return candidate > minEnd ? candidate + 1 : hardEnd;
 }
 
 const PAGE_STYLE = `

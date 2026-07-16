@@ -774,6 +774,74 @@ test("source ingestion chunks documents, preserves provenance, and links chunk g
   ).toBe(true);
 }, 45_000);
 
+test("async source ingestion queues a durable job and completes the graph pipeline", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-async-source-${crypto.randomUUID()}`;
+  const anchor = await createMemory(worker, tenant, {
+    content: "Boris maintains Graph Indexing for async OpenMemory retrieval.",
+    tags: ["architecture"],
+  });
+
+  const queued = await getJson<SourceIngestJobResponse>(
+    await worker.fetch("/v1/sources/async", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenant),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        title: "Async source notes",
+        source: "async-architecture-doc",
+        tags: ["docs", "async"],
+        chunkSize: 450,
+        overlap: 80,
+        content: [
+          "Graph Indexing connects queued source chunks with existing memories.",
+          "Cloudflare Queues accepts the ingestion request before heavier chunking and embedding work starts.",
+          "Cloudflare Workflows coordinates the durable processing step so retries do not lose source provenance.",
+          "Boris should be discoverable through graph expansion after the async source job completes.",
+        ].join(" "),
+      }),
+    }),
+  );
+
+  expect(queued.sourceId).toMatch(/^src_/);
+  expect(queued.status).toBe("queued");
+  expect(queued.metadata).toMatchObject({
+    strategy: "queue-workflow-source-ingestion-v1",
+  });
+
+  const completed = await waitForSourceJob(worker, tenant, queued.sourceId);
+  expect(completed.status).toBe("completed");
+  expect(completed.result).toMatchObject({
+    sourceId: queued.sourceId,
+  });
+  expect(completed.result?.chunkCount).toBeGreaterThan(0);
+  expect(completed.result?.memoryIds.length).toBe(completed.result?.chunkCount);
+
+  const neighbors = await getJson<EdgeResponse[]>(
+    await worker.fetch(`/v1/graph/${anchor.id}/neighbors`, {
+      headers: tenantHeaders(tenant),
+    }),
+  );
+  expect(neighbors).toContainEqual(
+    expect.objectContaining({
+      targetId: anchor.id,
+      relationship: "shares_entity",
+    }),
+  );
+
+  const results = await search(worker, tenant, {
+    q: "queued durable workflows source provenance",
+    limit: 5,
+  });
+  expect(
+    results.some((result) => result.metadata.sourceId === queued.sourceId),
+  ).toBe(true);
+}, 60_000);
+
 test("recall benchmark preserves ranking quality across direct and graph retrieval", async () => {
   const worker = await startWorker();
   workers.push(worker);
@@ -1090,6 +1158,38 @@ async function search(
   );
 }
 
+async function waitForSourceJob(
+  worker: WorkerProcess,
+  tenantId: string,
+  sourceId: string,
+) {
+  const startedAt = Date.now();
+  let latest: SourceIngestJobResponse | undefined;
+
+  while (Date.now() - startedAt < 30_000) {
+    latest = await getJson<SourceIngestJobResponse>(
+      await worker.fetch(`/v1/sources/${sourceId}`, {
+        headers: tenantHeaders(tenantId),
+      }),
+    );
+
+    if (latest.status === "completed") {
+      return latest;
+    }
+    if (latest.status === "failed") {
+      throw new Error(
+        `Async source ingestion failed: ${JSON.stringify(latest)}`,
+      );
+    }
+
+    await sleep(500);
+  }
+
+  throw new Error(
+    `Timed out waiting for source ingestion job: ${JSON.stringify(latest)}`,
+  );
+}
+
 function tenantHeaders(tenantId: string) {
   return { "x-openmemory-user-id": tenantId };
 }
@@ -1368,6 +1468,19 @@ type SourceIngestResponse = {
   chunkCount: number;
   memories: MemoryResponse[];
   edges: EdgeResponse[];
+};
+
+type SourceIngestJobResponse = {
+  sourceId: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  metadata: Record<string, unknown>;
+  result?: {
+    sourceId: string;
+    chunkCount: number;
+    memoryIds: string[];
+    edgeCount: number;
+  };
+  error?: Record<string, unknown>;
 };
 
 type GraphStatsResponse = {

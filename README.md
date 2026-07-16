@@ -10,9 +10,10 @@ Vectorize and Workers AI for semantic recall, R2 for exports, and Cloudflare's
 MCP runtime for tool access.
 
 > Status: alpha. The core memory API, graph store, OAuth-backed MCP endpoint,
-> recall flow, exports, repair path, dashboard, and local integration suite are
-> working. The product UI, async extraction pipeline, named external MCP client
-> dogfooding, and production telemetry are still active roadmap items.
+> recall flow, source ingestion, async ingestion jobs, exports, repair path,
+> dashboard, and local integration suite are working. The product UI, entity
+> extraction workers, named external MCP client dogfooding, and production
+> telemetry are still active roadmap items.
 
 ## Why OpenMemory
 
@@ -34,6 +35,8 @@ to provide the infrastructure layer behind a more portable experience:
 - Memory create, read, update, soft-forget, search, profile, context, graph
   neighbors, graph stats, source ingestion, R2 export, and Vectorize repair APIs.
 - Chunked source/document ingestion with source and chunk provenance.
+- Async source ingestion jobs backed by Cloudflare Queues, Workflows, and the
+  tenant Durable Object job ledger.
 - Deterministic recall reranking that combines retrieval score, reason,
   confidence, importance, recency, and currentness.
 - Optional semantic candidate retrieval through Workers AI embeddings and
@@ -69,7 +72,8 @@ Runtime services:
 - **Vectorize + Workers AI**: embedding generation and semantic retrieval.
 - **R2**: tenant graph exports and backup artifacts.
 - **Cloudflare Agents MCP**: streamable HTTP MCP surface.
-- **Queues/Workflows**: planned async ingestion and extraction pipeline.
+- **Queues + Workflows**: async source ingestion request buffering and durable
+  processing.
 
 The default deployment shape is intentionally monolithic: API routes, Better
 Auth, hosted dashboard, and `/mcp` ship as one Worker. MCP uses Cloudflare
@@ -132,6 +136,8 @@ Useful endpoints:
 - `POST /v1/context`
 - `POST /v1/ingest`
 - `POST /v1/sources`
+- `POST /v1/sources/async`
+- `GET /v1/sources/:sourceId`
 - `GET /v1/profile`
 - `GET /v1/graph/stats`
 - `GET /v1/graph/:id/neighbors`
@@ -209,8 +215,8 @@ bun run test:e2e:local
 The local integration suite starts real Wrangler Workers on randomized
 non-default ports, applies D1 migrations into isolated local persistence, and
 exercises Durable Objects, D1 auth storage, Better Auth sessions, OAuth
-metadata, MCP, graph edges, recall, source ingestion, exports, index repair, and
-the dashboard API.
+metadata, MCP, graph edges, recall, sync and async source ingestion, Queues,
+Workflows, exports, index repair, and the dashboard API.
 
 The local browser E2E suite starts the API and TanStack Start app on explicit
 non-default ports and exercises the dashboard, charts, memory table, source
@@ -241,7 +247,6 @@ Current priorities:
   while API and MCP integrations remain the primary product surfaces.
 - Expand charts and the knowledge map for graph health, recall quality, index
   freshness, and MCP usage.
-- Move source/document ingestion to Queues and Workflows.
 - Add entity and relationship extraction workers.
 - Expand recall quality benchmarks with larger MemoryBench-style fixtures.
 - Add larger graph performance benchmarks and production telemetry.

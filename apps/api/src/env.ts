@@ -1,10 +1,12 @@
 import type {
   Ai,
   D1Database,
+  Queue,
   R2Bucket,
   VectorizeIndex,
 } from "@cloudflare/workers-types";
 import type { MemoryGraph } from "./memory-graph";
+import type { SourceIngestionMessage } from "./source-ingestion";
 
 export type Env = {
   MEMORY_GRAPHS: MemoryGraphNamespace;
@@ -12,6 +14,8 @@ export type Env = {
   MEMORY_VECTORS?: VectorizeIndex;
   AI?: Ai;
   MEMORY_EXPORTS?: R2Bucket;
+  SOURCE_INGESTION_QUEUE?: Queue<SourceIngestionMessage>;
+  SOURCE_INGESTION_WORKFLOW?: WorkflowBinding<SourceIngestionMessage>;
   EMBEDDING_MODEL: string;
   OPENMEMORY_API_TOKEN?: string;
   OPENMEMORY_RATE_LIMIT_ENABLED?: string;
@@ -30,3 +34,14 @@ type MemoryGraphNamespace = {
 };
 
 type MemoryGraphId = unknown;
+
+type WorkflowBinding<T> = {
+  create(options?: {
+    id?: string;
+    params?: T;
+    retention?: {
+      successRetention?: string;
+      errorRetention?: string;
+    };
+  }): Promise<unknown>;
+};

@@ -35,6 +35,30 @@
       "bucket_name": "openmemory-exports"
     }
   ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "SOURCE_INGESTION_QUEUE",
+        "queue": "openmemory-source-ingestion"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "openmemory-source-ingestion",
+        "max_batch_size": 4,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "openmemory-source-ingestion-dlq"
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "binding": "SOURCE_INGESTION_WORKFLOW",
+      "name": "openmemory-source-ingestion",
+      "class_name": "SourceIngestionWorkflow"
+    }
+  ],
   "vars": {
     "EMBEDDING_MODEL": "@cf/baai/bge-small-en-v1.5"
   },
