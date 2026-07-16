@@ -42,6 +42,7 @@ The script creates:
 - D1 database bound as `AUTH_DB`
 - Vectorize index bound as `MEMORY_VECTORS`
 - R2 bucket bound as `MEMORY_EXPORTS`
+- Workers Analytics Engine dataset bound as `OPENMEMORY_ANALYTICS`
 - Queue producer/consumer resources for async source ingestion and memory
   extraction
 - Dead-letter queues for failed source ingestion and memory extraction messages

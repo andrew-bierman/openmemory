@@ -35,6 +35,12 @@
       "bucket_name": "openmemory-exports"
     }
   ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "OPENMEMORY_ANALYTICS",
+      "dataset": "openmemory_events"
+    }
+  ],
   "queues": {
     "producers": [
       {

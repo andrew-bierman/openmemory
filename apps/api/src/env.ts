@@ -15,6 +15,7 @@ export type Env = {
   MEMORY_VECTORS?: VectorizeIndex;
   AI?: Ai;
   MEMORY_EXPORTS?: R2Bucket;
+  OPENMEMORY_ANALYTICS?: AnalyticsEngineBinding;
   MEMORY_EXTRACTION_QUEUE?: Queue<MemoryExtractionMessage>;
   MEMORY_EXTRACTION_WORKFLOW?: WorkflowBinding<MemoryExtractionMessage>;
   SOURCE_INGESTION_QUEUE?: Queue<SourceIngestionMessage>;
@@ -37,6 +38,14 @@ type MemoryGraphNamespace = {
 };
 
 type MemoryGraphId = unknown;
+
+type AnalyticsEngineBinding = {
+  writeDataPoint(event?: {
+    blobs?: Array<ArrayBuffer | string | null>;
+    doubles?: number[];
+    indexes?: Array<ArrayBuffer | string | null>;
+  }): void;
+};
 
 type WorkflowBinding<T> = {
   create(options?: {

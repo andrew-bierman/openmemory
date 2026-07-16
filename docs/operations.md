@@ -136,6 +136,10 @@ Create saved Cloudflare log queries or dashboard filters for:
 - stuck source ingestion jobs where `GET /v1/sources/:sourceId` remains
   `queued` or `processing` beyond the expected document size window
 
+Saved Workers Analytics Engine SQL lives in
+[observability-queries.sql](observability-queries.sql), and the broader
+observability setup is documented in [observability.md](observability.md).
+
 Healthy signals:
 
 - `/health` returns 200 and includes `x-openmemory-request-id`
@@ -162,6 +166,10 @@ Create alerts before broader public launch for:
 - sustained 401/403 spikes on OAuth or MCP routes
 - live smoke failure after deploy
 - missing Cloudflare binding or startup/deploy failures
+
+The `Live Smoke` GitHub Actions workflow runs hourly and should be treated as
+the default alpha alert path. Add Cloudflare Notifications or external paging
+before a higher-volume launch.
 
 Suggested first thresholds:
 

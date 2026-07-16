@@ -11,8 +11,8 @@ adopters who are comfortable with Cloudflare Workers, Durable Objects, D1,
 Vectorize, Workers AI, R2, OAuth, and MCP.
 
 It is not yet a broad self-serve SaaS launch. The backend is functional and
-well covered; the companion UI, larger benchmarks, and production observability
-still need work before a larger public push.
+well covered; the companion UI, larger benchmarks, and higher-volume production
+operations still need work before a larger public push.
 
 ## Proven Today
 
@@ -31,6 +31,10 @@ still need work before a larger public push.
 - The official MCP TypeScript SDK client is dogfooded in CI, and named
   interactive MCP clients are documented for manual OAuth testing.
 - Operational headers and request IDs are live on `/health`.
+- Workers Analytics Engine receives request, error, rate-limit, and async
+  worker telemetry when deployed with the `OPENMEMORY_ANALYTICS` binding.
+- Saved Workers Analytics Engine SQL queries and hourly live-smoke alerting
+  cover the alpha operations baseline.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
 
@@ -80,9 +84,9 @@ still need work before a larger public push.
 - [x] Live smoke workflow exists.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
-- [ ] Log dashboard or saved queries exist for `openmemory.request`,
+- [x] Log dashboard or saved queries exist for `openmemory.request`,
   `openmemory.request_error`, 429s, and 5xxs.
-- [ ] Alerting exists for sustained errors, missing bindings, or auth failures.
+- [x] Alerting exists for sustained errors, missing bindings, or auth failures.
 - [x] GitHub secret scanning or an equivalent secret-detection control is
   enabled for public contributions.
 - [x] Documented rollback procedure includes Worker version rollback and D1
