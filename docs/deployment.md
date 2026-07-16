@@ -42,8 +42,9 @@ The script creates:
 - D1 database bound as `AUTH_DB`
 - Vectorize index bound as `MEMORY_VECTORS`
 - R2 bucket bound as `MEMORY_EXPORTS`
-- Queue producer/consumer resources for async source ingestion
-- Dead-letter queue for failed source ingestion messages
+- Queue producer/consumer resources for async source ingestion and memory
+  extraction
+- Dead-letter queues for failed source ingestion and memory extraction messages
 - Remote D1 migrations
 
 The Worker already has Durable Object migrations and the

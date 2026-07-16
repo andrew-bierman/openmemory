@@ -13,6 +13,7 @@ import {
   SearchSchema,
   UpdateMemorySchema,
 } from "@openmemory/core";
+import type { ExtractedRelationship } from "./memory-signals";
 import type { RateLimitResult } from "./operational-controls";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -32,6 +33,12 @@ type IngestionJobInput = {
   sourceId: string;
   input: unknown;
   metadata?: Record<string, unknown>;
+};
+
+type ExtractedSignalsInput = {
+  entityIds: string[];
+  relationships: ExtractedRelationship[];
+  tags: string[];
 };
 
 type MemoryGraphEnv = Record<string, unknown>;
@@ -196,6 +203,57 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       )
       .toArray()[0];
     return row ? rowToIngestionJob(row) : undefined;
+  }
+
+  async applyExtractedSignals(id: string, input: ExtractedSignalsInput) {
+    const memory = this.getMemoryById(id);
+    if (!memory || memory.status === "forgotten") {
+      return {
+        applied: false,
+        edges: [],
+        memory: undefined,
+      };
+    }
+
+    const entityIds = mergeUnique([...memory.entityIds, ...input.entityIds]);
+    const tags = mergeUnique([...memory.tags, ...input.tags]);
+    const metadata = {
+      ...memory.metadata,
+      extraction: {
+        ...(isRecord(memory.metadata.extraction)
+          ? memory.metadata.extraction
+          : {}),
+        strategy: "deterministic-worker-v1",
+        entityIds: input.entityIds,
+        relationships: input.relationships,
+        tags: input.tags,
+      },
+    };
+    const now = new Date().toISOString();
+
+    this.sqlState.storage.sql.exec(
+      `update memories
+       set tags_json = ?, metadata_json = ?, entity_ids_json = ?, updated_at = ?
+       where id = ?`,
+      JSON.stringify(tags),
+      JSON.stringify(metadata),
+      JSON.stringify(entityIds),
+      now,
+      id,
+    );
+    this.upsertTags(id, tags);
+    this.upsertEntities(id, entityIds);
+
+    const edges = [
+      ...(await this.linkRelatedMemories(id)),
+      ...(await this.linkExtractedRelationships(id, input.relationships)),
+    ];
+
+    return {
+      applied: true,
+      edges,
+      memory: this.getMemoryById(id),
+    };
   }
 
   private get sqlState(): SqlState {
@@ -594,6 +652,48 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       );
     }
 
+    return edges;
+  }
+
+  private async linkExtractedRelationships(
+    id: string,
+    relationships: ExtractedRelationship[],
+  ) {
+    const edges = [];
+    for (const relationship of relationships) {
+      const rows = this.sqlState.storage.sql
+        .exec<MemoryRow>(
+          `select distinct m.* from memories m
+           join memory_entities e on e.memory_id = m.id
+           where e.entity_id = ?
+             and m.id != ?
+             and m.status = 'active'
+             and m.is_latest = 1
+           order by m.importance desc, m.updated_at desc
+           limit 8`,
+          relationship.targetEntityId,
+          id,
+        )
+        .toArray();
+
+      for (const related of rows.map(rowToMemory)) {
+        edges.push(
+          await this.addEdge({
+            sourceId: id,
+            targetId: related.id,
+            relationship: relationship.relationship,
+            weight: 0.72,
+            metadata: {
+              createdBy: "applyExtractedSignals",
+              source: relationship.source,
+              sourceEntityId: relationship.sourceEntityId,
+              target: relationship.target,
+              targetEntityId: relationship.targetEntityId,
+            },
+          }),
+        );
+      }
+    }
     return edges;
   }
 
@@ -1088,6 +1188,10 @@ function parseJson<T>(value: string, fallback: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function mergeUnique(values: string[]) {
+  return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
 function addColumn(

@@ -290,7 +290,11 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   const neighborInspectButtons = page
     .getByLabel("Graph neighbor relationships")
     .getByRole("button", { name: "Inspect" });
-  await expect(neighborInspectButtons).toHaveCount(2);
+  await expect
+    .poll(() => neighborInspectButtons.count(), {
+      message: "expected graph neighbor inspect controls",
+    })
+    .toBeGreaterThanOrEqual(2);
   await expect(neighborInspectButtons.first()).toBeVisible();
 
   await page
