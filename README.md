@@ -12,8 +12,10 @@ MCP runtime for tool access.
 > Status: alpha. The core memory API, graph store, OAuth-backed MCP endpoint,
 > recall flow, source ingestion, async ingestion jobs, exports, repair path,
 > dashboard, extraction workers, and local integration suite are working. The
-> product UI, named external MCP client dogfooding, and production telemetry are
-> still active roadmap items.
+> hosted profile/onboarding UI, named MCP request-profile dogfooding, larger
+> recall benchmarks, and production telemetry are working. Manual external
+> OAuth callback dogfooding and higher-volume operations remain active roadmap
+> items.
 
 ## Why OpenMemory
 
@@ -51,8 +53,9 @@ to provide the infrastructure layer behind a more portable experience:
 - Authenticated OAuth/MCP connection listing and revocation.
 - Worker-hosted dashboard for capture, recall, forgetting, and local inspection.
 - TanStack Start web app with a polished hosted-dashboard direction, shared
-  shadcn-style UI package, memory health metrics, charts, and an Obsidian-style
-  knowledge map.
+  shadcn-style UI package, hosted profile editing, onboarding empty states,
+  memory health metrics, charts, graph operations signals, and an
+  Obsidian-style knowledge map.
 - Wrangler-backed integration tests and optional Docker reproduction.
 
 ## Architecture
@@ -207,8 +210,9 @@ compatibility dependency. OpenMemory's ORM path is Drizzle.
 ## Testing
 
 OpenMemory follows the testing trophy: targeted unit coverage, heavier
-integration coverage around runtime boundaries, named MCP client smoke, and
-end-to-end browser/API smoke for the deployed product.
+integration coverage around runtime boundaries, MemoryBench-style recall and
+graph-scale benchmarks, named MCP client request-profile smoke, and end-to-end
+browser/API smoke for the deployed product.
 
 ```sh
 bun run check

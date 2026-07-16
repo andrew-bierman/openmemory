@@ -13,6 +13,31 @@ const testTmpRoot = existsSync("/Volumes/CrucialX10")
   ? externalTmpRoot
   : join(tmpdir(), "openmemory-mcp-sdk-smoke");
 
+const CLIENT_PROFILES = [
+  {
+    name: "official-typescript-sdk",
+    headers: {},
+  },
+  {
+    name: "mcp-inspector-config-shape",
+    headers: {
+      "user-agent": "MCP-Inspector/OpenMemory-Smoke",
+    },
+  },
+  {
+    name: "cursor-remote-mcp-config-shape",
+    headers: {
+      "user-agent": "Cursor/OpenMemory-Smoke",
+    },
+  },
+  {
+    name: "claude-remote-mcp-config-shape",
+    headers: {
+      "user-agent": "Claude-MCP/OpenMemory-Smoke",
+    },
+  },
+] as const;
+
 const port = await getAvailablePort();
 const persistTo = join(testTmpRoot, crypto.randomUUID());
 await mkdir(persistTo, { recursive: true });
@@ -49,27 +74,33 @@ collectOutput(worker.stderr, output);
 try {
   const baseUrl = `http://127.0.0.1:${port}`;
   await waitForHealth(baseUrl, worker, output);
-  await runSdkSmoke(baseUrl);
+  for (const profile of CLIENT_PROFILES) {
+    await runSdkSmoke(baseUrl, profile);
+  }
 } finally {
   worker.kill();
   await waitForExit(worker);
   await rm(persistTo, { force: true, recursive: true });
 }
 
-async function runSdkSmoke(baseUrl: string) {
-  const tenantId = `mcp-sdk-${crypto.randomUUID()}`;
+async function runSdkSmoke(
+  baseUrl: string,
+  profile: (typeof CLIENT_PROFILES)[number],
+) {
+  const tenantId = `mcp-sdk-${profile.name}-${crypto.randomUUID()}`;
   const transport = new StreamableHTTPClientTransport(
     new URL(`${baseUrl}/mcp`),
     {
       requestInit: {
         headers: {
+          ...profile.headers,
           "x-openmemory-user-id": tenantId,
         },
       },
     },
   );
   const client = new Client({
-    name: "openmemory-mcp-sdk-smoke",
+    name: `openmemory-${profile.name}`,
     version: "0.1.0",
   });
 

@@ -10,9 +10,10 @@ OpenMemory is ready for an alpha open-source release aimed at technical early
 adopters who are comfortable with Cloudflare Workers, Durable Objects, D1,
 Vectorize, Workers AI, R2, OAuth, and MCP.
 
-It is not yet a broad self-serve SaaS launch. The backend is functional and
-well covered; the companion UI, larger benchmarks, and higher-volume production
-operations still need work before a larger public push.
+It is not yet a broad self-serve SaaS launch. The backend, companion UI, larger
+benchmarks, and alpha telemetry are covered; higher-volume production
+operations and full external OAuth callback dogfooding still need work before a
+larger hosted push.
 
 ## Proven Today
 
@@ -29,12 +30,13 @@ operations still need work before a larger public push.
 - Entity and relationship extraction workers are covered by local Wrangler
   integration with Queues and Workflows.
 - The official MCP TypeScript SDK client is dogfooded in CI, and named
-  interactive MCP clients are documented for manual OAuth testing.
+  Inspector, Cursor, and Claude-style request profiles are smoke-tested and
+  documented.
 - Operational headers and request IDs are live on `/health`.
 - Workers Analytics Engine receives request, error, rate-limit, and async
   worker telemetry when deployed with the `OPENMEMORY_ANALYTICS` binding.
-- Saved Workers Analytics Engine SQL queries and hourly live-smoke alerting
-  cover the alpha operations baseline.
+- Saved Workers Analytics Engine SQL queries, graph/RAG performance queries,
+  and hourly live-smoke alerting cover the alpha operations baseline.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
 - Public launch copy and first-feedback triage guidance are written in
@@ -65,8 +67,9 @@ operations still need work before a larger public push.
 - [x] Better Auth session and OAuth flows covered by local and live tests.
 - [x] MCP endpoint exposes `remember`, `recall`, `profile`, and `forget`.
 - [x] Graph memory CRUD, recall, source chunks, exports, and repair paths work.
-- [x] Hosted dashboard has capture, recall, table, charts, graph explorer, MCP
-  setup, and admin settings.
+- [x] Hosted dashboard has capture, recall, table, charts, graph explorer, graph
+  operations signals, MCP setup, onboarding, profile editing, and admin
+  settings.
 - [x] First-party hosted web app has fully polished authenticated navigation,
   account settings, and team/tenant management.
 - [x] MCP protocol compatibility matrix is tested and documented.

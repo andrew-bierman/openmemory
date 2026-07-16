@@ -44,6 +44,48 @@ describe("OpenMemory client", () => {
       status: 401,
     });
   });
+
+  test("updates account profile through the typed RPC surface", async () => {
+    const requests: Array<{ url: string; method: string; body: unknown }> = [];
+    const api = createOpenMemoryClient("https://api.openmemory.test", {
+      fetch: fakeFetch(async (input, init) => {
+        const request = new Request(input, init);
+        requests.push({
+          url: request.url,
+          method: request.method,
+          body: await request.json(),
+        });
+
+        return Response.json({
+          user: {
+            id: "usr_1",
+            email: "owner@example.com",
+            name: "Research Lead",
+          },
+          workspace: {
+            id: "wrk_1",
+            name: "Research",
+            tenantId: "usr_1",
+            ownerUserId: "usr_1",
+            createdAt: "2026-07-01T00:00:00.000Z",
+            updatedAt: "2026-07-01T00:00:00.000Z",
+          },
+          members: [],
+        });
+      }),
+    });
+
+    const account = await api.updateAccountProfile("Research Lead");
+
+    expect(account.user.name).toBe("Research Lead");
+    expect(requests).toEqual([
+      {
+        url: "https://api.openmemory.test/v1/account/profile",
+        method: "PATCH",
+        body: { name: "Research Lead" },
+      },
+    ]);
+  });
 });
 
 function fakeFetch(

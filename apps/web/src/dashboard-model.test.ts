@@ -4,6 +4,7 @@ import {
   getActivitySummary,
   getDashboardMetrics,
   getGraphHealthSummary,
+  getGraphOperationsSummary,
   getIndexReadinessSummary,
   getKnowledgeMap,
   getLifecycleDistribution,
@@ -150,6 +151,27 @@ describe("dashboard model", () => {
     ).toEqual({
       relationshipDiversity: 60,
       status: "Typed graph",
+    });
+  });
+
+  test("summarizes graph operations pressure for dashboard review", () => {
+    expect(
+      getGraphOperationsSummary({
+        activeMemories: 240,
+        totalMemories: 260,
+        totalEdges: 720,
+        relationshipCount: 6,
+        entityCount: 220,
+        tagCount: 30,
+        oauthConnections: 2,
+        recalledMemories: 230,
+      }),
+    ).toEqual({
+      averageDegree: 3,
+      benchmarkSize: 240,
+      relationshipTypes: 6,
+      status: "Benchmark ready",
+      traversalBudget: "large fixture",
     });
   });
 

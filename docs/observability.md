@@ -9,6 +9,7 @@ write after the binding is defined in Wrangler. See
 [observability-queries.sql](observability-queries.sql) for saved SQL covering:
 
 - request volume and latency by route
+- graph/RAG route p95 latency and slow-request investigation
 - `openmemory.request_error`
 - 5xx responses by route
 - 429/rate-limit pressure
@@ -30,6 +31,8 @@ saved queries:
 
 - alert on any sustained `openmemory.request_error`
 - alert when 5xx responses exceed 2% for 5 minutes
+- alert when `/v1/search`, `/v1/context`, `/v1/graph/stats`, `/v1/sources`,
+  or `/mcp` p95 latency exceeds 2s for 10 minutes
 - alert when 429 responses exceed 5% for 10 minutes
 - alert on any sustained source ingestion or memory extraction worker failure
 

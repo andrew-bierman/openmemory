@@ -34,7 +34,7 @@
   - Worker secrets for `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL`
 - The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
 - Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
-- `apps/web` now has a polished hosted-dashboard direction with memory health metrics, capture cadence charts, memory-type distribution, admin settings, MCP setup, and a library-backed Obsidian-style knowledge map over graph-shaped memory data.
+- `apps/web` now has a polished hosted-dashboard direction with memory health metrics, capture cadence charts, memory-type distribution, hosted profile editing, onboarding empty states, admin settings, MCP setup, graph operations signals, and a library-backed Obsidian-style knowledge map over graph-shaped memory data.
 - Opt-in production API E2E covers hosted UI response, Better Auth session, graph recall, OAuth PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh, recall, and forget.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
@@ -48,7 +48,8 @@
 - Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
 - `bun run test:mcp:sdk` dogfoods the MCP endpoint through the official
-  TypeScript SDK `StreamableHTTPClientTransport`.
+  TypeScript SDK `StreamableHTTPClientTransport` across named request profiles
+  for the official SDK, MCP Inspector, Cursor, and Claude-style clients.
 - Workers Analytics Engine captures `openmemory.request`,
   `openmemory.request_error`, rate-limit, 5xx, and async worker failure events,
   with saved SQL in `docs/observability-queries.sql`.
@@ -61,22 +62,26 @@
 - The TanStack admin panel can sign in, rename a hosted workspace, invite or
   remove workspace members, manage runtime settings, and revoke MCP OAuth
   grants.
-- Local recall benchmark coverage includes multiple golden cases across people, decisions, preferences, source chunks, graph expansion, and distractors.
+- Local recall benchmark coverage includes larger MemoryBench-style golden cases across people, decisions, preferences, source chunks, graph expansion, operations, MCP, UI, and distractors.
+- Local graph performance coverage exercises a 220-memory tenant graph, and the
+  dashboard exposes graph operations status from active node and edge density
+  signals.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 
 ## Not Fully Solved Yet
 
-- Browser auth and dashboard need deeper product polish:
+- Browser auth and dashboard need deeper production polish:
   - deployed API routes reject header tenant mode by design
   - local development still supports tenant headers for tests and fast iteration
-  - the TanStack app now has real account and team management, but still needs
-    deeper hosted navigation polish and profile-editing niceties
+  - the TanStack app now has real account, profile editing, onboarding, and team
+    management, but still needs broader hosted user feedback on navigation
 - RAG quality is still basic:
   - no LLM/ML reranker
-- recall benchmark coverage has useful golden cases, but still needs larger MemoryBench-style fixtures before public release confidence
-- Graph performance has a first moderate local smoke and production request
-  telemetry, but still needs larger volume benchmarks and graph-specific
-  performance dashboards.
+- recall benchmark coverage has larger golden fixtures, but still needs an
+  external MemoryBench import path if we adopt a third-party benchmark corpus
+- Graph performance has a larger local smoke, graph-specific product signals,
+  and production request telemetry, but still needs high-volume production
+  benchmarks before a hosted SaaS launch.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the preferred deploy path; the manual GitHub deploy workflow remains a fallback and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
 - Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
 - Repository public-launch operations are complete: Discussions, topics/about
@@ -87,12 +92,12 @@
 ## Next Implementation Tracks
 
 1. Auth hardening
-   - Expand profile editing and hosted navigation polish.
+   - Expand hosted navigation polish from product feedback.
    - Keep `x-openmemory-user-id` only for local development and tests.
 
 2. MCP production flow
-   - Manually test interactive OAuth clients such as MCP Inspector, Cursor,
-     Claude, and ChatGPT connector flows before broad launch.
+   - Manually test full interactive OAuth callback flows in MCP Inspector,
+     Cursor, Claude, and ChatGPT connector surfaces before broad hosted launch.
    - Expand OAuth lifecycle UI from connection revocation into full client
      registration/management if we need first-party clients.
 
@@ -103,18 +108,19 @@
      has enough production traces to evaluate.
    - Store embeddings in Vectorize for every chunk and add deeper stale-index diagnostics.
    - Tune deterministic reranking and evaluate an optional LLM/ML reranker.
-   - Expand recall quality benchmarks with MemoryBench-style fixtures.
-   - Add larger graph performance benchmarks and production telemetry.
+   - Add an external MemoryBench fixture importer if a stable public corpus is
+     selected.
+   - Add higher-volume graph performance benchmarks and production telemetry.
 
 4. Web app expansion
-   - Expand profile editing, onboarding empty states, and hosted navigation
-     polish.
+   - Expand hosted navigation polish from alpha feedback.
    - Keep the hosted TanStack Start UI as a companion dashboard/control plane; the API and MCP integrations remain the primary product surfaces.
    - Use shadcn dashboard templates, defaults, and theme tokens as the baseline; defer Apple/SwiftUI-specific styling until the product structure is stronger.
-   - Expand charts for recall quality, memory growth, stale/superseded memories, indexing health, and MCP usage.
+   - Expand charts for recall quality, memory growth, stale/superseded memories,
+     indexing health, MCP usage, and graph operation latency.
    - Continue hardening the `react-force-graph` explorer and evaluate Sigma.js + Graphology, Reagraph, or React Flow only if graph size and layout requirements outgrow the current approach.
-   - Expand browser tests for authenticated account flows and MCP connection
-     revocation with seeded grants.
+   - Expand browser tests for hosted authenticated profile/team flows and MCP
+     connection revocation with seeded grants.
 
 5. CI and deployment
    - Connect Cloudflare Git/Workers Builds to `main`.

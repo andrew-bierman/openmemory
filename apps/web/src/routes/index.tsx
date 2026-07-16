@@ -71,6 +71,7 @@ import {
   getActivitySummary,
   getDashboardMetrics,
   getGraphHealthSummary,
+  getGraphOperationsSummary,
   getIndexReadinessSummary,
   getLifecycleDistribution,
   getMemoryNeighborDetails,
@@ -154,6 +155,7 @@ function Home() {
   const [ingestContent, setIngestContent] = useState("");
   const [ingestSource, setIngestSource] = useState("conversation");
   const [workspaceName, setWorkspaceName] = useState("");
+  const [profileName, setProfileName] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<"admin" | "member">("member");
   const [tags, setTags] = useState("");
@@ -259,6 +261,13 @@ function Home() {
   const graphGlobalFilter = graphSearch ?? "";
   const graphRelationshipFilter = graphRelationship ?? "all";
   const graphTypeFilter = graphType ?? "all";
+
+  useEffect(() => {
+    const nextName = account?.user.name ?? sessionUser?.name ?? "";
+    if (nextName && !profileName) {
+      setProfileName(nextName);
+    }
+  }, [account?.user.name, profileName, sessionUser?.name]);
 
   const invalidateDashboard = useCallback(async () => {
     await Promise.all([
@@ -468,6 +477,12 @@ function Home() {
     onMutate: () => setError(null),
     onSuccess: invalidateDashboard,
   });
+  const updateProfileMutation = useMutation({
+    mutationFn: api.updateAccountProfile,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
   const inviteMemberMutation = useMutation({
     mutationFn: api.inviteWorkspaceMember,
     onError: (caught) => setError(formatError(caught)),
@@ -511,6 +526,7 @@ function Home() {
     authMutation.isPending ||
     revokeOAuthMutation.isPending ||
     renameWorkspaceMutation.isPending ||
+    updateProfileMutation.isPending ||
     inviteMemberMutation.isPending ||
     removeMemberMutation.isPending ||
     exportGraphMutation.isPending ||
@@ -606,6 +622,16 @@ function Home() {
     }
 
     await renameWorkspaceMutation.mutateAsync(nextName);
+  }
+
+  async function saveCurrentProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const nextName = profileName.trim() || account?.user.name;
+    if (!nextName) {
+      return;
+    }
+
+    await updateProfileMutation.mutateAsync(nextName);
   }
 
   async function inviteCurrentMember(event: FormEvent<HTMLFormElement>) {
@@ -856,6 +882,7 @@ function Home() {
                   </div>
                 </div>
                 <GraphStatsPanel stats={graphStats} />
+                <GraphOperationsPanel metrics={dashboardMetrics} />
                 <KnowledgeMap
                   graphRelationship={graphRelationshipFilter}
                   graphSearch={graphGlobalFilter}
@@ -923,11 +950,13 @@ function Home() {
                 onInviteMember={inviteCurrentMember}
                 onRevoke={revokeOAuthConnection}
                 onRemoveMember={removeCurrentMember}
+                onSaveProfile={saveCurrentProfile}
                 onRenameWorkspace={renameCurrentWorkspace}
                 onSignIn={signIn}
                 onSignOut={signOut}
                 onSignUp={signUp}
                 password={password}
+                profileName={profileName || account?.user.name || name}
                 sessionUser={sessionUser}
                 setApiUrl={setApiUrl}
                 setEmail={setEmail}
@@ -935,6 +964,7 @@ function Home() {
                 setMemberRole={setMemberRole}
                 setName={setName}
                 setPassword={setPassword}
+                setProfileName={setProfileName}
                 setTenantId={setTenantId}
                 setToken={setToken}
                 setWorkspaceName={setWorkspaceName}
@@ -955,17 +985,25 @@ function Home() {
                     <h2>Memories</h2>
                   </div>
                 </div>
-                <MemoryDataTable
-                  globalFilter={tableGlobalFilter}
-                  memories={memories}
-                  onForget={forget}
-                  onGlobalFilterChange={updateMemorySearch}
-                  onInspect={inspectMemory}
-                  onSortingChange={updateMemorySorting}
-                  onTypeFilterChange={updateMemoryType}
-                  sorting={tableSorting}
-                  typeFilter={tableTypeFilter}
-                />
+                {memories.length === 0 ? (
+                  <OnboardingEmptyState
+                    hasSession={Boolean(sessionUser)}
+                    onGoToAdmin={() => selectView("admin")}
+                    onGoToIngest={() => selectView("ingest")}
+                  />
+                ) : (
+                  <MemoryDataTable
+                    globalFilter={tableGlobalFilter}
+                    memories={memories}
+                    onForget={forget}
+                    onGlobalFilterChange={updateMemorySearch}
+                    onInspect={inspectMemory}
+                    onSortingChange={updateMemorySorting}
+                    onTypeFilterChange={updateMemoryType}
+                    sorting={tableSorting}
+                    typeFilter={tableTypeFilter}
+                  />
+                )}
               </>
             )}
           </div>
@@ -994,6 +1032,39 @@ function Home() {
         </div>
       </section>
     </main>
+  );
+}
+
+function OnboardingEmptyState({
+  hasSession,
+  onGoToAdmin,
+  onGoToIngest,
+}: Readonly<{
+  hasSession: boolean;
+  onGoToAdmin: () => void;
+  onGoToIngest: () => void;
+}>) {
+  return (
+    <div className="empty-state onboarding-empty">
+      <h3>Start your memory graph</h3>
+      <p>
+        Capture a short fact from the sidebar, ingest a source document, or
+        connect an MCP client so external AI tools can read and write context.
+      </p>
+      <div className="onboarding-steps">
+        <span>1. Save a profile or project memory</span>
+        <span>2. Ingest source notes for graph edges</span>
+        <span>3. Connect MCP after OAuth sign-in</span>
+      </div>
+      <div className="row">
+        <Button onClick={onGoToIngest} type="button" variant="outline">
+          Ingest source
+        </Button>
+        <Button onClick={onGoToAdmin} type="button" variant="outline">
+          {hasSession ? "Review account" : "Sign in"}
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -1508,6 +1579,35 @@ function GraphStatsPanel({ stats }: Readonly<{ stats: GraphStats | null }>) {
       <Stat label="Edges" value={stats.totalEdges} />
       <Stat label="Entities" value={stats.entityCount} />
     </div>
+  );
+}
+
+function GraphOperationsPanel({
+  metrics,
+}: Readonly<{ metrics: DashboardMetrics }>) {
+  const summary = getGraphOperationsSummary(metrics);
+
+  return (
+    <section
+      aria-label="Graph operations dashboard"
+      className="operations-panel"
+    >
+      <div>
+        <span>Benchmark status</span>
+        <strong>{summary.status}</strong>
+        <small>{summary.traversalBudget}</small>
+      </div>
+      <div>
+        <span>Average degree</span>
+        <strong>{summary.averageDegree}</strong>
+        <small>{summary.relationshipTypes} relationship types</small>
+      </div>
+      <div>
+        <span>Fixture size</span>
+        <strong>{summary.benchmarkSize}</strong>
+        <small>active graph nodes</small>
+      </div>
+    </section>
   );
 }
 

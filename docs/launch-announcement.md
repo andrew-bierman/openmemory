@@ -25,10 +25,12 @@ server.
 - R2 graph exports, index repair, global Durable Object rate limiting, and
   Workers Analytics Engine telemetry.
 - TanStack Start dashboard with shadcn-style UI, charts, table filters,
-  knowledge map, MCP setup, account settings, and workspace/team management.
+  knowledge map, graph operations signals, MCP setup, account settings, hosted
+  profile editing, onboarding empty states, and workspace/team management.
 - Testing trophy baseline covering static checks, unit tests, local
   Wrangler/D1/Queues/Workflows integration, browser E2E, MCP SDK smoke, recall
-  benchmarks, Cloudflare Workers Build, and live production smoke.
+  benchmarks, larger graph-scale checks, Cloudflare Workers Build, and live
+  production smoke.
 
 ## Who should try it now
 
@@ -38,8 +40,8 @@ MCP.
 
 It is not positioned as a broad self-serve SaaS launch yet. The backend and
 Cloudflare-native paths are hardened enough to inspect and build on, while
-larger recall fixtures, higher-volume operations, profile editing, and
-additional MCP client dogfooding remain active work.
+higher-volume operations, external OAuth callback dogfooding, and larger
+third-party benchmark corpus imports remain active work.
 
 ## Try it
 
@@ -53,7 +55,8 @@ additional MCP client dogfooding remain active work.
 ## Feedback we want first
 
 - MCP client compatibility with Inspector, Cursor, Claude, ChatGPT connectors,
-  and other Streamable HTTP clients.
+  and other Streamable HTTP clients, especially full interactive OAuth callback
+  flows.
 - Self-hosting friction in Cloudflare account setup, D1 migrations, Vectorize,
   Workers AI, and OAuth provider configuration.
 - Recall quality issues where graph expansion or reranking returns stale,

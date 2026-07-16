@@ -131,6 +131,9 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     .getByRole("button", { name: "Knowledge Map", exact: true })
     .click();
   await expect(page.locator(".graph-controls input")).toBeVisible();
+  await expect(page.getByLabel("Graph operations dashboard")).toContainText(
+    "Benchmark status",
+  );
   await expect(page.locator(".graph-controls select")).toHaveCount(2);
   await expect(page.locator(".force-graph-frame canvas")).toHaveCount(1);
   await expect(page.getByLabel("Graph relationship summary")).toBeVisible();
@@ -190,6 +193,7 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.getByLabel("Workspace name")).toHaveValue(
     "Local workspace",
   );
+  await expect(page.getByLabel("Display name")).toBeDisabled();
   await expect(page.getByLabel("Member email")).toBeDisabled();
   await expect(page.getByLabel("Role")).toBeDisabled();
   await expect(page.getByText("No hosted workspace loaded")).toBeVisible();
@@ -237,6 +241,21 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     "decision",
   );
   await expect(page.locator(".graph-node-card")).toHaveCount(1);
+
+  await page.goto("/");
+  await page.evaluate(
+    ({ apiUrl, tenantId }) => {
+      window.localStorage.setItem("openmemory:apiUrl", apiUrl);
+      window.localStorage.setItem("openmemory:tenantId", tenantId);
+    },
+    {
+      apiUrl: API_URL,
+      tenantId: `empty-ui-e2e-${crypto.randomUUID()}`,
+    },
+  );
+  await page.reload({ waitUntil: "networkidle" });
+  await expect(page.getByText("Start your memory graph")).toBeVisible();
+  await expect(page.getByText("Connect MCP after OAuth sign-in")).toBeVisible();
 
   await page.goto("/");
   await page.evaluate(

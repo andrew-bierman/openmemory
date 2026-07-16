@@ -27,6 +27,52 @@ WHERE timestamp >= NOW() - INTERVAL '1' HOUR
 GROUP BY bucket, method, path
 ORDER BY bucket DESC, requests DESC;
 
+-- Graph and RAG route performance dashboard.
+SELECT
+  intDiv(toUInt32(timestamp), 300) * 300 AS bucket,
+  blob2 AS method,
+  blob3 AS path,
+  count() AS requests,
+  avg(double2) AS avg_duration_ms,
+  quantile(0.95)(double2) AS p95_duration_ms,
+  max(double2) AS max_duration_ms
+FROM openmemory_events
+WHERE timestamp >= NOW() - INTERVAL '6' HOUR
+  AND blob1 = 'openmemory.request'
+  AND blob3 IN (
+    '/v1/search',
+    '/v1/context',
+    '/v1/graph/stats',
+    '/v1/sources',
+    '/v1/sources/async',
+    '/mcp'
+  )
+GROUP BY bucket, method, path
+ORDER BY bucket DESC, p95_duration_ms DESC;
+
+-- Graph and RAG slow requests requiring investigation.
+SELECT
+  blob2 AS method,
+  blob3 AS path,
+  blob5 AS status,
+  count() AS slow_requests,
+  avg(double2) AS avg_duration_ms,
+  max(double2) AS max_duration_ms
+FROM openmemory_events
+WHERE timestamp >= NOW() - INTERVAL '24' HOUR
+  AND blob1 = 'openmemory.request'
+  AND blob3 IN (
+    '/v1/search',
+    '/v1/context',
+    '/v1/graph/stats',
+    '/v1/sources',
+    '/v1/sources/async',
+    '/mcp'
+  )
+  AND double2 >= 2000
+GROUP BY method, path, status
+ORDER BY slow_requests DESC, max_duration_ms DESC;
+
 -- Request errors emitted by the Worker catch path.
 SELECT
   intDiv(toUInt32(timestamp), 300) * 300 AS bucket,

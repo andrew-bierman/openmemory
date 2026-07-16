@@ -953,6 +953,33 @@ textarea:focus-visible,
   line-height: 1.45;
 }
 
+.onboarding-empty {
+  display: flex;
+  min-height: 320px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+}
+
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  inline-size: min(100%, 720px);
+}
+
+.onboarding-steps span {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  padding: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: start;
+}
+
 .memory {
   border-radius: 15px;
   padding: 13px;
@@ -1087,6 +1114,34 @@ textarea:focus-visible,
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+}
+
+.operations-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.operations-panel > div {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--secondary);
+  padding: 12px;
+}
+
+.operations-panel span,
+.operations-panel small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.operations-panel strong {
+  display: block;
+  margin-block: 5px 3px;
+  color: var(--foreground);
+  font-size: 18px;
+  line-height: 1.1;
 }
 
 .stat {
@@ -1484,6 +1539,11 @@ textarea:focus-visible,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .operations-panel,
+  .onboarding-steps {
+    grid-template-columns: 1fr;
+  }
+
   .source-result-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1508,6 +1568,10 @@ textarea:focus-visible,
   }
 
   .source-result-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .operations-panel {
     grid-template-columns: 1fr;
   }
 
