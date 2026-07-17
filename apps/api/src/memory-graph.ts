@@ -6,6 +6,8 @@ import {
   CreateMemorySchema,
   createMemoryId,
   ForgetMemorySchema,
+  getGraphRelationshipDefinition,
+  GraphRelationshipCatalog,
   GraphEdgeSchema,
   type MemoryRecord,
   type SearchInput,
@@ -508,6 +510,19 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
 
   async addEdge(input: unknown) {
     const edge = GraphEdgeSchema.parse(input);
+    const relationship = getGraphRelationshipDefinition(edge.relationship);
+    const weight = edge.weight ?? relationship.defaultWeight;
+    const metadata = {
+      ...edge.metadata,
+      relationshipCategory:
+        typeof edge.metadata.relationshipCategory === "string"
+          ? edge.metadata.relationshipCategory
+          : relationship.category,
+      relationshipDirection:
+        typeof edge.metadata.relationshipDirection === "string"
+          ? edge.metadata.relationshipDirection
+          : relationship.direction,
+    };
     const now = new Date().toISOString();
     this.sqlState.storage.sql.exec(
       `insert or replace into edges
@@ -516,15 +531,15 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       edge.sourceId,
       edge.targetId,
       edge.relationship,
-      edge.weight,
-      JSON.stringify(edge.metadata),
+      weight,
+      JSON.stringify(metadata),
       edge.sourceId,
       edge.relationship,
       edge.targetId,
       now,
       now,
     );
-    return { ...edge, createdAt: now, updatedAt: now };
+    return { ...edge, weight, metadata, createdAt: now, updatedAt: now };
   }
 
   async getNeighbors(id: string) {
@@ -563,6 +578,30 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
         from edges`,
       )
       .toArray();
+    const relationshipDistribution = this.sqlState.storage.sql
+      .exec<{
+        relationship: string;
+        count: number;
+        average_weight: number;
+      }>(
+        `select relationship, count(*) as count, avg(weight) as average_weight
+         from edges
+         group by relationship
+         order by count desc, relationship asc`,
+      )
+      .toArray()
+      .map((row) => {
+        const definition = getGraphRelationshipDefinition(
+          GraphEdgeSchema.shape.relationship.parse(row.relationship),
+        );
+        return {
+          relationship: row.relationship,
+          label: definition.label,
+          category: definition.category,
+          count: row.count,
+          averageWeight: row.average_weight,
+        };
+      });
     const [entityStats] = this.sqlState.storage.sql
       .exec<{ entity_count: number }>(
         `select count(distinct entity_id) as entity_count from memory_entities`,
@@ -581,10 +620,19 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       forgottenMemories: memoryStats?.forgotten_memories ?? 0,
       totalEdges: edgeStats?.total_edges ?? 0,
       relationshipCount: edgeStats?.relationship_count ?? 0,
+      relationshipDistribution,
+      graphDensity: calculateGraphDensity(
+        memoryStats?.active_memories ?? 0,
+        edgeStats?.total_edges ?? 0,
+      ),
       entityCount: entityStats?.entity_count ?? 0,
       tagCount: tagStats?.tag_count ?? 0,
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  async getRelationshipCatalog() {
+    return GraphRelationshipCatalog;
   }
 
   async exportGraph() {
@@ -1192,6 +1240,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function mergeUnique(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+}
+
+function calculateGraphDensity(activeMemories: number, totalEdges: number) {
+  if (activeMemories <= 1) {
+    return 0;
+  }
+
+  return Number(
+    (totalEdges / (activeMemories * (activeMemories - 1))).toFixed(4),
+  );
 }
 
 function addColumn(

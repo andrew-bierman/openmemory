@@ -661,6 +661,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
 
     return graph.getStats();
   })
+  .get("/v1/graph/relationships", async ({ headers, request, status }) => {
+    const { tenant, graph } = await withTenant(request, headers);
+    if (!graph) {
+      return status(errorStatus(tenantError(tenant)), tenant);
+    }
+
+    return graph.getRelationshipCatalog();
+  })
   .get(
     "/v1/graph/:id/neighbors",
     async ({ headers, params, request, status }) => {

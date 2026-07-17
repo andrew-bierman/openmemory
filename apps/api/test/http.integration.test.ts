@@ -168,7 +168,6 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     sourceId: memoryB.id,
     targetId: memoryA.id,
     relationship: "supports",
-    weight: 0.75,
     metadata: { reason: "retrieval depends on canonical storage" },
   });
   await addEdge(worker, tenantA, {
@@ -178,6 +177,32 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     weight: 0.8,
     metadata: { reason: "idempotent replacement" },
   });
+  const invalidEdge = await worker.fetch("/v1/graph/edges", {
+    method: "POST",
+    headers: {
+      ...tenantHeaders(tenantA),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      sourceId: memoryB.id,
+      targetId: memoryA.id,
+      relationship: "maybe_related",
+    }),
+  });
+  expect(invalidEdge.status).toBeGreaterThanOrEqual(400);
+
+  const relationshipCatalog = await getJson<GraphRelationshipResponse[]>(
+    await worker.fetch("/v1/graph/relationships", {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(relationshipCatalog).toContainEqual(
+    expect.objectContaining({
+      relationship: "supports",
+      category: "causal",
+      defaultWeight: 0.72,
+    }),
+  );
 
   const neighbors = await getJson<EdgeResponse[]>(
     await worker.fetch(`/v1/graph/${memoryA.id}/neighbors`, {
@@ -192,6 +217,24 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(matchingEdges).toHaveLength(1);
   expect(matchingEdges[0]?.weight).toBe(0.8);
+  expect(matchingEdges[0]?.metadata).toMatchObject({
+    relationshipCategory: "causal",
+    relationshipDirection: "forward",
+  });
+
+  const stats = await getJson<GraphStatsResponse>(
+    await worker.fetch("/v1/graph/stats", {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(stats.relationshipDistribution).toContainEqual(
+    expect.objectContaining({
+      relationship: "supports",
+      category: "causal",
+      count: 1,
+    }),
+  );
+  expect(stats.graphDensity).toBeGreaterThan(0);
 
   const exported = await getJson<GraphExportResponse>(
     await worker.fetch("/v1/exports", {
@@ -1195,7 +1238,10 @@ test("graph stats and recall stay bounded on a larger local graph", async () => 
 
   const tenant = `tenant-scale-${crypto.randomUUID()}`;
   const topics = ["Atlas", "Borealis", "Cosmos", "Delta"];
-  const graphSize = 220;
+  const requestedGraphSize = Number(process.env.OPENMEMORY_SCALE_GRAPH_SIZE);
+  const graphSize = Number.isFinite(requestedGraphSize)
+    ? Math.max(220, Math.min(1_000, requestedGraphSize))
+    : 220;
   for (let index = 0; index < graphSize; index += 1) {
     const topic = topics[index % topics.length];
     await createMemory(worker, tenant, {
@@ -1213,6 +1259,8 @@ test("graph stats and recall stay bounded on a larger local graph", async () => 
   expect(stats.activeMemories).toBe(graphSize);
   expect(stats.totalMemories).toBe(graphSize);
   expect(stats.tagCount).toBeGreaterThanOrEqual(5);
+  expect(stats.relationshipDistribution.length).toBeGreaterThan(0);
+  expect(stats.graphDensity).toBeGreaterThan(0);
 
   const startedAt = performance.now();
   const results = await search(worker, tenant, {
@@ -1224,7 +1272,7 @@ test("graph stats and recall stay bounded on a larger local graph", async () => 
   expect(results).toHaveLength(10);
   expect(results[0]?.content).toContain("Atlas");
   expect(elapsedMs).toBeLessThan(7_500);
-}, 90_000);
+}, 180_000);
 
 test("auth helpers keep tenant headers local-only", () => {
   const local = new Request("http://127.0.0.1:54150/v1/memories");
@@ -1769,9 +1817,26 @@ type GraphStatsResponse = {
   forgottenMemories: number;
   totalEdges: number;
   relationshipCount: number;
+  relationshipDistribution: Array<{
+    relationship: string;
+    label: string;
+    category: string;
+    count: number;
+    averageWeight: number;
+  }>;
+  graphDensity: number;
   entityCount: number;
   tagCount: number;
   generatedAt: string;
+};
+
+type GraphRelationshipResponse = {
+  relationship: string;
+  category: string;
+  direction: string;
+  label: string;
+  defaultWeight: number;
+  description: string;
 };
 
 type GraphExportResponse = {

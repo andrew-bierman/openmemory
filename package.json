@@ -33,11 +33,13 @@
     "security:secrets:self-test": "bun scripts/secret-scan.ts --self-test",
     "test": "turbo run test",
     "test:benchmark:local": "bun run --cwd apps/api test:benchmark",
+    "test:scale:local": "bun run --cwd apps/api test:scale",
     "test:mcp:sdk": "bun scripts/mcp-sdk-smoke.ts",
     "test:integration:local": "bun run --cwd apps/api test:integration",
     "test:integration:docker": "docker compose -f docker-compose.test.yml run --rm local-wrangler-integration",
     "test:e2e:local": "playwright test -c playwright.local.config.ts",
-    "test:e2e:ui": "OPENMEMORY_LIVE_E2E=true playwright test -c playwright.config.ts"
+    "test:e2e:ui": "OPENMEMORY_LIVE_E2E=true playwright test -c playwright.config.ts",
+    "release:validate": "bun run format && bun run check && bun run build && bun run test:mcp:sdk && bun run test:integration:local && bun run test:e2e:local && bun run test:benchmark:local && bun run test:scale:local"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.6",

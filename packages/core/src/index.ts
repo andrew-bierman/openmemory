@@ -18,6 +18,134 @@ export const MemoryStatusSchema = z.enum([
   "archived",
 ]);
 
+export const GraphRelationshipDefinitions = {
+  updates: {
+    category: "versioning",
+    direction: "forward",
+    label: "Updates",
+    defaultWeight: 1,
+    description: "A newer memory supersedes an older memory.",
+  },
+  extends: {
+    category: "versioning",
+    direction: "forward",
+    label: "Extends",
+    defaultWeight: 0.8,
+    description: "A memory adds detail without replacing the target.",
+  },
+  derives: {
+    category: "provenance",
+    direction: "forward",
+    label: "Derives",
+    defaultWeight: 0.72,
+    description: "A memory was inferred from or derived from the target.",
+  },
+  supports: {
+    category: "causal",
+    direction: "forward",
+    label: "Supports",
+    defaultWeight: 0.72,
+    description: "The source strengthens or enables the target.",
+  },
+  blocks: {
+    category: "causal",
+    direction: "forward",
+    label: "Blocks",
+    defaultWeight: 0.72,
+    description: "The source prevents or conflicts with the target.",
+  },
+  depends_on: {
+    category: "causal",
+    direction: "forward",
+    label: "Depends on",
+    defaultWeight: 0.72,
+    description: "The source requires the target.",
+  },
+  replaces: {
+    category: "versioning",
+    direction: "forward",
+    label: "Replaces",
+    defaultWeight: 0.86,
+    description: "The source explicitly replaces the target.",
+  },
+  uses: {
+    category: "reference",
+    direction: "forward",
+    label: "Uses",
+    defaultWeight: 0.68,
+    description: "The source uses or calls the target.",
+  },
+  improves: {
+    category: "causal",
+    direction: "forward",
+    label: "Improves",
+    defaultWeight: 0.74,
+    description: "The source improves or optimizes the target.",
+  },
+  shares_entity: {
+    category: "similarity",
+    direction: "bidirectional",
+    label: "Shares entity",
+    defaultWeight: 0.5,
+    description: "Memories mention at least one shared canonical entity.",
+  },
+  next_chunk: {
+    category: "document",
+    direction: "forward",
+    label: "Next chunk",
+    defaultWeight: 0.82,
+    description: "The target is the next chunk from the same source document.",
+  },
+  previous_chunk: {
+    category: "document",
+    direction: "reverse",
+    label: "Previous chunk",
+    defaultWeight: 0.82,
+    description:
+      "The target is the previous chunk from the same source document.",
+  },
+} as const;
+
+export const GraphRelationshipSchema = z.enum(
+  Object.keys(GraphRelationshipDefinitions) as [
+    keyof typeof GraphRelationshipDefinitions,
+    ...(keyof typeof GraphRelationshipDefinitions)[],
+  ],
+);
+
+export type GraphRelationship = z.infer<typeof GraphRelationshipSchema>;
+export type GraphRelationshipCategory =
+  (typeof GraphRelationshipDefinitions)[GraphRelationship]["category"];
+
+export type GraphRelationshipDefinition = {
+  relationship: GraphRelationship;
+  category: GraphRelationshipCategory;
+  direction: "forward" | "reverse" | "bidirectional";
+  label: string;
+  defaultWeight: number;
+  description: string;
+};
+
+export const GraphRelationshipCatalog: GraphRelationshipDefinition[] =
+  Object.entries(GraphRelationshipDefinitions).map(
+    ([relationship, definition]) => ({
+      relationship: relationship as GraphRelationship,
+      ...definition,
+    }),
+  );
+
+export function normalizeGraphRelationship(value: string): GraphRelationship {
+  return GraphRelationshipSchema.parse(
+    value.trim().toLowerCase().replace(/[\s-]+/g, "_"),
+  );
+}
+
+export function getGraphRelationshipDefinition(
+  relationship: GraphRelationship,
+) {
+  return GraphRelationshipDefinitions[relationship];
+}
+
 export const CreateMemorySchema = z.object({
   content: z.string().min(1).max(200_000),
   source: z.string().min(1).max(120).default("api"),
@@ -44,14 +172,20 @@ export const SearchSchema = z.object({
 export const GraphEdgeSchema = z.object({
   sourceId: z.string().min(1),
   targetId: z.string().min(1),
-  relationship: z.string().min(1).max(80),
-  weight: z.number().min(0).max(1).default(1),
+  relationship: z
+    .string()
+    .min(1)
+    .max(80)
+    .transform((value) => normalizeGraphRelationship(value)),
+  weight: z.number().min(0).max(1).optional(),
   metadata: MemoryMetadataSchema,
 });
 
 export const UpdateMemorySchema = z.object({
   content: z.string().min(1).max(200_000),
-  relationship: z.enum(["updates", "extends", "derives"]).default("updates"),
+  relationship: z
+    .enum(["updates", "extends", "derives"])
+    .default("updates"),
   source: z.string().min(1).max(120).default("api"),
   tags: z.array(z.string().min(1).max(80)).max(50).optional(),
   metadata: MemoryMetadataSchema,
