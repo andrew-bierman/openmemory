@@ -8,9 +8,20 @@ bounded local graph performance, MCP compatibility, auth, and browser flows.
 ## Required Local Gate
 
 ```sh
+bun run release:validate
+```
+
+The release validation command runs formatting, secret scanning, type checks,
+unit/integration tests, the production build, MCP SDK smoke tests, local
+Playwright E2E, recall benchmarks, and the heavier opt-in scale gate.
+
+For a faster pull-request loop, run the same checks individually:
+
+```sh
 bun run format
 bun run check
 bun run build
+bun run test:mcp:sdk
 bun run test:integration:local
 bun run test:e2e:local
 bun run test:benchmark:local
@@ -23,6 +34,16 @@ The benchmark command runs the focused recall and graph-scale cases from
 - MemoryBench-style recall fixtures must keep Hit@3 at or above `0.9`.
 - A 220-memory tenant graph must return bounded recall results in under
   `7.5s` on the local Wrangler test runner.
+
+The heavier launch scale gate is:
+
+```sh
+bun run test:scale:local
+```
+
+It runs the same bounded graph benchmark with `OPENMEMORY_SCALE_GRAPH_SIZE=360`
+by default. The test clamps custom sizes between 220 and 1,000 memories so local
+runs cannot accidentally create unbounded Durable Object state.
 
 ## Optional Live Gate
 

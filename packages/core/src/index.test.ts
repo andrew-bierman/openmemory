@@ -2,6 +2,10 @@ import { describe, expect, test } from "vitest";
 import {
   CreateMemorySchema,
   createMemoryId,
+  GraphEdgeSchema,
+  GraphRelationshipCatalog,
+  getGraphRelationshipDefinition,
+  normalizeGraphRelationship,
   normalizeTenantId,
   SearchSchema,
 } from ".";
@@ -28,6 +32,31 @@ describe("core contracts", () => {
       tags: [],
       includeHistorical: false,
       includeForgotten: false,
+    });
+  });
+
+  test("normalizes graph relationships into the canonical taxonomy", () => {
+    expect(normalizeGraphRelationship("Shares Entity")).toBe("shares_entity");
+    expect(
+      GraphEdgeSchema.parse({
+        sourceId: "a",
+        targetId: "b",
+        relationship: "next-chunk",
+        metadata: {},
+      }).relationship,
+    ).toBe("next_chunk");
+  });
+
+  test("rejects graph relationships outside the launch taxonomy", () => {
+    expect(() => normalizeGraphRelationship("maybe_related")).toThrow();
+  });
+
+  test("exports graph relationship definitions for API and UI consumers", () => {
+    expect(GraphRelationshipCatalog.length).toBeGreaterThan(8);
+    expect(getGraphRelationshipDefinition("updates")).toMatchObject({
+      category: "versioning",
+      defaultWeight: 1,
+      direction: "forward",
     });
   });
 });

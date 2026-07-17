@@ -1,4 +1,8 @@
-import type { GraphEdge, Memory } from "@openmemory/client";
+import type {
+  GraphEdge,
+  GraphRelationshipDefinition,
+  Memory,
+} from "@openmemory/client";
 import {
   Badge,
   Button,
@@ -324,6 +328,7 @@ export function KnowledgeMap({
   onGraphSearchChange,
   onGraphTypeChange,
   onInspect,
+  relationshipCatalog,
   selectedMemoryId,
 }: Readonly<{
   graphRelationship: string;
@@ -335,6 +340,7 @@ export function KnowledgeMap({
   onGraphSearchChange: (value: string) => void;
   onGraphTypeChange: (value: string) => void;
   onInspect: (id: string) => Promise<void>;
+  relationshipCatalog: GraphRelationshipDefinition[];
   selectedMemoryId: string | null;
 }>) {
   const [ForceGraph, setForceGraph] = useState<ForceGraph2DComponent | null>(
@@ -362,9 +368,24 @@ export function KnowledgeMap({
   const relationshipTypes = useMemo(
     () =>
       Array.from(
-        new Set(baseGraph.links.map((link) => link.relationship)),
+        new Set([
+          ...relationshipCatalog.map(
+            (relationship) => relationship.relationship,
+          ),
+          ...baseGraph.links.map((link) => link.relationship),
+        ]),
       ).sort((left, right) => left.localeCompare(right)),
-    [baseGraph.links],
+    [baseGraph.links, relationshipCatalog],
+  );
+  const relationshipLabelById = useMemo(
+    () =>
+      new Map(
+        relationshipCatalog.map((relationship) => [
+          relationship.relationship,
+          relationship.label,
+        ]),
+      ),
+    [relationshipCatalog],
   );
   const graph = useMemo(
     () =>
@@ -480,6 +501,7 @@ export function KnowledgeMap({
           onRelationshipChange={onGraphRelationshipChange}
           onSearchChange={onGraphSearchChange}
           onTypeChange={onGraphTypeChange}
+          relationshipLabelById={relationshipLabelById}
           relationshipTypes={relationshipTypes}
         />
         <div className="empty-map">
@@ -509,6 +531,7 @@ export function KnowledgeMap({
         onRelationshipChange={onGraphRelationshipChange}
         onSearchChange={onGraphSearchChange}
         onTypeChange={onGraphTypeChange}
+        relationshipLabelById={relationshipLabelById}
         relationshipTypes={relationshipTypes}
       />
       <div className="graph-explorer-grid">
@@ -627,7 +650,10 @@ export function KnowledgeMap({
                   className="selected-relationship-row"
                   key={`${relationship.direction}:${relationship.relationship}:${relationship.memory.id}`}
                 >
-                  <span>{relationship.relationship}</span>
+                  <span>
+                    {relationshipLabelById.get(relationship.relationship) ??
+                      relationship.relationship}
+                  </span>
                   <strong>{relationship.memory.type}</strong>
                   <small>
                     {relationship.direction === "incoming" ? "From" : "To"} ·{" "}
@@ -677,6 +703,7 @@ function GraphExplorerControls({
   onRelationshipChange,
   onSearchChange,
   onTypeChange,
+  relationshipLabelById,
   relationshipTypes,
 }: Readonly<{
   graphRelationship: string;
@@ -687,6 +714,7 @@ function GraphExplorerControls({
   onRelationshipChange: (value: string) => void;
   onSearchChange: (value: string) => void;
   onTypeChange: (value: string) => void;
+  relationshipLabelById: Map<string, string>;
   relationshipTypes: string[];
 }>) {
   return (
@@ -717,7 +745,7 @@ function GraphExplorerControls({
         <option value="all">All relationships</option>
         {relationshipTypes.map((relationship) => (
           <option key={relationship} value={relationship}>
-            {relationship}
+            {relationshipLabelById.get(relationship) ?? relationship}
           </option>
         ))}
       </Select>

@@ -7,4 +7,5 @@ coverage
 playwright-report
 test-results
 artifacts
+.tmp
 *.log

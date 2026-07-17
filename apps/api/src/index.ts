@@ -9,6 +9,7 @@ import {
   CreateMemorySchema,
   createSourceId,
   ForgetMemorySchema,
+  GraphEdgeSchema,
   IngestSourceSchema,
   SearchSchema,
   UpdateMemorySchema,
@@ -646,10 +647,15 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
-      return status(
-        201,
-        await graph.addEdge({ metadata: {}, weight: 1, ...body }),
-      );
+      const parsedEdge = GraphEdgeSchema.safeParse({ metadata: {}, ...body });
+      if (!parsedEdge.success) {
+        return status(422, {
+          error: "invalid_graph_edge" as const,
+          issues: parsedEdge.error.issues,
+        });
+      }
+
+      return status(201, await graph.addEdge(parsedEdge.data));
     },
     { body: edgeBody },
   )
@@ -660,6 +666,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     }
 
     return graph.getStats();
+  })
+  .get("/v1/graph/relationships", async ({ headers, request, status }) => {
+    const { tenant, graph } = await withTenant(request, headers);
+    if (!graph) {
+      return status(errorStatus(tenantError(tenant)), tenant);
+    }
+
+    return graph.getRelationshipCatalog();
   })
   .get(
     "/v1/graph/:id/neighbors",

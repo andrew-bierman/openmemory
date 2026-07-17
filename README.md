@@ -13,8 +13,9 @@ MCP runtime for tool access.
 > recall flow, source ingestion, async ingestion jobs, exports, repair path,
 > dashboard, extraction workers, and local integration suite are working. The
 > hosted profile/onboarding UI, named MCP request-profile dogfooding, larger
-> recall benchmarks, and production telemetry are working. Manual external
-> OAuth callback dogfooding and higher-volume operations remain active roadmap
+> recall benchmarks, typed relationship diagnostics, production telemetry, and
+> release validation gates are working. Manual external OAuth callback
+> dogfooding and higher-volume production operations remain active roadmap
 > items.
 
 ## Why OpenMemory
@@ -34,6 +35,8 @@ to provide the infrastructure layer behind a more portable experience:
 - Multi-user memory isolation through Durable Object names.
 - SQLite-backed memory graph per tenant with nodes, edges, entities, metadata,
   tags, confidence, importance, currentness, validity windows, and supersession.
+- Canonical typed graph relationship taxonomy shared by the API, Durable
+  Object graph store, Eden client, stats, tests, and web explorer.
 - Memory create, read, update, soft-forget, search, profile, context, graph
   neighbors, graph stats, source ingestion, R2 export, and Vectorize repair APIs.
 - Chunked source/document ingestion with source and chunk provenance.
@@ -55,7 +58,7 @@ to provide the infrastructure layer behind a more portable experience:
 - TanStack Start web app with a polished hosted-dashboard direction, shared
   shadcn-style UI package, hosted profile editing, onboarding empty states,
   memory health metrics, charts, graph operations signals, and an
-  Obsidian-style knowledge map.
+  Obsidian-style knowledge map backed by `react-force-graph-2d`.
 - Wrangler-backed integration tests and optional Docker reproduction.
 
 ## Architecture
@@ -148,6 +151,7 @@ Useful endpoints:
 - `GET /v1/sources/:sourceId`
 - `GET /v1/profile`
 - `GET /v1/graph/stats`
+- `GET /v1/graph/relationships`
 - `GET /v1/graph/:id/neighbors`
 - `POST /v1/exports`
 - `POST /v1/index/repair`
@@ -215,11 +219,18 @@ graph-scale benchmarks, named MCP client request-profile smoke, and end-to-end
 browser/API smoke for the deployed product.
 
 ```sh
+bun run release:validate
+```
+
+For the faster pull-request loop:
+
+```sh
 bun run check
 bun run build
 bun run test:integration:local
 bun run test:mcp:sdk
 bun run test:e2e:local
+bun run test:benchmark:local
 ```
 
 The local integration suite starts real Wrangler Workers on randomized
@@ -239,6 +250,12 @@ Optional clean container reproduction:
 
 ```sh
 bun run test:integration:docker
+```
+
+Optional heavier local scale check:
+
+```sh
+bun run test:scale:local
 ```
 
 Optional live checks:

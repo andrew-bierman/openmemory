@@ -3,7 +3,7 @@
 @source "../**/*.{ts,tsx}";
 
 :root {
-  --background: #f8fafc;
+  --background: #f7f7f8;
   --foreground: #09090b;
   --card: #ffffff;
   --card-solid: #ffffff;
@@ -21,11 +21,11 @@
   --border: #e4e4e7;
   --input: #d4d4d8;
   --ring: rgba(37, 99, 235, 0.26);
-  --shadow: 0 1px 2px rgba(24, 24, 27, 0.06);
+  --shadow: 0 10px 28px rgba(24, 24, 27, 0.06);
   --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.05);
-  --radius: 10px;
-  --radius-lg: 14px;
-  --sidebar-width: 344px;
+  --radius: 8px;
+  --radius-lg: 10px;
+  --sidebar-width: 330px;
   color: var(--foreground);
   background: var(--background);
   font-family:
@@ -77,7 +77,7 @@ textarea:focus-visible,
   height: 100vh;
   overflow: auto;
   border-right: 1px solid var(--border);
-  background: #fafafa;
+  background: #fbfbfb;
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -99,7 +99,7 @@ textarea:focus-visible,
   display: grid;
   place-items: center;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 8px;
   background: var(--primary);
   color: var(--primary-foreground);
   font-size: 13px;
@@ -184,7 +184,7 @@ textarea:focus-visible,
   flex-direction: column;
   gap: 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   background: var(--card);
   padding: 14px;
   box-shadow: var(--shadow-sm);
@@ -286,7 +286,7 @@ textarea:focus-visible,
 }
 
 .content {
-  padding: 24px;
+  padding: 22px;
   display: grid;
   grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: 16px;
@@ -299,9 +299,9 @@ textarea:focus-visible,
   justify-content: space-between;
   gap: 18px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   background: var(--card);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-sm);
   padding: 20px;
 }
 
@@ -334,7 +334,7 @@ textarea:focus-visible,
   flex-direction: column;
   gap: 2px;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--secondary);
   padding: 10px 12px;
 }
@@ -372,7 +372,7 @@ textarea:focus-visible,
 .metric-tile {
   position: relative;
   min-height: 104px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   padding: 15px;
   display: flex;
   flex-direction: column;
@@ -405,7 +405,7 @@ textarea:focus-visible,
 }
 
 .chart-panel {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   padding: 15px;
 }
 
@@ -423,7 +423,7 @@ textarea:focus-visible,
 
 .insight-panel {
   min-height: 100%;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   padding: 15px;
 }
 
@@ -618,7 +618,7 @@ textarea:focus-visible,
 }
 
 .panel {
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   padding: 16px;
 }
 
@@ -1116,6 +1116,68 @@ textarea:focus-visible,
   gap: 8px;
 }
 
+.graph-stats-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.relationship-health {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 0.28fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.relationship-health > div,
+.relationship-health li {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--secondary);
+  padding: 12px;
+}
+
+.relationship-health > div {
+  display: grid;
+  gap: 4px;
+}
+
+.relationship-health ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relationship-health span,
+.relationship-health small {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 780;
+  line-height: 1.3;
+}
+
+.relationship-health span {
+  text-transform: uppercase;
+}
+
+.relationship-health strong {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font-size: 20px;
+  line-height: 1.05;
+}
+
+.relationship-health li strong {
+  margin-block: 4px 2px;
+  font-size: 16px;
+}
+
 .operations-panel {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1145,7 +1207,7 @@ textarea:focus-visible,
 }
 
 .stat {
-  border-radius: 15px;
+  border-radius: var(--radius);
   padding: 12px;
   min-width: 0;
 }
@@ -1161,7 +1223,7 @@ textarea:focus-visible,
 .knowledge-map {
   position: relative;
   overflow: hidden;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   padding: 15px;
 }
 
@@ -1174,7 +1236,7 @@ textarea:focus-visible,
 
 .graph-explorer-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
   align-items: stretch;
   gap: 12px;
 }
@@ -1184,7 +1246,7 @@ textarea:focus-visible,
   min-height: 420px;
   overflow: hidden;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background:
     linear-gradient(rgba(113, 113, 122, 0.08) 1px, transparent 1px),
     linear-gradient(90deg, rgba(113, 113, 122, 0.08) 1px, transparent 1px),
@@ -1202,10 +1264,11 @@ textarea:focus-visible,
 .graph-inspector {
   min-width: 0;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
+  align-content: start;
   gap: 10px;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: var(--radius);
   background: var(--secondary);
   padding: 12px;
 }
@@ -1245,7 +1308,7 @@ textarea:focus-visible,
 .relationship-list {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -1299,7 +1362,7 @@ textarea:focus-visible,
   display: grid;
   gap: 8px;
   border: 1px solid var(--border);
-  border-radius: 13px;
+  border-radius: var(--radius);
   background: var(--background);
   padding: 10px;
 }
@@ -1351,7 +1414,7 @@ textarea:focus-visible,
 .selected-relationship-list {
   grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: 1fr;
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -1361,7 +1424,7 @@ textarea:focus-visible,
 .selected-relationship-empty,
 .selected-relationship-row {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--background);
   padding: 9px;
 }
@@ -1412,7 +1475,7 @@ textarea:focus-visible,
   justify-content: space-between;
   gap: 8px;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: var(--card);
   padding: 10px;
   box-shadow: none;
@@ -1498,6 +1561,11 @@ textarea:focus-visible,
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .graph-stats-layout,
+  .graph-explorer-grid {
+    grid-template-columns: 1fr;
+  }
+
   .activity-panel,
   .type-panel {
     grid-column: span 2;
@@ -1537,6 +1605,10 @@ textarea:focus-visible,
 
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .relationship-health {
+    grid-template-columns: 1fr;
   }
 
   .operations-panel,
@@ -1584,6 +1656,11 @@ textarea:focus-visible,
   }
 
   .relationship-list {
+    grid-template-columns: 1fr;
+  }
+
+  .relationship-health ul,
+  .stats-grid {
     grid-template-columns: 1fr;
   }
 

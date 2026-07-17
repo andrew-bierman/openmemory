@@ -34,6 +34,15 @@ export type GraphEdge = {
   metadata: Record<string, unknown>;
 };
 
+export type GraphRelationshipDefinition = {
+  relationship: string;
+  category: string;
+  direction: "forward" | "reverse" | "bidirectional";
+  label: string;
+  defaultWeight: number;
+  description: string;
+};
+
 export type GraphStats = {
   totalMemories: number;
   activeMemories: number;
@@ -41,6 +50,14 @@ export type GraphStats = {
   forgottenMemories: number;
   totalEdges: number;
   relationshipCount: number;
+  relationshipDistribution: Array<{
+    relationship: string;
+    label: string;
+    category: string;
+    count: number;
+    averageWeight: number;
+  }>;
+  graphDensity: number;
   entityCount: number;
   tagCount: number;
   generatedAt: string;
@@ -175,6 +192,10 @@ export function createOpenMemoryClient(
     getNeighbors: (id: string) =>
       unwrap<GraphEdge[]>(client.v1.graph({ id }).neighbors.get()),
     getGraphStats: () => unwrap<GraphStats>(client.v1.graph.stats.get()),
+    getGraphRelationships: () =>
+      unwrap<GraphRelationshipDefinition[]>(
+        client.v1.graph.relationships.get(),
+      ),
     getAccount: () => unwrap<Account>(client.v1.account.get()),
     updateAccountProfile: (name: string) =>
       unwrap<Account>(client.v1.account.profile.patch({ name })),
@@ -282,6 +303,9 @@ type EdenClient = {
       };
     }) & {
       stats: {
+        get(): EdenResult;
+      };
+      relationships: {
         get(): EdenResult;
       };
       edges: {

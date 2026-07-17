@@ -13,6 +13,7 @@
     "check-types": "cd ../.. && node_modules/.bin/tsc -p apps/api/tsconfig.json --noEmit && node_modules/.bin/tsc -p apps/api/test/tsconfig.json --noEmit",
     "test": "vitest run test",
     "test:benchmark": "vitest run test/http.integration.test.ts -t \"recall benchmark|graph stats and recall stay bounded\"",
+    "test:scale": "OPENMEMORY_SCALE_GRAPH_SIZE=360 vitest run test/http.integration.test.ts -t \"graph stats and recall stay bounded\"",
     "test:integration": "vitest run test/http.integration.test.ts",
     "test:live": "OPENMEMORY_LIVE_E2E=true vitest run test/live.e2e.test.ts"
   },

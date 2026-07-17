@@ -28,6 +28,16 @@ describe("dashboard model", () => {
       forgottenMemories: 1,
       totalEdges: 21,
       relationshipCount: 4,
+      relationshipDistribution: [
+        {
+          relationship: "shares_entity",
+          label: "Shares entity",
+          category: "similarity",
+          count: 12,
+          averageWeight: 0.5,
+        },
+      ],
+      graphDensity: 0.29,
       entityCount: 18,
       tagCount: 7,
       generatedAt: "2026-07-01T12:00:00.000Z",
