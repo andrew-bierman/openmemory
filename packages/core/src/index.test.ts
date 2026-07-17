@@ -2,9 +2,9 @@ import { describe, expect, test } from "vitest";
 import {
   CreateMemorySchema,
   createMemoryId,
-  getGraphRelationshipDefinition,
   GraphEdgeSchema,
   GraphRelationshipCatalog,
+  getGraphRelationshipDefinition,
   normalizeGraphRelationship,
   normalizeTenantId,
   SearchSchema,
@@ -37,12 +37,14 @@ describe("core contracts", () => {
 
   test("normalizes graph relationships into the canonical taxonomy", () => {
     expect(normalizeGraphRelationship("Shares Entity")).toBe("shares_entity");
-    expect(GraphEdgeSchema.parse({
-      sourceId: "a",
-      targetId: "b",
-      relationship: "next-chunk",
-      metadata: {},
-    }).relationship).toBe("next_chunk");
+    expect(
+      GraphEdgeSchema.parse({
+        sourceId: "a",
+        targetId: "b",
+        relationship: "next-chunk",
+        metadata: {},
+      }).relationship,
+    ).toBe("next_chunk");
   });
 
   test("rejects graph relationships outside the launch taxonomy", () => {

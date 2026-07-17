@@ -208,6 +208,11 @@ function Home() {
     queryKey: ["openmemory", "graph-stats", ...queryScope],
     queryFn: () => api.getGraphStats(),
   });
+  const graphRelationshipsQuery = useQuery({
+    enabled: hasLoadedConnection && view === "graph",
+    queryKey: ["openmemory", "graph-relationships", ...queryScope],
+    queryFn: () => api.getGraphRelationships(),
+  });
   const selectedMemoryQuery = useQuery({
     enabled: hasLoadedConnection && Boolean(memoryId),
     queryKey: ["openmemory", "memory", memoryId, ...queryScope],
@@ -237,6 +242,7 @@ function Home() {
   const selectedMemory = selectedMemoryQuery.data ?? null;
   const neighbors = neighborsQuery.data ?? [];
   const graphStats = graphStatsQuery.data ?? null;
+  const graphRelationships = graphRelationshipsQuery.data ?? [];
   const oauthConnections = oauthConnectionsQuery.data ?? [];
   const account = accountQuery.data ?? null;
   const context = contextQuery.data ?? null;
@@ -515,6 +521,7 @@ function Home() {
     memoriesQuery.isFetching ||
     profileQuery.isFetching ||
     graphStatsQuery.isFetching ||
+    graphRelationshipsQuery.isFetching ||
     selectedMemoryQuery.isFetching ||
     neighborsQuery.isFetching ||
     accountQuery.isFetching ||
@@ -831,7 +838,9 @@ function Home() {
 
         <div
           className={
-            view === "admin" ? "workspace workspace-wide" : "workspace"
+            view === "admin" || view === "graph"
+              ? "workspace workspace-wide"
+              : "workspace"
           }
         >
           <div className="panel">
@@ -887,6 +896,7 @@ function Home() {
                   graphRelationship={graphRelationshipFilter}
                   graphSearch={graphGlobalFilter}
                   graphType={graphTypeFilter}
+                  relationshipCatalog={graphRelationships}
                   memories={memories}
                   neighbors={neighbors}
                   onGraphRelationshipChange={updateGraphRelationship}
@@ -1573,11 +1583,29 @@ function GraphStatsPanel({ stats }: Readonly<{ stats: GraphStats | null }>) {
   }
 
   return (
-    <div className="stats-grid">
-      <Stat label="Active" value={stats.activeMemories} />
-      <Stat label="Historical" value={stats.historicalMemories} />
-      <Stat label="Edges" value={stats.totalEdges} />
-      <Stat label="Entities" value={stats.entityCount} />
+    <div className="graph-stats-layout">
+      <div className="stats-grid">
+        <Stat label="Active" value={stats.activeMemories} />
+        <Stat label="Historical" value={stats.historicalMemories} />
+        <Stat label="Edges" value={stats.totalEdges} />
+        <Stat label="Entities" value={stats.entityCount} />
+      </div>
+      <div className="relationship-health">
+        <div>
+          <span>Graph density</span>
+          <strong>{stats.graphDensity.toFixed(3)}</strong>
+          <small>{stats.relationshipCount} typed relationship classes</small>
+        </div>
+        <ul aria-label="Top graph relationships">
+          {stats.relationshipDistribution.slice(0, 4).map((relationship) => (
+            <li key={relationship.relationship}>
+              <span>{relationship.label}</span>
+              <strong>{relationship.count}</strong>
+              <small>{relationship.category}</small>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }

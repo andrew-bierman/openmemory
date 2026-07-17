@@ -43,7 +43,14 @@
   Cloudflare Workflow.
 - Memory create/update/source chunk ingestion enqueues extraction work that
   enriches entity metadata and adds relationship-specific graph edges.
-- `/v1/graph/stats` exposes graph size counters, and local Wrangler integration includes a moderate graph-scale recall smoke.
+- `packages/core` owns the canonical graph relationship taxonomy used by edge
+  validation, the Durable Object graph store, the Eden client, integration
+  tests, and the TanStack graph explorer.
+- `/v1/graph/stats` exposes graph size counters, relationship distribution, and
+  graph density; `/v1/graph/relationships` exposes the relationship catalog to
+  clients.
+- Local Wrangler integration includes a moderate graph-scale recall smoke, and
+  `bun run test:scale:local` runs a heavier bounded 360-memory graph check.
 - Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.
 - Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
@@ -70,18 +77,19 @@
 
 ## Not Fully Solved Yet
 
-- Browser auth and dashboard need deeper production polish:
+- Browser auth and dashboard need production feedback:
   - deployed API routes reject header tenant mode by design
   - local development still supports tenant headers for tests and fast iteration
-  - the TanStack app now has real account, profile editing, onboarding, and team
-    management, but still needs broader hosted user feedback on navigation
+  - the TanStack app now has real account, profile editing, onboarding, team
+    management, shadcn-style dashboard surfaces, charts, and a wide graph
+    explorer, but still needs broader hosted user feedback on navigation
 - RAG quality is still basic:
   - no LLM/ML reranker
 - recall benchmark coverage has larger golden fixtures, but still needs an
   external MemoryBench import path if we adopt a third-party benchmark corpus
-- Graph performance has a larger local smoke, graph-specific product signals,
-  and production request telemetry, but still needs high-volume production
-  benchmarks before a hosted SaaS launch.
+- Graph performance has larger local smoke coverage, graph-specific product
+  signals, relationship diagnostics, and production request telemetry, but
+  still needs high-volume production benchmarks before a hosted SaaS launch.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the preferred deploy path; the manual GitHub deploy workflow remains a fallback and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
 - Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
 - Repository public-launch operations are complete: Discussions, topics/about
@@ -125,6 +133,7 @@
 5. CI and deployment
    - Connect Cloudflare Git/Workers Builds to `main`.
    - Keep GitHub CI as quality gate.
+   - Use `bun run release:validate` before tagging a public alpha.
    - Keep hourly live-smoke passing against production after deploys.
    - Add Cloudflare Notifications or external paging before any higher-volume
      hosted launch.

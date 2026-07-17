@@ -9,6 +9,7 @@ import {
   CreateMemorySchema,
   createSourceId,
   ForgetMemorySchema,
+  GraphEdgeSchema,
   IngestSourceSchema,
   SearchSchema,
   UpdateMemorySchema,
@@ -646,10 +647,15 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
-      return status(
-        201,
-        await graph.addEdge({ metadata: {}, weight: 1, ...body }),
-      );
+      const parsedEdge = GraphEdgeSchema.safeParse({ metadata: {}, ...body });
+      if (!parsedEdge.success) {
+        return status(422, {
+          error: "invalid_graph_edge" as const,
+          issues: parsedEdge.error.issues,
+        });
+      }
+
+      return status(201, await graph.addEdge(parsedEdge.data));
     },
     { body: edgeBody },
   )

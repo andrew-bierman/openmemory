@@ -164,12 +164,13 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(filteredSearch).toEqual([]);
 
-  await addEdge(worker, tenantA, {
+  const defaultWeightedEdge = await addEdge(worker, tenantA, {
     sourceId: memoryB.id,
     targetId: memoryA.id,
     relationship: "supports",
     metadata: { reason: "retrieval depends on canonical storage" },
   });
+  expect(defaultWeightedEdge.weight).toBe(0.72);
   await addEdge(worker, tenantA, {
     sourceId: memoryB.id,
     targetId: memoryA.id,
@@ -189,7 +190,10 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
       relationship: "maybe_related",
     }),
   });
-  expect(invalidEdge.status).toBeGreaterThanOrEqual(400);
+  expect(invalidEdge.status).toBe(422);
+  expect(await invalidEdge.json()).toMatchObject({
+    error: "invalid_graph_edge",
+  });
 
   const relationshipCatalog = await getJson<GraphRelationshipResponse[]>(
     await worker.fetch("/v1/graph/relationships", {

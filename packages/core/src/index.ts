@@ -136,7 +136,10 @@ export const GraphRelationshipCatalog: GraphRelationshipDefinition[] =
 
 export function normalizeGraphRelationship(value: string): GraphRelationship {
   return GraphRelationshipSchema.parse(
-    value.trim().toLowerCase().replace(/[\s-]+/g, "_"),
+    value
+      .trim()
+      .toLowerCase()
+      .replace(/[\s-]+/g, "_"),
   );
 }
 
@@ -176,16 +179,20 @@ export const GraphEdgeSchema = z.object({
     .string()
     .min(1)
     .max(80)
-    .transform((value) => normalizeGraphRelationship(value)),
+    .transform((value) =>
+      value
+        .trim()
+        .toLowerCase()
+        .replace(/[\s-]+/g, "_"),
+    )
+    .pipe(GraphRelationshipSchema),
   weight: z.number().min(0).max(1).optional(),
   metadata: MemoryMetadataSchema,
 });
 
 export const UpdateMemorySchema = z.object({
   content: z.string().min(1).max(200_000),
-  relationship: z
-    .enum(["updates", "extends", "derives"])
-    .default("updates"),
+  relationship: z.enum(["updates", "extends", "derives"]).default("updates"),
   source: z.string().min(1).max(120).default("api"),
   tags: z.array(z.string().min(1).max(80)).max(50).optional(),
   metadata: MemoryMetadataSchema,

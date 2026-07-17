@@ -257,15 +257,9 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.getByText("Start your memory graph")).toBeVisible();
   await expect(page.getByText("Connect MCP after OAuth sign-in")).toBeVisible();
 
-  await page.goto("/");
-  await page.evaluate(
-    ({ apiUrl, tenantId }) => {
-      window.localStorage.setItem("openmemory:apiUrl", apiUrl);
-      window.localStorage.setItem("openmemory:tenantId", tenantId);
-    },
-    { apiUrl: API_URL, tenantId: tenant },
-  );
-  await page.reload({ waitUntil: "networkidle" });
+  await page.getByLabel("Tenant").fill(tenant);
+  await page.getByRole("button", { name: /refresh/i }).click();
+  await expect(page.locator("tbody tr")).toHaveCount(4);
   await page
     .locator("tbody")
     .getByRole("button", { name: "Inspect", exact: true })
@@ -297,7 +291,7 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     "OpenMemory uses Durable Objects",
   );
   await expect(page.getByLabel("Selected memory relationships")).toContainText(
-    "supports",
+    "Supports",
   );
   await page
     .getByLabel("Filter graph by relationship")
@@ -404,13 +398,13 @@ async function seedTenant(tenant: string) {
     addEdge(tenant, {
       sourceId: memories[1].id,
       targetId: memories[2].id,
-      relationship: "informs",
+      relationship: "uses",
       weight: 0.78,
     }),
     addEdge(tenant, {
       sourceId: memories[2].id,
       targetId: memories[3].id,
-      relationship: "relates",
+      relationship: "extends",
       weight: 0.64,
     }),
   ]);
