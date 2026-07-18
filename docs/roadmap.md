@@ -43,7 +43,9 @@
   tenant readiness snapshots, graph recall, source ingestion, R2 export, OAuth
   PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh,
-  recall, forget, and browser-session readiness access.
+  recall, forget, browser-session readiness access, profile/workspace updates,
+  team member invite/remove, seeded OAuth/MCP connection revocation, and
+  confirmed account deletion.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
 - `/v1/sources/async` creates durable ingestion jobs, buffers requests through
   Cloudflare Queues, and runs the same graph/indexing pipeline through a
@@ -120,8 +122,9 @@
   - deployed API routes reject header tenant mode by design
   - local development still supports tenant headers for tests and fast iteration
   - the TanStack app now has real account, profile editing, onboarding, team
-    management, shadcn-style dashboard surfaces, charts, and a wide graph
-    explorer, but still needs broader hosted user feedback on navigation
+    management, shadcn-style dashboard surfaces, charts, a wide graph explorer,
+    and hosted browser smoke coverage for profile/team/OAuth admin flows, but
+    still needs broader hosted user feedback on navigation
 - RAG quality is still basic:
   - no LLM/ML reranker
 - Graph performance has larger local smoke coverage, release benchmark
@@ -172,8 +175,8 @@
    - Expand charts for recall quality, memory growth, stale/superseded memories,
      indexing health, MCP usage, and graph operation latency.
    - Continue hardening the `react-force-graph` explorer and evaluate Sigma.js + Graphology, Reagraph, or React Flow only if graph size and layout requirements outgrow the current approach.
-   - Expand browser tests for hosted authenticated profile/team flows and MCP
-     connection revocation with seeded grants.
+   - Expand browser coverage when new hosted account, team, OAuth, or graph
+     workflows are added.
 
 5. CI and deployment
    - Connect Cloudflare Git/Workers Builds to `main`.

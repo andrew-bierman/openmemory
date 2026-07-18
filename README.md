@@ -274,7 +274,9 @@ TypeScript SDK `StreamableHTTPClientTransport`.
 The local browser E2E suite starts the API and TanStack Start app on explicit
 non-default ports and exercises the dashboard, charts, memory table, source
 ingest, graph explorer, operations readiness, admin settings, and MCP setup
-panel.
+panel. The hosted browser smoke additionally covers Better Auth signup,
+profile/workspace updates, team member invite/remove, seeded OAuth connection
+revocation, readiness, recall, forget, and confirmed account deletion.
 
 Optional clean container reproduction:
 
@@ -328,7 +330,7 @@ R2 export, OAuth/MCP, and browser-session readiness access.
 
 Current priorities:
 
-- Polish hosted onboarding and profile-editing flows.
+- Polish hosted onboarding and dashboard navigation from alpha feedback.
 - Keep the hosted TanStack Start app as a companion dashboard/control plane
   while API and MCP integrations remain the primary product surfaces.
 - Expand charts and the knowledge map for graph health, recall quality, index
