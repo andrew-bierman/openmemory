@@ -123,6 +123,27 @@ to a Workers AI text-generation model. When unset, recall uses deterministic
 ranking only. `OPENMEMORY_RERANK_TIMEOUT_MS` defaults to `900`; timeout,
 malformed model output, or local binding gaps fall back to deterministic order.
 
+Optional alert dispatch can be enabled for the built-in Cloudflare Cron health
+monitor:
+
+```sh
+bun --cwd apps/api wrangler secret put OPENMEMORY_ALERT_WEBHOOK_URL
+bun --cwd apps/api wrangler secret put OPENMEMORY_ALERT_WEBHOOK_TOKEN
+```
+
+`OPENMEMORY_ALERT_WEBHOOK_TOKEN` is optional. If present, the monitor sends it
+as a bearer token to the webhook destination. For email-style routing through a
+separate internal Worker or provider endpoint, set
+`OPENMEMORY_ALERT_EMAIL_ENDPOINT`. `OPENMEMORY_BASE_URL` can override the
+monitored base URL; otherwise the monitor uses `BETTER_AUTH_URL` and then the
+current production Worker URL as fallback.
+
+The Worker Cron Trigger runs every 15 minutes from Wrangler config and checks
+`/health` plus MCP OAuth protected-resource metadata. It writes
+`openmemory.scheduled_health` Analytics Engine datapoints every run and sends
+`openmemory.scheduled_health_failed` JSON alerts on failures when a destination
+is configured.
+
 ## Cloudflare Git Deploys
 
 Preferred production deploy path:

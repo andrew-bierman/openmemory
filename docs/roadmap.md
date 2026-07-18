@@ -81,6 +81,10 @@
   with saved SQL in `docs/observability-queries.sql`.
 - The `Live Smoke` workflow runs hourly against production as the alpha alert
   path for API, auth, readiness, MCP, and hosted UI regressions.
+- A Cloudflare Cron Trigger runs every 15 minutes in the Worker, checks
+  `/health` and MCP OAuth protected-resource metadata, writes
+  `openmemory.scheduled_health`, and can dispatch failure alerts through
+  `OPENMEMORY_ALERT_WEBHOOK_URL` or `OPENMEMORY_ALERT_EMAIL_ENDPOINT`.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - `/v1/imports/preview` validates replace or merge imports and reports incoming
   counts, existing graph counts, duplicate IDs, changed fields, new IDs, and
@@ -192,8 +196,8 @@
    - Use `bun run release:validate` or the manual `Release Qualification`
      workflow before tagging a public alpha.
    - Keep hourly live-smoke passing against production after deploys.
-   - Add Cloudflare Notifications or external paging before any higher-volume
-     hosted launch.
+   - Add Cloudflare Notifications, PagerDuty, or another escalation workflow
+     before any higher-volume hosted launch.
    - Add a scoped `CLOUDFLARE_API_TOKEN` repository secret only if we keep the GitHub manual deploy fallback.
 
 6. Open-source launch operations
