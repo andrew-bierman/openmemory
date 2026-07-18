@@ -30,6 +30,7 @@ so protocol behavior can run in CI without external OAuth fixtures.
 | MCP Inspector | Config-shape smoke in CI | `bun run test:mcp:sdk` runs an `mcp-inspector-config-shape` request profile with Inspector-like headers through the official transport. | Manual UI OAuth callback dogfooding remains useful before broad hosted launch. |
 | Cursor | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `cursor-remote-mcp-config-shape` profile against `/mcp`. | Requires the user/client OAuth flow against the deployed Worker in real Cursor. |
 | Claude remote MCP connector / Messages API MCP connector | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `claude-remote-mcp-config-shape` profile against `/mcp`. | Requires provider-side OAuth configuration in real Claude surfaces. |
+| ChatGPT connector / Apps SDK MCP client | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `chatgpt-connector-mcp-config-shape` profile against `/mcp`. | Requires provider-side OAuth configuration in real ChatGPT connector surfaces. |
 
 ## Client Expectations
 
@@ -57,8 +58,8 @@ Clients should run the normal MCP handshake:
 ## Known Gaps
 
 - Manual external-client OAuth callback dogfooding remains recommended before a
-  high-volume hosted launch, but named streamable HTTP request shapes are now
-  smoke-tested in CI.
+  high-volume hosted launch, but named Inspector, Cursor, Claude, and
+  ChatGPT-style streamable HTTP request shapes are now smoke-tested in CI.
 - OpenMemory does not currently expose MCP resources or prompts.
 - MCP runs in the monolithic API Worker. Move to a dedicated `McpAgent` Worker
   only if session-specific state or independent scaling becomes necessary.

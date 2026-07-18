@@ -31,8 +31,8 @@ larger hosted push.
 - Entity and relationship extraction workers are covered by local Wrangler
   integration with Queues and Workflows.
 - The official MCP TypeScript SDK client is dogfooded in CI, and named
-  Inspector, Cursor, and Claude-style request profiles are smoke-tested and
-  documented.
+  Inspector, Cursor, Claude, and ChatGPT-style request profiles are
+  smoke-tested and documented.
 - Operational headers and request IDs are live on `/health`.
 - Workers Analytics Engine receives request, error, rate-limit, and async
   worker telemetry when deployed with the `OPENMEMORY_ANALYTICS` binding.
