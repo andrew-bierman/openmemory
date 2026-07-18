@@ -89,6 +89,12 @@ It imports a generated graph export, asserts hosted graph recall latency under
 `OPENMEMORY_LIVE_GRAPH_SIZE` to request a size; the live test clamps it between
 40 and 160 memories.
 
+The standard live production smoke also repairs and checks the semantic index
+for its throwaway account, asserts Workers AI and Vectorize are configured, and
+requires at least one hosted recall result with `reason: "semantic"`. This keeps
+remote provider coverage explicit while preserving the same account cleanup
+path as the rest of live smoke.
+
 External MemoryBench-style fixtures can be converted into an OpenMemory graph
 export for local restore/import testing:
 

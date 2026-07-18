@@ -6,6 +6,7 @@ import {
   indexMemory,
   isMemoryForIndex,
   semanticSearch,
+  semanticVectorId,
 } from "../src/semantic-index";
 
 describe("semantic index provider contracts", () => {
@@ -19,6 +20,18 @@ describe("semantic index provider contracts", () => {
     expect(aiRun).toHaveBeenCalledWith("@cf/test/embedding", {
       text: "Graph Indexing",
     });
+  });
+
+  test("builds Vectorize ids under Cloudflare's hosted limit", () => {
+    const vectorId = semanticVectorId(
+      "2wb0oyknll738tgsbraljldthgylwprb",
+      "mem_ad20b24d-1ac1-4caa-8a5a-c5a062bf91f7",
+    );
+
+    expect(vectorId).toMatch(
+      /^t_[\da-f]{16}:mem_[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/,
+    );
+    expect(new TextEncoder().encode(vectorId).length).toBeLessThanOrEqual(64);
   });
 
   test("upserts Vectorize records with tenant-scoped ids and recall metadata", async () => {
@@ -36,7 +49,7 @@ describe("semantic index provider contracts", () => {
 
     expect(vectorUpsert).toHaveBeenCalledWith([
       {
-        id: "tenant-a:mem_1",
+        id: semanticVectorId("tenant-a", "mem_1"),
         values: [0.1, 0.2, 0.3],
         metadata: {
           tenantId: "tenant-a",
@@ -84,9 +97,9 @@ describe("semantic index provider contracts", () => {
 
   test("diagnoses missing and stale vector samples from graph inventory", async () => {
     const vectorGetByIds = vi.fn(async (ids: string[]) =>
-      ids.includes("tenant-a:mem_old")
-        ? [{ id: "tenant-a:mem_old", values: [0.1] }]
-        : [{ id: "tenant-a:mem_current", values: [0.2] }],
+      ids.includes(semanticVectorId("tenant-a", "mem_old"))
+        ? [{ id: semanticVectorId("tenant-a", "mem_old"), values: [0.1] }]
+        : [{ id: semanticVectorId("tenant-a", "mem_current"), values: [0.2] }],
     );
     const env = fakeEnv({ vectorGetByIds });
 
@@ -110,10 +123,12 @@ describe("semantic index provider contracts", () => {
       workersAiConfigured: true,
     });
     expect(vectorGetByIds).toHaveBeenCalledWith([
-      "tenant-a:mem_current",
-      "tenant-a:mem_missing",
+      semanticVectorId("tenant-a", "mem_current"),
+      semanticVectorId("tenant-a", "mem_missing"),
     ]);
-    expect(vectorGetByIds).toHaveBeenCalledWith(["tenant-a:mem_old"]);
+    expect(vectorGetByIds).toHaveBeenCalledWith([
+      semanticVectorId("tenant-a", "mem_old"),
+    ]);
   });
 });
 

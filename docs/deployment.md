@@ -48,7 +48,8 @@ bash scripts/setup-cloudflare.sh
 The script creates:
 
 - D1 database bound as `AUTH_DB`
-- Vectorize index bound as `MEMORY_VECTORS`
+- Vectorize index bound as `MEMORY_VECTORS`, plus metadata indexes for
+  `tenantId`, `status`, and `isLatest`
 - R2 bucket bound as `MEMORY_EXPORTS`
 - R2 lifecycle policy from `infra/cloudflare/r2-lifecycle.json`
 - Workers Analytics Engine dataset bound as `OPENMEMORY_ANALYTICS`
@@ -70,6 +71,13 @@ bun run setup:r2-lifecycle
 
 The alpha policy expires tenant graph exports after 90 days and aborts
 incomplete multipart uploads after 7 days.
+
+To add or verify the required Vectorize metadata indexes on an existing
+environment without recreating other Cloudflare resources:
+
+```sh
+bun run setup:vectorize-metadata
+```
 
 ## Required Secrets
 

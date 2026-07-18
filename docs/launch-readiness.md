@@ -22,10 +22,11 @@ larger hosted push.
   `wrangler.jsonc`.
 - Local CI covers formatting, types, unit tests, Worker integration tests, and
   browser E2E.
-- Live production smoke has passed against the deployed Worker.
-- Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, source
-  ingestion, R2 export, tenant readiness snapshots, browser-session readiness,
-  and hosted UI smoke are covered by tests.
+- Live production smoke has passed against the deployed Worker, including
+  remote Workers AI and Vectorize semantic indexing/recall checks.
+- Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, semantic
+  provider recall, source ingestion, R2 export, tenant readiness snapshots,
+  browser-session readiness, and hosted UI smoke are covered by tests.
 - API and MCP recall use the shared graph recall path; semantic candidates are
   included when Vectorize is configured, with an optional Workers AI rerank pass
   behind `OPENMEMORY_RERANK_MODEL` and deterministic fallback.

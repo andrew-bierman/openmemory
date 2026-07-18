@@ -134,6 +134,34 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       );
       expect(stats.totalEdges).toBeGreaterThan(0);
 
+      const indexRepair = await authedJson<IndexRepairResponse>(
+        cookie,
+        "/v1/index/repair",
+        {
+          method: "POST",
+        },
+      );
+      expect(indexRepair.vectorizeConfigured).toBe(true);
+      expect(indexRepair.expectedVectors).toBeGreaterThanOrEqual(
+        stats.activeMemories,
+      );
+      expect(indexRepair.semanticIndex).toMatchObject({
+        configured: true,
+        vectorizeConfigured: true,
+        workersAiConfigured: true,
+      });
+      expect(indexRepair.semanticIndex.status).not.toBe("unconfigured");
+
+      const semanticSearch = await waitForSemanticSearch(
+        cookie,
+        "Vectorize semantic candidates source chunks document order",
+      );
+      expect(semanticSearch).toContainEqual(
+        expect.objectContaining({
+          reason: "semantic",
+        }),
+      );
+
       const exported = await authedJson<GraphExportResponse>(
         cookie,
         "/v1/exports",
@@ -245,9 +273,16 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
           authDb: true,
           durableObjects: true,
           r2Exports: true,
+          vectorize: true,
+          workersAi: true,
         },
         exports: {
           r2Configured: true,
+        },
+        semanticIndex: {
+          configured: true,
+          vectorizeConfigured: true,
+          workersAiConfigured: true,
         },
       });
       expect(readiness.tenant.id).toBeTruthy();
@@ -273,6 +308,10 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       ]);
       expect(readiness.rateLimit.enabled).toBe(true);
       expect(readiness.rateLimit.limitPerMinute).toBeGreaterThan(0);
+      expect(readiness.semanticIndex.expectedVectors).toBeGreaterThanOrEqual(
+        stats.activeMemories,
+      );
+      expect(readiness.semanticIndex.status).not.toBe("unconfigured");
       const serializedReadiness = JSON.stringify(readiness);
       expect(serializedReadiness).not.toContain(password);
       expect(serializedReadiness).not.toContain(token.access_token);
@@ -652,6 +691,26 @@ async function authedJson<T>(
   );
 }
 
+async function waitForSemanticSearch(cookie: string, query: string) {
+  let latest: SearchResponse[] = [];
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    latest = await authedJson<SearchResponse[]>(cookie, "/v1/search", {
+      method: "POST",
+      body: JSON.stringify({ q: query, limit: 8 }),
+    });
+    if (latest.some((result) => result.reason === "semantic")) {
+      return latest;
+    }
+    await sleep(1_000);
+  }
+
+  return latest;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function mcpCall(accessToken: string, body: Record<string, unknown>) {
   return getJson<unknown>(
     fetchLive("/mcp", {
@@ -819,6 +878,18 @@ type GraphExportResponse = {
   key: string;
   memoryCount: number;
   writtenToR2: boolean;
+};
+
+type IndexRepairResponse = {
+  expectedVectors: number;
+  vectorizeConfigured: boolean;
+  semanticIndex: {
+    configured: boolean;
+    workersAiConfigured: boolean;
+    vectorizeConfigured: boolean;
+    expectedVectors: number;
+    status: "current" | "needs_repair" | "unchecked" | "unconfigured";
+  };
 };
 
 type GraphImportResponse = {

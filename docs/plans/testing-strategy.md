@@ -117,13 +117,15 @@ This uses `OPENMEMORY_LIVE_BASE_URL` when provided and otherwise targets the dep
 - Core schema/unit tests in `packages/core/src/index.test.ts`.
 - Worker integration test in `apps/api/test/http.integration.test.ts`.
 - Client request contract tests in `packages/client/src/index.test.ts`.
-- Opt-in production E2E smoke in `apps/api/test/live.e2e.test.ts`.
+- Opt-in production E2E smoke in `apps/api/test/live.e2e.test.ts`, including
+  remote Workers AI and Vectorize semantic indexing/recall checks.
 - Opt-in hosted UI browser E2E in `apps/api/e2e/live-ui.spec.ts`.
+- Local browser E2E in `apps/web/e2e/dashboard.spec.ts` covers dashboard,
+  graph inspection, graph import preview, source ingest, MCP setup, operations,
+  and screenshot capture.
 - Workers AI / Vectorize binding contract tests in `apps/api/test/semantic-index.test.ts`.
 
 ## Next Coverage Work
 
 - Add Cloudflare Vitest worker-pool tests if we need direct Durable Object method tests without HTTP.
 - Add MemoryBench provider once graph-aware recall is available.
-- Expand browser-level Web UI E2E for ingest, graph inspection, and MCP setup.
-- Add remote provider smoke tests for Workers AI and Vectorize with explicit opt-in.
