@@ -101,4 +101,10 @@ bun run test:mcp:sdk
 ```
 
 That starts local Wrangler and connects with the official MCP TypeScript SDK
-`StreamableHTTPClientTransport`.
+`StreamableHTTPClientTransport`. The named request profiles are stored in
+[`config/mcp-client-profiles.json`](../config/mcp-client-profiles.json) and
+validated with:
+
+```sh
+bun run mcp:profiles:check
+```

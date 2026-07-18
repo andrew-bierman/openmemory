@@ -1,0 +1,57 @@
+{
+  "$schema": "https://openmemory.local/schemas/mcp-client-profiles.schema.json",
+  "baseUrl": "https://openmemory-api.abbierman101.workers.dev",
+  "profiles": [
+    {
+      "id": "official-typescript-sdk",
+      "label": "Official MCP TypeScript SDK",
+      "status": "tested-in-ci",
+      "transport": "streamable-http",
+      "userAgent": "OpenMemory-MCP-SDK-Smoke",
+      "expectedTools": ["remember", "recall", "profile", "forget"],
+      "notes": "Uses StreamableHTTPClientTransport locally in CI."
+    },
+    {
+      "id": "mcp-inspector-config-shape",
+      "label": "MCP Inspector",
+      "status": "config-shape-smoke",
+      "transport": "streamable-http",
+      "userAgent": "MCP-Inspector/OpenMemory-Smoke",
+      "expectedTools": ["remember", "recall", "profile", "forget"],
+      "notes": "Manual UI OAuth callback dogfooding remains useful before broad hosted launch."
+    },
+    {
+      "id": "cursor-remote-mcp-config-shape",
+      "label": "Cursor remote MCP",
+      "status": "config-shape-smoke",
+      "transport": "streamable-http",
+      "userAgent": "Cursor/OpenMemory-Smoke",
+      "expectedTools": ["remember", "recall", "profile", "forget"],
+      "notes": "Requires the user/client OAuth flow against the deployed Worker in real Cursor."
+    },
+    {
+      "id": "claude-remote-mcp-config-shape",
+      "label": "Claude remote MCP connector / Messages API MCP connector",
+      "status": "config-shape-smoke",
+      "transport": "streamable-http",
+      "userAgent": "Claude-MCP/OpenMemory-Smoke",
+      "expectedTools": ["remember", "recall", "profile", "forget"],
+      "notes": "Requires provider-side OAuth configuration in real Claude surfaces."
+    },
+    {
+      "id": "chatgpt-connector-mcp-config-shape",
+      "label": "ChatGPT connector / Apps SDK MCP client",
+      "status": "config-shape-smoke",
+      "transport": "streamable-http",
+      "userAgent": "ChatGPT-Connector/OpenMemory-Smoke",
+      "expectedTools": ["remember", "recall", "profile", "forget"],
+      "notes": "Requires provider-side OAuth configuration in real ChatGPT connector surfaces."
+    }
+  ],
+  "oauth": {
+    "authorizationServerPath": "/.well-known/oauth-authorization-server/api/auth",
+    "protectedResourcePath": "/.well-known/oauth-protected-resource/mcp",
+    "scopes": ["openid", "profile", "memory:read", "memory:write"]
+  },
+  "serverPath": "/mcp"
+}
