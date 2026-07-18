@@ -12,7 +12,7 @@ Vectorize, Workers AI, R2, OAuth, and MCP.
 
 It is not yet a broad self-serve SaaS launch. The backend, companion UI, larger
 benchmarks, and alpha telemetry are covered; higher-volume production
-operations and full external OAuth callback dogfooding still need work before a
+operations and vendor-specific MCP client dogfooding still need work before a
 larger hosted push.
 
 ## Proven Today
@@ -44,6 +44,10 @@ larger hosted push.
 - The official MCP TypeScript SDK client is dogfooded in CI, and named
   Inspector, Cursor, Claude, and ChatGPT-style request profiles are
   smoke-tested and documented across tools, resources, and prompts.
+- Local and live browser E2E verify the generic MCP OAuth callback flow with a
+  randomized localhost callback listener, consent UI, PKCE token exchange, and
+  MCP calls. Live browser E2E proves bearer-token MCP access; local browser E2E
+  keeps the development tenant header for the localhost MCP routing path.
 - Operational headers and request IDs are live on `/health`.
 - Workers Analytics Engine receives request, error, rate-limit, and async
   worker telemetry when deployed with the `OPENMEMORY_ANALYTICS` binding.
@@ -97,7 +101,9 @@ larger hosted push.
   account settings, team/tenant management, and confirmed account deletion.
 - [x] MCP protocol compatibility matrix is tested and documented for tools,
   resources, prompts, and named request profiles.
-- [x] Named external MCP clients are dogfooded and documented.
+- [x] Named external MCP request profiles are dogfooded and documented.
+- [x] Generic browser OAuth callback behavior for MCP clients is verified in
+  local and live browser E2E.
 - [x] Async source ingestion uses Queues and Workflows.
 - [x] Entity and relationship extraction workers are implemented.
 - [x] Larger recall and graph performance benchmarks run in CI or release

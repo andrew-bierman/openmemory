@@ -17,7 +17,8 @@ scopes, expected tools, and this compatibility matrix stay in sync.
 | Streamable HTTP `POST /mcp` | Supported | `apps/api/test/http.integration.test.ts` posts JSON-RPC requests with `Accept: application/json, text/event-stream`. |
 | OAuth protected resource discovery | Supported | Local and live tests validate `/.well-known/oauth-protected-resource/mcp`. |
 | OAuth dynamic client registration | Supported | Local and live tests register Better Auth OAuth clients. |
-| Authorization code with PKCE | Supported | Live E2E exchanges a PKCE code for an MCP-scoped bearer token. |
+| Authorization code with PKCE | Supported | Live API E2E exchanges a PKCE code for an MCP-scoped bearer token. |
+| Browser OAuth callback redirect | Supported | Local and live browser E2E register a client with a randomized localhost callback listener, accept consent in the browser, capture `code` and `state`, exchange the code, and call MCP. Live browser E2E proves bearer-token MCP access; local browser E2E keeps the development tenant header for localhost MCP routing. |
 | Bearer token audience validation | Supported | MCP verifies access-token audience against `<resource>/mcp`. |
 | `initialize` handshake | Supported | Integration tests call `initialize` and assert OpenMemory server metadata and tool capability advertisement. |
 | `notifications/initialized` | Supported | Integration tests assert the initialized notification is accepted as a 2xx request. |
@@ -34,10 +35,10 @@ scopes, expected tools, and this compatibility matrix stay in sync.
 | Client | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Official MCP TypeScript SDK `StreamableHTTPClientTransport` | Tested in CI | `bun run test:mcp:sdk` starts local Wrangler, connects to `/mcp`, lists tools/resources/prompts, calls `remember` and `recall`, reads `openmemory://profile` and `openmemory://recent`, and gets the `context` prompt. | Uses the local tenant header because CI cannot complete browser OAuth. Production clients should use OAuth. |
-| MCP Inspector | Config-shape smoke in CI | `bun run test:mcp:sdk` runs an `mcp-inspector-config-shape` request profile with Inspector-like headers through the official transport. | Manual UI OAuth callback dogfooding remains useful before broad hosted launch. |
-| Cursor | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `cursor-remote-mcp-config-shape` profile against `/mcp`. | Requires the user/client OAuth flow against the deployed Worker in real Cursor. |
-| Claude remote MCP connector / Messages API MCP connector | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `claude-remote-mcp-config-shape` profile against `/mcp`. | Requires provider-side OAuth configuration in real Claude surfaces. |
-| ChatGPT connector / Apps SDK MCP client | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `chatgpt-connector-mcp-config-shape` profile against `/mcp`. | Requires provider-side OAuth configuration in real ChatGPT connector surfaces. |
+| MCP Inspector | Config-shape smoke in CI plus generic browser callback verification | `bun run test:mcp:sdk` runs an `mcp-inspector-config-shape` request profile with Inspector-like headers through the official transport; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Manual Inspector UI dogfooding remains useful before broad hosted launch. |
+| Cursor | Config-shape smoke in CI plus generic browser callback verification | `bun run test:mcp:sdk` runs a `cursor-remote-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Requires the user/client OAuth flow against the deployed Worker in real Cursor. |
+| Claude remote MCP connector / Messages API MCP connector | Config-shape smoke in CI plus generic browser callback verification | `bun run test:mcp:sdk` runs a `claude-remote-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Requires provider-side OAuth configuration in real Claude surfaces. |
+| ChatGPT connector / Apps SDK MCP client | Config-shape smoke in CI plus generic browser callback verification | `bun run test:mcp:sdk` runs a `chatgpt-connector-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Requires provider-side OAuth configuration in real ChatGPT connector surfaces. |
 
 ## Client Expectations
 
@@ -76,6 +77,9 @@ Clients should run the normal MCP handshake:
 
 - Manual external-client OAuth callback dogfooding remains recommended before a
   high-volume hosted launch, but named Inspector, Cursor, Claude, and
-  ChatGPT-style streamable HTTP request shapes are now smoke-tested in CI.
+  ChatGPT-style streamable HTTP request shapes are smoke-tested in CI and the
+  generic browser callback redirect/token-exchange path is covered by local and
+  live browser E2E. Live browser E2E is the bearer-token proof; local browser
+  E2E preserves localhost tenant-header routing after token exchange.
 - MCP runs in the monolithic API Worker. Move to a dedicated `McpAgent` Worker
   only if session-specific state or independent scaling becomes necessary.

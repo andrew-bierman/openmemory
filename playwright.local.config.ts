@@ -13,7 +13,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "bun run dev:api",
+      command: "bun run db:migrate:local && bun run dev:api",
       url: "http://127.0.0.1:54150",
       reuseExistingServer: true,
       timeout: 60_000,
