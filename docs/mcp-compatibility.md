@@ -5,6 +5,11 @@ Worker-native `createMcpHandler`. Production clients authenticate with OAuth
 bearer tokens. Local integration tests use the development tenant header path
 so protocol behavior can run in CI without external OAuth fixtures.
 
+Named client request profiles live in
+[`config/mcp-client-profiles.json`](../config/mcp-client-profiles.json). The
+root `bun run check` gate validates that profile artifact, required OAuth
+scopes, expected tools, and this compatibility matrix stay in sync.
+
 ## Protocol Coverage
 
 | Client behavior | Status | Evidence |
@@ -42,6 +47,13 @@ URL: https://openmemory-api.abbierman101.workers.dev/mcp
 Accept: application/json, text/event-stream
 Content-Type: application/json
 Scopes: openid profile memory:read memory:write
+```
+
+The checked profile artifact can be used as a starting point for client-specific
+configuration:
+
+```sh
+bun run mcp:profiles:check
 ```
 
 Clients should run the normal MCP handshake:

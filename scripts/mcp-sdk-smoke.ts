@@ -1,6 +1,6 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,64 +13,38 @@ const testTmpRoot = existsSync("/Volumes/CrucialX10")
   ? externalTmpRoot
   : join(tmpdir(), "openmemory-mcp-sdk-smoke");
 
-const CLIENT_PROFILES = [
-  {
-    name: "official-typescript-sdk",
-    headers: {},
-  },
-  {
-    name: "mcp-inspector-config-shape",
-    headers: {
-      "user-agent": "MCP-Inspector/OpenMemory-Smoke",
-    },
-  },
-  {
-    name: "cursor-remote-mcp-config-shape",
-    headers: {
-      "user-agent": "Cursor/OpenMemory-Smoke",
-    },
-  },
-  {
-    name: "claude-remote-mcp-config-shape",
-    headers: {
-      "user-agent": "Claude-MCP/OpenMemory-Smoke",
-    },
-  },
-  {
-    name: "chatgpt-connector-mcp-config-shape",
-    headers: {
-      "user-agent": "ChatGPT-Connector/OpenMemory-Smoke",
-    },
-  },
-] as const;
+type ClientProfile = {
+  expectedTools: string[];
+  id: string;
+  userAgent: string;
+};
+
+const profiles = await loadProfiles();
 
 const worker = await startWorker();
 try {
-  for (const profile of CLIENT_PROFILES) {
+  for (const profile of profiles) {
     await runSdkSmoke(worker.baseUrl, profile);
   }
 } finally {
   await worker.stop();
 }
 
-async function runSdkSmoke(
-  baseUrl: string,
-  profile: (typeof CLIENT_PROFILES)[number],
-) {
-  const tenantId = `mcp-sdk-${profile.name}-${crypto.randomUUID()}`;
+async function runSdkSmoke(baseUrl: string, profile: ClientProfile) {
+  const tenantId = `mcp-sdk-${profile.id}-${crypto.randomUUID()}`;
   const transport = new StreamableHTTPClientTransport(
     new URL(`${baseUrl}/mcp`),
     {
       requestInit: {
         headers: {
-          ...profile.headers,
+          "user-agent": profile.userAgent,
           "x-openmemory-user-id": tenantId,
         },
       },
     },
   );
   const client = new Client({
-    name: `openmemory-${profile.name}`,
+    name: `openmemory-${profile.id}`,
     version: "0.1.0",
   });
 
@@ -78,10 +52,9 @@ async function runSdkSmoke(
   try {
     const tools = await client.listTools();
     const toolNames = tools.tools.map((tool) => tool.name);
-    assertIncludes(toolNames, "remember");
-    assertIncludes(toolNames, "recall");
-    assertIncludes(toolNames, "profile");
-    assertIncludes(toolNames, "forget");
+    for (const tool of profile.expectedTools) {
+      assertIncludes(toolNames, tool);
+    }
 
     await client.callTool({
       name: "remember",
@@ -106,6 +79,36 @@ async function runSdkSmoke(
   } finally {
     await client.close();
   }
+}
+
+async function loadProfiles(): Promise<ClientProfile[]> {
+  const raw = await readFile(
+    join(repoRoot, "config/mcp-client-profiles.json"),
+    "utf8",
+  );
+  const parsed = JSON.parse(raw) as {
+    profiles?: Array<Partial<ClientProfile>>;
+  };
+  const profiles = parsed.profiles ?? [];
+  if (profiles.length === 0) {
+    throw new Error("No MCP client profiles configured.");
+  }
+
+  return profiles.map((profile) => {
+    if (
+      !profile.id ||
+      !profile.userAgent ||
+      !Array.isArray(profile.expectedTools)
+    ) {
+      throw new Error(`Invalid MCP client profile: ${JSON.stringify(profile)}`);
+    }
+
+    return {
+      expectedTools: profile.expectedTools,
+      id: profile.id,
+      userAgent: profile.userAgent,
+    };
+  });
 }
 
 function assertIncludes(values: string[], expected: string) {
