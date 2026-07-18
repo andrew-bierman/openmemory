@@ -209,6 +209,24 @@ describe("dashboard model", () => {
       staleMemories: 1,
       status: "Needs repair",
     });
+
+    expect(
+      getIndexReadinessSummary(memories, {
+        ...readiness,
+        semanticIndex: {
+          ...readiness.semanticIndex,
+          expectedVectors: 8,
+          repairRecommended: true,
+          staleVectorCandidates: 2,
+          status: "needs_repair",
+        },
+      }),
+    ).toEqual({
+      currentMemories: 8,
+      currentShare: 80,
+      staleMemories: 2,
+      status: "Needs repair",
+    });
   });
 
   test("summarizes completed source ingestion for the ingest view", () => {
@@ -674,6 +692,18 @@ const readiness: ReadinessSnapshot = {
   },
   exports: {
     r2Configured: true,
+  },
+  semanticIndex: {
+    checkedVectorSample: 25,
+    configured: true,
+    expectedVectors: 240,
+    missingVectorSample: [],
+    repairRecommended: false,
+    staleVectorCandidates: 0,
+    staleVectorSample: [],
+    status: "current",
+    vectorizeConfigured: true,
+    workersAiConfigured: true,
   },
   warnings: [],
 };

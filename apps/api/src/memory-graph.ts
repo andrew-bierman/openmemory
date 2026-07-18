@@ -389,6 +389,51 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     return rows.map(rowToMemory);
   }
 
+  async listIndexableMemories() {
+    const rows = this.sqlState.storage.sql
+      .exec<MemoryRow>(
+        `select * from memories
+         where status = 'active' and is_latest = 1
+         order by created_at desc`,
+      )
+      .toArray();
+
+    return rows.map(rowToMemory);
+  }
+
+  async getIndexInventory(sampleLimit = 25) {
+    const rows = this.sqlState.storage.sql
+      .exec<{ id: string; status: string; is_latest: number }>(
+        `select id, status, is_latest
+         from memories
+         order by updated_at desc, created_at desc`,
+      )
+      .toArray();
+    const indexableMemoryIds = rows
+      .filter((row) => row.status === "active" && row.is_latest === 1)
+      .map((row) => row.id);
+    const purgeableMemoryIds = rows
+      .filter((row) => row.status !== "active" || row.is_latest === 0)
+      .map((row) => row.id);
+    const safeSampleLimit = Math.max(1, Math.min(sampleLimit, 100));
+
+    return {
+      totalMemories: rows.length,
+      indexableMemories: indexableMemoryIds.length,
+      purgeableMemories: purgeableMemoryIds.length,
+      indexableMemoryIds,
+      purgeableMemoryIds,
+      samples: {
+        indexableMemoryIds: indexableMemoryIds.slice(0, safeSampleLimit),
+        purgeableMemoryIds: purgeableMemoryIds.slice(0, safeSampleLimit),
+        indexableMemoryIdsTruncated:
+          indexableMemoryIds.length > safeSampleLimit,
+        purgeableMemoryIdsTruncated:
+          purgeableMemoryIds.length > safeSampleLimit,
+      },
+    };
+  }
+
   async search(input: SearchWithSemanticIds) {
     const data = SearchSchema.parse(input);
     const semanticIds = Array.isArray(input.semanticIds)

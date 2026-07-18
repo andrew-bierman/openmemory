@@ -230,7 +230,32 @@ export function getGraphOperationsSummary(
 
 export function getIndexReadinessSummary(
   memories: Memory[],
+  readiness?: ReadinessSnapshot | null,
 ): IndexReadinessSummary {
+  if (readiness?.semanticIndex) {
+    const { semanticIndex } = readiness;
+    const currentMemories = semanticIndex.expectedVectors;
+    const totalIndexCandidates =
+      semanticIndex.expectedVectors + semanticIndex.staleVectorCandidates;
+    const currentShare =
+      totalIndexCandidates > 0
+        ? Math.round((currentMemories / totalIndexCandidates) * 100)
+        : 0;
+    const status =
+      semanticIndex.expectedVectors === 0
+        ? "Empty"
+        : semanticIndex.repairRecommended
+          ? "Needs repair"
+          : "Current";
+
+    return {
+      currentMemories,
+      currentShare,
+      staleMemories: semanticIndex.staleVectorCandidates,
+      status,
+    };
+  }
+
   const indexedMemories = memories.filter(
     (memory) => memory.status !== "forgotten",
   );

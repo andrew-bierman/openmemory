@@ -104,6 +104,22 @@ tenant's vectors.
 The search path uses semantic candidates when available and falls back to
 deterministic keyword/graph ranking when embeddings are not configured.
 
+`GET /v1/readiness` includes a semantic-index diagnostic derived from the
+canonical Durable Object graph plus sampled Vectorize lookups when Vectorize is
+bound. The diagnostic reports:
+
+- expected current vectors from active latest graph memories
+- stale vector candidates from superseded, historical, or forgotten graph
+  records
+- sampled missing current vectors
+- sampled stale vectors that still exist in Vectorize
+- whether `/v1/index/repair` is recommended
+
+`POST /v1/index/repair` deletes tenant-scoped vectors for stale graph records
+before re-upserting every active latest graph memory. The graph remains the
+source of truth; Vectorize is treated as an eventually consistent secondary
+index.
+
 ## R2 Exports
 
 `POST /v1/exports` serializes the current tenant graph and writes JSON to R2
@@ -199,6 +215,8 @@ MCP tools at launch are `remember`, `recall`, `profile`, and `forget`.
 
 - tenant source and normalized tenant id
 - graph counts, density, entity count, tag count
+- semantic index status, expected vector count, stale candidate count, sampled
+  missing vectors, sampled stale vectors, and repair recommendation
 - relationship catalog size and top relationship distribution
 - binding availability booleans
 - auth mode and provider availability booleans
