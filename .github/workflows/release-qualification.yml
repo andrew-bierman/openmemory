@@ -51,3 +51,11 @@ jobs:
         run: bun run test:scale:local
         env:
           OPENMEMORY_SCALE_GRAPH_SIZE: ${{ github.event.inputs.scale_graph_size }}
+
+      - name: Upload benchmark reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-reports
+          path: .tmp/benchmark-reports/*.jsonl
+          if-no-files-found: ignore

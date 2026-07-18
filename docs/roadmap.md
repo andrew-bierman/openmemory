@@ -64,6 +64,9 @@
 - Local Wrangler integration includes a moderate graph-scale recall smoke, and
   `bun run test:scale:local` runs a heavier bounded graph check with an
   overridable 220 to 1,000 memory size.
+- Local benchmark and release-qualification runs emit JSONL benchmark evidence
+  under `.tmp/benchmark-reports/`; the manual GitHub release workflow uploads
+  those files as a `benchmark-reports` artifact.
 - Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.
 - Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
@@ -117,9 +120,10 @@
     explorer, but still needs broader hosted user feedback on navigation
 - RAG quality is still basic:
   - no LLM/ML reranker
-- Graph performance has larger local smoke coverage, graph-specific product
-  signals, relationship diagnostics, and production request telemetry, but
-  still needs high-volume production benchmarks before a hosted SaaS launch.
+- Graph performance has larger local smoke coverage, release benchmark
+  artifacts, graph-specific product signals, relationship diagnostics, and
+  production request telemetry, but still needs recurring high-volume
+  production observations before a hosted SaaS launch.
 - Graph restore supports preview, whole-tenant replace, and additive merge
   recovery, but not field-level diff conflict resolution.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the

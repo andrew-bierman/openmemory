@@ -246,7 +246,8 @@ bun run release:validate
 
 Maintainers can also run the manual `Release Qualification` GitHub Actions
 workflow before publishing a tag. It records the full local release gate and a
-configurable high-volume graph scale run.
+configurable high-volume graph scale run, then uploads benchmark JSONL reports
+as a `benchmark-reports` artifact.
 
 For the faster pull-request loop:
 
@@ -285,6 +286,10 @@ Optional heavier local scale check:
 bun run test:scale:local
 OPENMEMORY_SCALE_GRAPH_SIZE=1000 bun run test:scale:local
 ```
+
+Benchmark runs write ignored JSONL evidence under
+`.tmp/benchmark-reports/`, including recall-quality scores, graph size, recall
+latency, and asserted thresholds.
 
 Convert external MemoryBench-style JSON or JSONL fixtures into an OpenMemory
 graph export for local restore/import evaluation:

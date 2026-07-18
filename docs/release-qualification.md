@@ -52,6 +52,13 @@ The benchmark command runs the focused recall and graph-scale cases from
 - A 220-memory tenant graph must return bounded recall results in under
   `7.5s` on the local Wrangler test runner.
 
+Local benchmark commands write JSONL evidence to
+`.tmp/benchmark-reports/benchmark-local.jsonl` and
+`.tmp/benchmark-reports/scale-local.jsonl`. Each row includes the generated
+timestamp, commit when available, benchmark type, graph size or recall case
+count, measured recall latency or quality score, and the threshold asserted by
+the test.
+
 The heavier launch scale gate is:
 
 ```sh
@@ -88,6 +95,10 @@ when you want a durable GitHub Actions record. It runs `bun run
 release:validate` and, by default, follows it with the 1,000-memory local scale
 gate. Set `scale_graph_size` to `0` only when intentionally skipping the
 additional high-volume local gate for a maintenance-only release.
+
+The workflow uploads the generated `.tmp/benchmark-reports/*.jsonl` files as a
+`benchmark-reports` artifact so release reviewers can compare graph latency and
+recall-quality evidence across candidate commits.
 
 ## Optional Live Gate
 
