@@ -51,6 +51,7 @@
     "test:mcp:sdk": "bun run build:web-shell && bun scripts/mcp-sdk-smoke.ts",
     "test:integration:local": "bun run --cwd apps/api test:integration",
     "test:integration:docker": "docker compose -f docker-compose.test.yml run --build --rm local-wrangler-integration",
+    "test:integration:docker:cached": "docker compose -f docker-compose.test.yml run --pull never --rm -v \"$PWD:/workspace\" local-wrangler-integration sh -lc 'bun install --frozen-lockfile && bun run test:integration:local'",
     "test:e2e:local": "bun run build:web-shell && playwright test -c playwright.local.config.ts",
     "test:e2e:ui": "OPENMEMORY_LIVE_E2E=true playwright test -c playwright.config.ts",
     "release:validate": "bun run format && bun run check && bun run build && bun run test:mcp:sdk && bun run test:integration:local && bun run test:e2e:local && bun run test:benchmark:local && bun run test:scale:local"
