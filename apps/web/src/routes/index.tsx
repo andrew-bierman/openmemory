@@ -1438,8 +1438,10 @@ function OperationsReadiness({
             <div>
               <dt>Providers</dt>
               <dd>
-                GitHub {readiness?.auth.socialProviders.github ? "on" : "off"} ·
-                Google {readiness?.auth.socialProviders.google ? "on" : "off"}
+                GitHub{" "}
+                {formatProviderStatus(readiness?.auth.socialProviders.github)} ·
+                Google{" "}
+                {formatProviderStatus(readiness?.auth.socialProviders.google)}
               </dd>
             </div>
           </dl>
@@ -2271,9 +2273,30 @@ function formatBindingLabel(value: string) {
     .replace(/^./, (letter) => letter.toUpperCase());
 }
 
+function formatProviderStatus(
+  provider?: ReadinessSnapshot["auth"]["socialProviders"]["github"],
+) {
+  switch (provider?.status) {
+    case "ready":
+      return "ready";
+    case "partial":
+      return "partial";
+    case "missing":
+      return "not configured";
+    default:
+      return "unknown";
+  }
+}
+
 function formatWarningLabel(value: string) {
   if (value === "rerank_model_requires_workers_ai") {
     return "Rerank model requires Workers AI";
+  }
+  if (value === "github_oauth_provider_partial") {
+    return "GitHub OAuth provider is missing an id or secret";
+  }
+  if (value === "google_oauth_provider_partial") {
+    return "Google OAuth provider is missing an id or secret";
   }
 
   return value

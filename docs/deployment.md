@@ -104,6 +104,11 @@ bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_ID
 bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 
+`GET /v1/readiness` reports each provider as `ready`, `partial`, or `missing`
+without exposing credential values. A `partial` provider means only the client
+id or only the client secret is configured, and the readiness response includes
+`github_oauth_provider_partial` or `google_oauth_provider_partial`.
+
 Optional machine-token fallback:
 
 ```sh

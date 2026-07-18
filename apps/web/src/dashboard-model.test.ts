@@ -756,8 +756,18 @@ const readiness: ReadinessSnapshot = {
     mode: "local-development-header",
     betterAuthUrl: "http://127.0.0.1:8787",
     socialProviders: {
-      github: false,
-      google: false,
+      github: {
+        configured: false,
+        hasClientId: false,
+        hasClientSecret: false,
+        status: "missing",
+      },
+      google: {
+        configured: false,
+        hasClientId: false,
+        hasClientSecret: false,
+        status: "missing",
+      },
     },
   },
   mcp: {
