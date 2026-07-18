@@ -120,6 +120,12 @@ The workflow uploads the generated `.tmp/benchmark-reports/*.jsonl` files as a
 `benchmark-reports` artifact so release reviewers can compare graph latency and
 recall-quality evidence across candidate commits.
 
+The latest recorded release gate for
+`ae433710f37b7d784833c47d37b1d8da5dd8276e` passed in
+`https://github.com/andrew-bierman/openmemory/actions/runs/29664622501` with
+recall MRR `1.0`, Hit@3 `1.0`, 220-memory graph recall `19.92ms`,
+360-memory graph recall `20.51ms`, and 1,000-memory graph recall `65.73ms`.
+
 Launch-readiness evidence pointers live in
 `config/launch-evidence.json`. Keep that manifest and
 `docs/launch-readiness.md` synchronized when promoting a candidate:

@@ -124,12 +124,12 @@ larger hosted push.
   protected-resource metadata, with Analytics Engine telemetry and optional
   webhook/email/PagerDuty alert dispatch.
 - [x] Latest repository gate
-  `132a0dc175751f1bb2f90a1f4b9a0d4eb3f4bd73` has green main CI:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29664341903`.
+  `ae433710f37b7d784833c47d37b1d8da5dd8276e` has green main CI:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29664533575`.
 - [x] Latest repository gate
-  `132a0dc175751f1bb2f90a1f4b9a0d4eb3f4bd73` has a green Cloudflare Workers
+  `ae433710f37b7d784833c47d37b1d8da5dd8276e` has a green Cloudflare Workers
   Build:
-  `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/461e0692-86af-4cf6-bab2-e5645567e00a`.
+  `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/b08e35a6-9d52-4c33-a584-29680090eb95`.
 - [x] Latest verified runtime candidate
   `3f1603557c3e82351ea78734889aa8a61062e7c0` has green live smoke proving
   hosted auth, graph recall, readiness, R2 export, OAuth/MCP, hosted UI, remote
@@ -138,12 +138,14 @@ larger hosted push.
 - [x] Remote D1 cleanup counters after current live smoke are zero:
   `oauth_client=0`, `live_users=0`, `live_benchmark_users=0`.
 - [x] Latest full local release validation evidence passed on
-  `f7914b8ce9b78dc8e320c89c5a228593accb92e1` with `bun run
-  release:validate`, including local recall MRR `1.0`, hit@3 `1.0`,
-  220-memory graph recall `5.95ms`, and 360-memory graph recall `10.85ms`.
+  `ae433710f37b7d784833c47d37b1d8da5dd8276e` in
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29664622501`
+  with `bun run release:validate`, including local recall MRR `1.0`, hit@3
+  `1.0`, 220-memory graph recall `19.92ms`, 360-memory graph recall
+  `20.51ms`, and 1,000-memory graph recall `65.73ms`.
 - [x] Latest hosted production graph benchmark evidence passed in
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29662033364`:
-  80 active memories, 79 edges, recall latency `1055.43ms` versus a `12000ms`
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29664622502`:
+  80 active memories, 79 edges, recall latency `1071.36ms` versus a `12000ms`
   threshold.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
