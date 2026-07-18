@@ -12,8 +12,8 @@ Vectorize, Workers AI, R2, OAuth, and MCP.
 
 It is not yet a broad self-serve SaaS launch. The backend, companion UI, larger
 benchmarks, and alpha telemetry are covered; higher-volume production
-operations, hosted semantic-provider proof, and full external OAuth callback
-dogfooding still need work before a larger hosted push.
+operations and full external OAuth callback dogfooding still need work before a
+larger hosted push.
 
 ## Proven Today
 
@@ -22,9 +22,8 @@ dogfooding still need work before a larger hosted push.
   `wrangler.jsonc`.
 - Local CI covers formatting, types, unit tests, Worker integration tests, and
   browser E2E.
-- Live production smoke exists for the deployed Worker. The latest qualifying
-  run must pass remote Workers AI and Vectorize semantic indexing/recall checks
-  before alpha launch readiness is claimed.
+- Live production smoke has passed against the deployed Worker, including
+  remote Workers AI and Vectorize semantic indexing/recall checks.
 - Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, semantic
   provider diagnostics, source ingestion, R2 export, tenant readiness snapshots,
   browser-session readiness, and hosted UI smoke are covered by tests.
@@ -104,8 +103,9 @@ dogfooding still need work before a larger hosted push.
 - [x] Request IDs and structured request logs exist.
 - [x] Cloudflare-native global rate limiter exists through a Durable Object.
 - [x] Live smoke workflow exists.
-- [ ] Latest live smoke proves remote Workers AI and Vectorize semantic recall
-  after the deployed semantic-index metadata fix.
+- [x] Latest live smoke proves remote Workers AI and Vectorize semantic recall
+  after the deployed semantic-index metadata fix. Evidence:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29659581322`.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
