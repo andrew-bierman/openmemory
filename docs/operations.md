@@ -198,9 +198,9 @@ Current limitations:
   [r2-lifecycle.json](../infra/cloudflare/r2-lifecycle.json). Tenant/account
   deletion also best-effort removes the deleted tenant's export objects when
   the R2 binding is available.
-- Durable Object graph import supports tenant-scoped destructive `replace` and
-  additive `merge` from OpenMemory export payloads; field-level diff conflict
-  resolution is not implemented.
+- Durable Object graph import supports tenant-scoped preview, destructive
+  `replace`, and additive `merge` from OpenMemory export payloads; field-level
+  diff conflict resolution is not implemented.
 
 Recommended operator controls before broader public launch:
 
@@ -229,7 +229,21 @@ current tenant graph should be wiped before restoring the export.
 
 1. Retrieve the tenant export JSON from R2 or another trusted backup location.
 2. Confirm the target tenant id from `/v1/account` or `/v1/readiness`.
-3. Call:
+3. Preview the import:
+
+   ```sh
+   curl -X POST "$OPENMEMORY_API_URL/v1/imports/preview" \
+     -H "content-type: application/json" \
+     -H "authorization: Bearer $OPENMEMORY_API_TOKEN" \
+     -d @restore-payload.json
+   ```
+
+   Confirm the previewed `existing`, `incoming`, `impact`, `conflicts`, and
+   `candidates` fields match the recovery plan. Preview is read-only, but it
+   validates the same tenant confirmation, export shape, and dangling edge
+   rules as import.
+
+4. Call:
 
    ```sh
    curl -X POST "$OPENMEMORY_API_URL/v1/imports" \
@@ -257,7 +271,7 @@ current tenant graph should be wiped before restoring the export.
    new memory IDs from the export. Merge validates that every incoming edge
    points to either an existing memory or an incoming memory.
 
-4. Verify `/v1/graph/stats`, `/v1/search`, and `/v1/readiness` for the tenant.
+5. Verify `/v1/graph/stats`, `/v1/search`, and `/v1/readiness` for the tenant.
 
 ## Incident Notes
 

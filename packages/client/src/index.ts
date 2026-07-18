@@ -135,6 +135,45 @@ export type GraphImportResult = {
   importedAt: string;
 };
 
+export type GraphImportPreviewResult = {
+  tenantId: string;
+  mode: "replace" | "merge";
+  version: 1;
+  previewedAt: string;
+  incoming: {
+    memories: number;
+    edges: number;
+  };
+  existing: {
+    memories: number;
+    edges: number;
+    tags: number;
+    entities: number;
+    ingestionJobs: number;
+  };
+  impact: {
+    memoriesImported: number;
+    memoriesSkipped: number;
+    edgesImported: number;
+    wouldDelete: {
+      memories: number;
+      edges: number;
+      tags: number;
+      entities: number;
+      ingestionJobs: number;
+    };
+    wouldReplace: boolean;
+  };
+  conflicts: {
+    duplicateMemoryIds: string[];
+    duplicateMemoryIdsTruncated: boolean;
+  };
+  candidates: {
+    newMemoryIds: string[];
+    newMemoryIdsTruncated: boolean;
+  };
+};
+
 export type IndexRepairResult = {
   attempted: number;
   tenantId: string;
@@ -367,6 +406,17 @@ export function createOpenMemoryClient(
       unwrap<GraphImportResult>(
         client.v1.imports.post({ ...input, mode: input.mode ?? "replace" }),
       ),
+    previewGraphImport: (input: {
+      confirmTenantId: string;
+      export: unknown;
+      mode?: "replace" | "merge";
+    }) =>
+      unwrap<GraphImportPreviewResult>(
+        client.v1.imports.preview.post({
+          ...input,
+          mode: input.mode ?? "replace",
+        }),
+      ),
     repairIndex: () => unwrap<IndexRepairResult>(client.v1.index.repair.post()),
     purgeTenantData: (confirmTenantId: string) =>
       unwrap<TenantPurgeResult>(client.v1.tenant.delete({ confirmTenantId })),
@@ -455,6 +505,13 @@ type EdenClient = {
       post(): EdenResult;
     };
     imports: {
+      preview: {
+        post(input: {
+          confirmTenantId: string;
+          mode: "replace" | "merge";
+          export: unknown;
+        }): EdenResult;
+      };
       post(input: {
         confirmTenantId: string;
         mode: "replace" | "merge";

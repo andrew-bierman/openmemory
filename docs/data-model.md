@@ -118,8 +118,13 @@ Export keys use:
 The export payload contains `version`, `exportedAt`, graph `stats`, `memories`,
 and `edges`.
 
+`POST /v1/imports/preview` validates an OpenMemory graph export against the
+resolved tenant after the caller supplies a matching `confirmTenantId`. It
+returns incoming counts, existing graph counts, bounded duplicate/new memory ID
+lists, and the expected replace/merge impact without mutating the graph.
+
 `POST /v1/imports` imports an OpenMemory graph export into the resolved tenant
-after the caller supplies a matching `confirmTenantId`.
+after the same tenant confirmation and validation.
 
 - `mode: "replace"` is intentionally destructive: it purges the current tenant
   Durable Object graph, best-effort deletes stale Vectorize ids, imports
