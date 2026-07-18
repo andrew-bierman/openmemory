@@ -24,7 +24,8 @@ larger hosted push.
   browser E2E.
 - Live production smoke has passed against the deployed Worker.
 - Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, source
-  ingestion, R2 export, and hosted UI smoke are covered by tests.
+  ingestion, R2 export, tenant readiness snapshots, browser-session readiness,
+  and hosted UI smoke are covered by tests.
 - Async source ingestion is covered by local Wrangler integration with Queues
   and Workflows.
 - Entity and relationship extraction workers are covered by local Wrangler

@@ -35,8 +35,11 @@
 - The API Worker is deployed at `https://openmemory-api.abbierman101.workers.dev`.
 - Worker-hosted login, signup, consent, and dashboard flows use Better Auth session cookies.
 - `apps/web` now has a polished hosted-dashboard direction with memory health metrics, capture cadence charts, memory-type distribution, hosted profile editing, onboarding empty states, admin settings, MCP setup, graph operations signals, and a library-backed Obsidian-style knowledge map over graph-shaped memory data.
-- Opt-in production API E2E covers hosted UI response, Better Auth session, graph recall, OAuth PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
-- Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh, recall, and forget.
+- Opt-in production API E2E covers hosted UI response, Better Auth session,
+  tenant readiness snapshots, graph recall, source ingestion, R2 export, OAuth
+  PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
+- Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh,
+  recall, forget, and browser-session readiness access.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
 - `/v1/sources/async` creates durable ingestion jobs, buffers requests through
   Cloudflare Queues, and runs the same graph/indexing pipeline through a
@@ -66,7 +69,7 @@
   `openmemory.request_error`, rate-limit, 5xx, and async worker failure events,
   with saved SQL in `docs/observability-queries.sql`.
 - The `Live Smoke` workflow runs hourly against production as the alpha alert
-  path for API, auth, MCP, and hosted UI regressions.
+  path for API, auth, readiness, MCP, and hosted UI regressions.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
 - `/v1/account` exposes session-backed account, workspace, and team member
@@ -126,6 +129,9 @@
    - Add higher-volume graph performance benchmarks and production telemetry.
 
 4. Web app expansion
+   - Mount or deploy the richer TanStack Start dashboard so the production URL
+     serves the same Operations, graph explorer, admin, MCP, and chart surfaces
+     covered by local E2E.
    - Expand hosted navigation polish from alpha feedback.
    - Keep the hosted TanStack Start UI as a companion dashboard/control plane; the API and MCP integrations remain the primary product surfaces.
    - Use shadcn dashboard templates, defaults, and theme tokens as the baseline; defer Apple/SwiftUI-specific styling until the product structure is stronger.
