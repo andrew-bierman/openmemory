@@ -24,6 +24,12 @@ larger hosted push.
   browser E2E.
 - Live production smoke has passed against the deployed Worker, including
   remote Workers AI and Vectorize semantic indexing/recall checks.
+- Release validation has passed locally on the current launch candidate,
+  including secret scanning, type checks, unit/integration tests, production
+  build, MCP SDK smoke, local browser E2E, recall benchmarks, and bounded graph
+  scale.
+- Hosted production graph benchmark has passed against the deployed Worker with
+  an 80-memory throwaway graph, including account cleanup.
 - Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, semantic
   provider diagnostics, source ingestion, R2 export, tenant readiness snapshots,
   browser-session readiness, and hosted UI smoke are covered by tests.
@@ -107,6 +113,13 @@ larger hosted push.
   after the deployed semantic-index metadata fix. Evidence:
   `https://github.com/andrew-bierman/openmemory/actions/runs/29660451539`
   on `3e5c8f3549f4f2f6cd4e31a594b433f5d60bee81`.
+- [x] Latest local release validation passed on
+  `0952adae6259cd1574a738f6a1da194dbd4fe8d1` with `bun run
+  release:validate`.
+- [x] Latest hosted production graph benchmark passed on
+  `0952adae6259cd1574a738f6a1da194dbd4fe8d1`: 80 active memories, 79 edges,
+  recall latency `874.9ms` versus a `12000ms` threshold, with remote D1 cleanup
+  counters at zero for live-smoke and live-benchmark users.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
