@@ -105,7 +105,8 @@ larger hosted push.
 - [x] Live smoke workflow exists.
 - [x] Latest live smoke proves remote Workers AI and Vectorize semantic recall
   after the deployed semantic-index metadata fix. Evidence:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29659581322`.
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29660451539`
+  on `3e5c8f3549f4f2f6cd4e31a594b433f5d60bee81`.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
