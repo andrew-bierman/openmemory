@@ -416,6 +416,10 @@ textarea:focus-visible,
   min-width: 0;
 }
 
+.overview-grid-loading {
+  min-height: 432px;
+}
+
 .metric-tile,
 .chart-panel,
 .insight-panel,
@@ -461,6 +465,41 @@ textarea:focus-visible,
 
 .metric-tile small {
   color: var(--muted-foreground);
+}
+
+.skeleton-line {
+  display: block;
+  width: 100%;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e4e4e7 0%, #f4f4f5 50%, #e4e4e7 100%);
+  background-size: 200% 100%;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-line-short {
+  width: 48%;
+}
+
+.skeleton-line-title {
+  width: 64%;
+  height: 28px;
+}
+
+@keyframes skeleton-pulse {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-line {
+    animation: none;
+  }
 }
 
 .chart-panel {
