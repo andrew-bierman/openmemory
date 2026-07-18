@@ -860,6 +860,115 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     metadata: changedMemoryA.metadata,
     entityIds: changedMemoryA.entityIds,
   });
+
+  const semanticMergeMemoryA = {
+    ...changedMemoryA,
+    content:
+      "Memory A imported from another graph adds semantic restore context.",
+    tags: ["semantic", "overwrite"],
+    metadata: { semantic: true, importedPriority: "high" },
+    entityIds: ["restored-memory-a", "semantic-restore"],
+    confidence: 0.95,
+    importance: 0.9,
+    updatedAt: new Date().toISOString(),
+  };
+  const semanticMergePreview = await getJson<GraphImportPreviewResponse>(
+    await worker.fetch("/v1/imports/preview", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        confirmTenantId: tenantA,
+        mode: "merge",
+        conflictPolicy: "semantic_merge",
+        export: {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          memories: [semanticMergeMemoryA],
+          edges: [],
+        },
+      }),
+    }),
+  );
+  expect(semanticMergePreview).toMatchObject({
+    tenantId: tenantA,
+    mode: "merge",
+    conflictPolicy: "semantic_merge",
+    impact: {
+      memoriesImported: 0,
+      memoriesSkipped: 0,
+      memoriesOverwritten: 0,
+      memoriesMerged: 1,
+      edgesImported: 0,
+    },
+    conflicts: {
+      changedMemoryIds: [memoryA.id],
+    },
+  });
+  const semanticMerged = await getJson<GraphImportResponse>(
+    await worker.fetch("/v1/imports", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        confirmTenantId: tenantA,
+        mode: "merge",
+        conflictPolicy: "semantic_merge",
+        export: {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          memories: [semanticMergeMemoryA],
+          edges: [],
+        },
+      }),
+    }),
+  );
+  expect(semanticMerged).toMatchObject({
+    tenantId: tenantA,
+    mode: "merge",
+    memoriesImported: 0,
+    memoriesSkipped: 0,
+    memoriesOverwritten: 0,
+    memoriesMerged: 1,
+    edgesImported: 0,
+    activeMemoriesIndexed: 1,
+    merged: {
+      memoriesSkipped: 0,
+      memoriesOverwritten: 0,
+      memoriesMerged: 1,
+    },
+  });
+  const semanticallyMergedMemory = await getJson<MemoryResponse>(
+    await worker.fetch(`/v1/memories/${memoryA.id}`, {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(semanticallyMergedMemory.content).toContain(changedMemoryA.content);
+  expect(semanticallyMergedMemory.content).toContain(
+    semanticMergeMemoryA.content,
+  );
+  expect(semanticallyMergedMemory.tags).toEqual([
+    "restored",
+    "overwrite",
+    "semantic",
+  ]);
+  expect(semanticallyMergedMemory.entityIds).toEqual([
+    "restored-memory-a",
+    "semantic-restore",
+  ]);
+  expect(semanticallyMergedMemory.metadata).toMatchObject({
+    restored: true,
+    semantic: true,
+    importedPriority: "high",
+    openmemoryImportMerge: {
+      strategy: "semantic_merge",
+      incomingSource: semanticMergeMemoryA.source,
+    },
+  });
   const tenantBListAfterPurge = await getJson<MemoryResponse[]>(
     await worker.fetch("/v1/memories", {
       headers: tenantHeaders(tenantB),
@@ -2853,11 +2962,13 @@ type GraphImportResponse = {
   memoriesImported: number;
   memoriesSkipped?: number;
   memoriesOverwritten?: number;
+  memoriesMerged?: number;
   edgesImported: number;
   activeMemoriesIndexed: number;
   merged?: {
     memoriesSkipped: number;
     memoriesOverwritten: number;
+    memoriesMerged?: number;
   };
   replaced?: {
     memoriesDeleted: number;
@@ -2878,7 +2989,7 @@ type GraphImportResponse = {
 type GraphImportPreviewResponse = {
   tenantId: string;
   mode: "replace" | "merge";
-  conflictPolicy: "skip" | "overwrite";
+  conflictPolicy: "skip" | "overwrite" | "semantic_merge";
   version: 1;
   previewedAt: string;
   incoming: {
@@ -2896,6 +3007,7 @@ type GraphImportPreviewResponse = {
     memoriesImported: number;
     memoriesSkipped: number;
     memoriesOverwritten?: number;
+    memoriesMerged?: number;
     edgesImported: number;
     wouldDelete: {
       memories: number;

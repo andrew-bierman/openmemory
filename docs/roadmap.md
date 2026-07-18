@@ -87,8 +87,8 @@
   expected impact without mutating tenant graph data.
 - `/v1/imports` imports a validated OpenMemory graph export into a tenant as
   either a destructive `replace` or additive `merge`, supports explicit
-  duplicate-memory overwrite, then re-indexes active imported or overwritten
-  memories.
+  duplicate-memory overwrite or deterministic semantic merge, then re-indexes
+  active imported, overwritten, or synthesized merged memories.
 - `/v1/index/repair` deletes stale tenant-scoped vectors for superseded,
   historical, or forgotten graph records before re-upserting every active latest
   tenant memory through the embedding and Vectorize indexing path.
@@ -138,8 +138,8 @@
   production request telemetry, a recurring hosted synthetic benchmark, and
   generated hosted benchmark trend summaries, but still needs human review of
   those trends across multiple production runs before a hosted SaaS launch.
-- Graph restore supports preview, whole-tenant replace, additive merge, and
-  explicit duplicate overwrite recovery, but not automatic semantic merge of
+- Graph restore supports preview, whole-tenant replace, additive merge,
+  explicit duplicate overwrite recovery, and deterministic semantic merge of
   two changed memory records.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the
   preferred deploy path; the manual GitHub deploy workflow remains a fallback

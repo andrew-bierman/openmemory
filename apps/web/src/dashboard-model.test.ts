@@ -253,6 +253,7 @@ describe("dashboard model", () => {
       duplicateMemories: 0,
       edgesImported: 0,
       memoriesImported: 0,
+      memoriesMerged: 0,
       memoriesOverwritten: 0,
       memoriesSkipped: 0,
       newMemories: 0,
@@ -361,6 +362,57 @@ describe("dashboard model", () => {
     ).toMatchObject({
       memoriesOverwritten: 1,
       status: "Changed duplicates will be overwritten",
+      tone: "good",
+    });
+
+    expect(
+      getGraphImportPreviewSummary({
+        tenantId: "local-user",
+        mode: "merge",
+        conflictPolicy: "semantic_merge",
+        version: 1,
+        previewedAt: "2026-07-18T00:00:00.000Z",
+        incoming: { memories: 1, edges: 0 },
+        existing: {
+          memories: 4,
+          edges: 6,
+          tags: 7,
+          entities: 8,
+          ingestionJobs: 0,
+        },
+        impact: {
+          memoriesImported: 0,
+          memoriesSkipped: 0,
+          memoriesOverwritten: 0,
+          memoriesMerged: 1,
+          edgesImported: 0,
+          wouldDelete: {
+            memories: 0,
+            edges: 0,
+            tags: 0,
+            entities: 0,
+            ingestionJobs: 0,
+          },
+          wouldReplace: false,
+        },
+        conflicts: {
+          duplicateMemoryIds: ["mem_a"],
+          duplicateMemoryIdsTruncated: false,
+          changedMemoryIds: ["mem_a"],
+          changedMemoryIdsTruncated: false,
+          unchangedMemoryIds: [],
+          unchangedMemoryIdsTruncated: false,
+          fieldConflicts: [{ id: "mem_a", fields: ["content"] }],
+          fieldConflictsTruncated: false,
+        },
+        candidates: {
+          newMemoryIds: [],
+          newMemoryIdsTruncated: false,
+        },
+      }),
+    ).toMatchObject({
+      memoriesMerged: 1,
+      status: "Changed duplicates will be merged",
       tone: "good",
     });
 

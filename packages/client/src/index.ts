@@ -117,9 +117,11 @@ export type GraphImportResult = {
   activeMemoriesIndexed: number;
   memoriesSkipped?: number;
   memoriesOverwritten?: number;
+  memoriesMerged?: number;
   merged?: {
     memoriesSkipped: number;
     memoriesOverwritten: number;
+    memoriesMerged?: number;
   };
   replaced?: {
     memoriesDeleted: number;
@@ -140,7 +142,7 @@ export type GraphImportResult = {
 export type GraphImportPreviewResult = {
   tenantId: string;
   mode: "replace" | "merge";
-  conflictPolicy: "skip" | "overwrite";
+  conflictPolicy: "skip" | "overwrite" | "semantic_merge";
   version: 1;
   previewedAt: string;
   incoming: {
@@ -158,6 +160,7 @@ export type GraphImportPreviewResult = {
     memoriesImported: number;
     memoriesSkipped: number;
     memoriesOverwritten?: number;
+    memoriesMerged?: number;
     edgesImported: number;
     wouldDelete: {
       memories: number;
@@ -446,7 +449,7 @@ export function createOpenMemoryClient(
       confirmTenantId: string;
       export: unknown;
       mode?: "replace" | "merge";
-      conflictPolicy?: "skip" | "overwrite";
+      conflictPolicy?: "skip" | "overwrite" | "semantic_merge";
     }) =>
       unwrap<GraphImportResult>(
         client.v1.imports.post({
@@ -459,7 +462,7 @@ export function createOpenMemoryClient(
       confirmTenantId: string;
       export: unknown;
       mode?: "replace" | "merge";
-      conflictPolicy?: "skip" | "overwrite";
+      conflictPolicy?: "skip" | "overwrite" | "semantic_merge";
     }) =>
       unwrap<GraphImportPreviewResult>(
         client.v1.imports.preview.post({
@@ -560,14 +563,14 @@ type EdenClient = {
         post(input: {
           confirmTenantId: string;
           mode: "replace" | "merge";
-          conflictPolicy?: "skip" | "overwrite";
+          conflictPolicy?: "skip" | "overwrite" | "semantic_merge";
           export: unknown;
         }): EdenResult;
       };
       post(input: {
         confirmTenantId: string;
         mode: "replace" | "merge";
-        conflictPolicy?: "skip" | "overwrite";
+        conflictPolicy?: "skip" | "overwrite" | "semantic_merge";
         export: unknown;
       }): EdenResult;
     };

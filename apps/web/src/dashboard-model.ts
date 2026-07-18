@@ -305,6 +305,7 @@ export function getGraphImportPreviewSummary(
       duplicateMemories: 0,
       edgesImported: 0,
       memoriesImported: 0,
+      memoriesMerged: 0,
       memoriesOverwritten: 0,
       memoriesSkipped: 0,
       newMemories: 0,
@@ -314,6 +315,7 @@ export function getGraphImportPreviewSummary(
   }
 
   const changedDuplicates = preview.conflicts.changedMemoryIds.length;
+  const memoriesMerged = preview.impact.memoriesMerged ?? 0;
   const memoriesOverwritten = preview.impact.memoriesOverwritten ?? 0;
   const tone =
     preview.mode === "replace"
@@ -326,15 +328,18 @@ export function getGraphImportPreviewSummary(
       ? "Replace will delete current graph"
       : changedDuplicates > 0 && preview.conflictPolicy === "skip"
         ? "Changed duplicates will be skipped"
-        : memoriesOverwritten > 0
-          ? "Changed duplicates will be overwritten"
-          : "Merge is ready";
+        : memoriesMerged > 0
+          ? "Changed duplicates will be merged"
+          : memoriesOverwritten > 0
+            ? "Changed duplicates will be overwritten"
+            : "Merge is ready";
 
   return {
     changedDuplicates,
     duplicateMemories: preview.conflicts.duplicateMemoryIds.length,
     edgesImported: preview.impact.edgesImported,
     memoriesImported: preview.impact.memoriesImported,
+    memoriesMerged,
     memoriesOverwritten,
     memoriesSkipped: preview.impact.memoriesSkipped,
     newMemories: preview.candidates.newMemoryIds.length,
@@ -703,11 +708,13 @@ export type GraphImportPreviewSummary = {
   duplicateMemories: number;
   edgesImported: number;
   memoriesImported: number;
+  memoriesMerged: number;
   memoriesOverwritten: number;
   memoriesSkipped: number;
   newMemories: number;
   status:
     | "Changed duplicates will be overwritten"
+    | "Changed duplicates will be merged"
     | "Changed duplicates will be skipped"
     | "Merge is ready"
     | "Replace will delete current graph"

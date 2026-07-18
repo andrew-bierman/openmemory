@@ -201,7 +201,7 @@ function Home() {
   const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
   const [importConfirmTenantId, setImportConfirmTenantId] = useState("");
   const [importConflictPolicy, setImportConflictPolicy] = useState<
-    "skip" | "overwrite"
+    "skip" | "overwrite" | "semantic_merge"
   >("skip");
   const [importMode, setImportMode] = useState<"replace" | "merge">("merge");
   const [importPayload, setImportPayload] = useState("");
@@ -1935,7 +1935,7 @@ function GraphImportPanel({
   onPreview,
   payload,
 }: Readonly<{
-  conflictPolicy: "skip" | "overwrite";
+  conflictPolicy: "skip" | "overwrite" | "semantic_merge";
   confirmTenantId: string;
   importMode: "replace" | "merge";
   isImporting: boolean;
@@ -1943,7 +1943,9 @@ function GraphImportPanel({
   isPreviewing: boolean;
   lastImportResult: GraphImportResult | null;
   lastPreview: GraphImportPreviewResult | null;
-  onConflictPolicyChange: (policy: "skip" | "overwrite") => void;
+  onConflictPolicyChange: (
+    policy: "skip" | "overwrite" | "semantic_merge",
+  ) => void;
   onConfirmTenantIdChange: (tenantId: string) => void;
   onImport: () => void;
   onModeChange: (mode: "replace" | "merge") => void;
@@ -2013,11 +2015,14 @@ function GraphImportPanel({
             disabled={importMode === "replace"}
             id="importConflictPolicy"
             onChange={(event) =>
-              onConflictPolicyChange(event.target.value as "skip" | "overwrite")
+              onConflictPolicyChange(
+                event.target.value as "skip" | "overwrite" | "semantic_merge",
+              )
             }
             value={conflictPolicy}
           >
             <option value="skip">Skip changed duplicates</option>
+            <option value="semantic_merge">Merge changed duplicates</option>
             <option value="overwrite">Overwrite changed duplicates</option>
           </Select>
         </div>
@@ -2081,6 +2086,10 @@ function GraphImportPanel({
               <strong>{summary.memoriesOverwritten}</strong>
             </li>
             <li>
+              <span>Would merge</span>
+              <strong>{summary.memoriesMerged}</strong>
+            </li>
+            <li>
               <span>Duplicates</span>
               <strong>{summary.duplicateMemories}</strong>
             </li>
@@ -2119,6 +2128,7 @@ function GraphImportPanel({
             Skipped {lastImportResult.memoriesSkipped ?? 0} and overwrote{" "}
             {lastImportResult.memoriesOverwritten ?? 0}.
           </span>
+          <span>Merged {lastImportResult.memoriesMerged ?? 0} duplicates.</span>
           <span>
             Indexed {lastImportResult.activeMemoriesIndexed} memories.
           </span>
