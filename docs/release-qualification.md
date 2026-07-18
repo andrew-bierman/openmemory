@@ -126,7 +126,9 @@ The live gate exercises the hosted dashboard, Better Auth session flow, tenant
 readiness snapshot, graph recall, source ingestion, R2 export, OAuth PKCE, and
 MCP bearer-token `remember`, `recall`, `profile`, and `forget`. The hosted UI
 smoke also verifies the authenticated browser session can fetch readiness
-content from the deployed Worker.
+content from the deployed Worker, update profile and workspace settings, invite
+and remove a team member, revoke a seeded OAuth/MCP connection, and delete the
+test account through the Admin danger zone.
 
 Use the `Live Production Benchmark` workflow for recurring hosted graph
 performance evidence. It runs the same live benchmark command, defaults to an
