@@ -123,10 +123,10 @@ larger hosted push.
 - [x] Cloudflare Cron health monitor exists for `/health` and MCP OAuth
   protected-resource metadata, with Analytics Engine telemetry and optional
   webhook/email/PagerDuty alert dispatch.
-- [x] Latest repository gate
+- [x] Documented repository gate
   `ae433710f37b7d784833c47d37b1d8da5dd8276e` has green main CI:
   `https://github.com/andrew-bierman/openmemory/actions/runs/29664533575`.
-- [x] Latest repository gate
+- [x] Documented repository gate
   `ae433710f37b7d784833c47d37b1d8da5dd8276e` has a green Cloudflare Workers
   Build:
   `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/b08e35a6-9d52-4c33-a584-29680090eb95`.

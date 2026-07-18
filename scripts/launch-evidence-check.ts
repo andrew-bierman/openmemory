@@ -6,7 +6,7 @@ type LaunchEvidence = {
     liveBenchmarkRun: string;
     releaseValidationCommit: string;
   };
-  latestRepositoryGate: {
+  documentedRepositoryGate: {
     commit: string;
     mainCiRun: string;
     workersBuildUrl: string;
@@ -31,18 +31,18 @@ const releaseQualification = await readFile(releaseQualificationPath, "utf8");
 
 assertIncludes(
   launchReadiness,
-  evidence.latestRepositoryGate.commit,
-  "docs/launch-readiness.md must mention the latest repository-gate commit.",
+  evidence.documentedRepositoryGate.commit,
+  "docs/launch-readiness.md must mention the documented repository-gate commit.",
 );
 assertIncludes(
   launchReadiness,
-  evidence.latestRepositoryGate.mainCiRun,
-  "docs/launch-readiness.md must mention the latest main CI run.",
+  evidence.documentedRepositoryGate.mainCiRun,
+  "docs/launch-readiness.md must mention the documented main CI run.",
 );
 assertIncludes(
   launchReadiness,
-  evidence.latestRepositoryGate.workersBuildUrl,
-  "docs/launch-readiness.md must mention the latest Workers Build URL.",
+  evidence.documentedRepositoryGate.workersBuildUrl,
+  "docs/launch-readiness.md must mention the documented Workers Build URL.",
 );
 assertIncludes(
   launchReadiness,
@@ -85,7 +85,7 @@ for (const [name, count] of Object.entries(
 }
 
 console.log(
-  `Launch evidence is documented for repo ${evidence.latestRepositoryGate.commit.slice(
+  `Launch evidence is documented for repo ${evidence.documentedRepositoryGate.commit.slice(
     0,
     7,
   )} and runtime ${evidence.latestVerifiedRuntimeCandidate.commit.slice(0, 7)}.`,
@@ -98,22 +98,22 @@ function assertEvidence(value: unknown): asserts value is LaunchEvidence {
   );
   const evidence = value as Partial<LaunchEvidence>;
   assert(
-    typeof evidence.latestRepositoryGate === "object" &&
-      evidence.latestRepositoryGate !== null,
-    "latestRepositoryGate is required.",
+    typeof evidence.documentedRepositoryGate === "object" &&
+      evidence.documentedRepositoryGate !== null,
+    "documentedRepositoryGate is required.",
   );
   assert(
-    /^[0-9a-f]{40}$/.test(String(evidence.latestRepositoryGate.commit)),
-    "latestRepositoryGate.commit must be a full Git SHA.",
+    /^[0-9a-f]{40}$/.test(String(evidence.documentedRepositoryGate.commit)),
+    "documentedRepositoryGate.commit must be a full Git SHA.",
   );
   assert(
-    /^\d+$/.test(String(evidence.latestRepositoryGate.mainCiRun)),
-    "latestRepositoryGate.mainCiRun must be a GitHub run id.",
+    /^\d+$/.test(String(evidence.documentedRepositoryGate.mainCiRun)),
+    "documentedRepositoryGate.mainCiRun must be a GitHub run id.",
   );
   assert(
-    typeof evidence.latestRepositoryGate.workersBuildUrl === "string" &&
-      evidence.latestRepositoryGate.workersBuildUrl.startsWith("https://"),
-    "latestRepositoryGate.workersBuildUrl must be a URL.",
+    typeof evidence.documentedRepositoryGate.workersBuildUrl === "string" &&
+      evidence.documentedRepositoryGate.workersBuildUrl.startsWith("https://"),
+    "documentedRepositoryGate.workersBuildUrl must be a URL.",
   );
   assert(
     typeof evidence.latestVerifiedRuntimeCandidate === "object" &&
