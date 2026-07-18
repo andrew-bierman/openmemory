@@ -13,17 +13,9 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
   const memory = `UI E2E stores Graph Indexing context ${crypto.randomUUID()}`;
 
   const errors: string[] = [];
-  page.on("pageerror", (error) => {
-    if (isKnownStaticShellHydrationWarning(error.message)) {
-      return;
-    }
-    errors.push(error.message);
-  });
+  page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
     if (message.type() === "error") {
-      if (isKnownStaticShellHydrationWarning(message.text())) {
-        return;
-      }
       errors.push(message.text());
     }
   });
@@ -88,7 +80,3 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
 
   expect(errors).toEqual([]);
 });
-
-function isKnownStaticShellHydrationWarning(message: string) {
-  return message.includes("Minified React error #418");
-}
