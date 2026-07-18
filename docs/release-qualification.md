@@ -61,8 +61,11 @@ Run this only when production secrets and Cloudflare resources are configured:
 OPENMEMORY_LIVE_E2E=true bun run --cwd apps/api test:live
 ```
 
-The live gate exercises the hosted dashboard, Better Auth session flow, OAuth
-PKCE, and MCP bearer-token `remember`, `recall`, `profile`, and `forget`.
+The live gate exercises the hosted dashboard, Better Auth session flow, tenant
+readiness snapshot, graph recall, source ingestion, R2 export, OAuth PKCE, and
+MCP bearer-token `remember`, `recall`, `profile`, and `forget`. The hosted UI
+smoke also verifies the authenticated browser session can fetch readiness
+content from the deployed Worker.
 
 ## Release Evidence
 

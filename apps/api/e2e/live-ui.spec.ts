@@ -57,5 +57,21 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
   expect(deleteResponse.ok()).toBe(true);
   await expect(page.locator("#memories")).not.toContainText(memory);
 
+  const readinessResponse = await page.request.get("/v1/readiness");
+  expect(readinessResponse.ok()).toBe(true);
+  const readiness = (await readinessResponse.json()) as {
+    auth: { mode: string };
+    mcp: { tools: string[] };
+    tenant: { source: string };
+  };
+  expect(readiness.auth.mode).toBe("session");
+  expect(readiness.tenant.source).toBe("session");
+  expect(readiness.mcp.tools).toEqual([
+    "remember",
+    "recall",
+    "profile",
+    "forget",
+  ]);
+
   expect(errors).toEqual([]);
 });

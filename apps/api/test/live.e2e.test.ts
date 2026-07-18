@@ -201,6 +201,57 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
     expect(token.access_token).toBeTruthy();
     expect(token.token_type).toBe("Bearer");
 
+    const readiness = await authedJson<ReadinessResponse>(
+      cookie,
+      "/v1/readiness",
+    );
+    expect(readiness).toMatchObject({
+      service: "openmemory-api",
+      tenant: {
+        source: "session",
+        localDevelopment: false,
+      },
+      auth: {
+        mode: "session",
+      },
+      bindings: {
+        authDb: true,
+        durableObjects: true,
+        r2Exports: true,
+      },
+      exports: {
+        r2Configured: true,
+      },
+    });
+    expect(readiness.tenant.id).toBeTruthy();
+    expect(readiness.graph.activeMemories).toBeGreaterThanOrEqual(
+      stats.activeMemories,
+    );
+    expect(readiness.graph.totalEdges).toBeGreaterThanOrEqual(stats.totalEdges);
+    expect(readiness.relationships.catalogSize).toBeGreaterThan(8);
+    expect(readiness.mcp.endpoint).toBe(`${baseUrl}/mcp`);
+    expect(readiness.mcp.authorizationServer).toContain(
+      "/.well-known/oauth-authorization-server/api/auth",
+    );
+    expect(readiness.mcp.protectedResource).toContain(
+      "/.well-known/oauth-protected-resource/mcp",
+    );
+    expect(readiness.mcp.tools).toEqual([
+      "remember",
+      "recall",
+      "profile",
+      "forget",
+    ]);
+    expect(readiness.rateLimit.enabled).toBe(true);
+    expect(readiness.rateLimit.limitPerMinute).toBeGreaterThan(0);
+    const serializedReadiness = JSON.stringify(readiness);
+    expect(serializedReadiness).not.toContain(password);
+    expect(serializedReadiness).not.toContain(token.access_token);
+    expect(serializedReadiness).not.toContain("Boris maintains Graph Indexing");
+    expect(serializedReadiness).not.toContain(
+      "Workers AI creates embeddings and Vectorize supplies semantic candidates",
+    );
+
     const rememberText = mcpText(
       await mcpCall(token.access_token, {
         jsonrpc: "2.0",
@@ -437,6 +488,68 @@ type GraphExportResponse = {
   key: string;
   memoryCount: number;
   writtenToR2: boolean;
+};
+
+type ReadinessResponse = {
+  service: "openmemory-api";
+  tenant: {
+    id: string;
+    source: "session" | "local-header";
+    localDevelopment: boolean;
+  };
+  graph: {
+    activeMemories: number;
+    totalMemories: number;
+    totalEdges: number;
+    relationshipTypes: number;
+    graphDensity: number;
+    entityCount: number;
+    tagCount: number;
+  };
+  relationships: {
+    catalogSize: number;
+    top: Array<{
+      relationship: string;
+      label: string;
+      category: string;
+      count: number;
+    }>;
+  };
+  bindings: Record<
+    | "authDb"
+    | "durableObjects"
+    | "vectorize"
+    | "workersAi"
+    | "r2Exports"
+    | "analytics"
+    | "memoryExtractionQueue"
+    | "memoryExtractionWorkflow"
+    | "sourceIngestionQueue"
+    | "sourceIngestionWorkflow",
+    boolean
+  >;
+  auth: {
+    mode: "session" | "local-development-header";
+    betterAuthUrl: string;
+    socialProviders: {
+      github: boolean;
+      google: boolean;
+    };
+  };
+  mcp: {
+    endpoint: string;
+    authorizationServer: string;
+    protectedResource: string;
+    tools: Array<"remember" | "recall" | "profile" | "forget">;
+  };
+  rateLimit: {
+    enabled: boolean;
+    limitPerMinute: number;
+  };
+  exports: {
+    r2Configured: boolean;
+  };
+  warnings: string[];
 };
 
 type OAuthClientResponse = {

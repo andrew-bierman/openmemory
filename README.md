@@ -245,7 +245,8 @@ TypeScript SDK `StreamableHTTPClientTransport`.
 
 The local browser E2E suite starts the API and TanStack Start app on explicit
 non-default ports and exercises the dashboard, charts, memory table, source
-ingest, graph explorer, admin settings, and MCP setup panel.
+ingest, graph explorer, operations readiness, admin settings, and MCP setup
+panel.
 
 Optional clean container reproduction:
 
@@ -267,7 +268,8 @@ bun run test:e2e:ui
 ```
 
 The live checks require a reachable deployment and any environment required by
-the target workflow.
+the target workflow. They cover hosted auth, graph recall, readiness snapshots,
+R2 export, OAuth/MCP, and browser-session readiness access.
 
 ## Roadmap
 
