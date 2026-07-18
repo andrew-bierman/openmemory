@@ -81,11 +81,12 @@
   path for API, auth, readiness, MCP, and hosted UI regressions.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - `/v1/imports/preview` validates replace or merge imports and reports incoming
-  counts, existing graph counts, duplicate IDs, new IDs, and expected impact
-  without mutating tenant graph data.
+  counts, existing graph counts, duplicate IDs, changed fields, new IDs, and
+  expected impact without mutating tenant graph data.
 - `/v1/imports` imports a validated OpenMemory graph export into a tenant as
-  either a destructive `replace` or additive `merge`, then re-indexes active
-  imported memories.
+  either a destructive `replace` or additive `merge`, supports explicit
+  duplicate-memory overwrite, then re-indexes active imported or overwritten
+  memories.
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
 - `DELETE /v1/tenant` hard-deletes the resolved tenant's Durable Object graph
   data after explicit tenant confirmation and best-effort deletes matching
@@ -124,8 +125,9 @@
   artifacts, graph-specific product signals, relationship diagnostics, and
   production request telemetry, but still needs recurring high-volume
   production observations before a hosted SaaS launch.
-- Graph restore supports preview, whole-tenant replace, and additive merge
-  recovery, but not field-level diff conflict resolution.
+- Graph restore supports preview, whole-tenant replace, additive merge, and
+  explicit duplicate overwrite recovery, but not automatic semantic merge of
+  two changed memory records.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the
   preferred deploy path; the manual GitHub deploy workflow remains a fallback
   and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
