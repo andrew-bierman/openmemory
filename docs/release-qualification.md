@@ -53,6 +53,20 @@ It runs the same bounded graph benchmark with `OPENMEMORY_SCALE_GRAPH_SIZE=360`
 by default. The test clamps custom sizes between 220 and 1,000 memories so local
 runs cannot accidentally create unbounded Durable Object state.
 
+To run the largest supported local graph gate explicitly:
+
+```sh
+OPENMEMORY_SCALE_GRAPH_SIZE=1000 bun run test:scale:local
+```
+
+## Recorded GitHub Gate
+
+Use the manual `Release Qualification` workflow before publishing a release tag
+when you want a durable GitHub Actions record. It runs `bun run
+release:validate` and, by default, follows it with the 1,000-memory local scale
+gate. Set `scale_graph_size` to `0` only when intentionally skipping the
+additional high-volume local gate for a maintenance-only release.
+
 ## Optional Live Gate
 
 Run this only when production secrets and Cloudflare resources are configured:
