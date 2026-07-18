@@ -179,6 +179,31 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   );
   await expect(page.locator(".graph-node-card")).toHaveCount(1);
 
+  const emptyGraphExport = {
+    version: 1,
+    exportedAt: "2026-07-18T00:00:00.000Z",
+    memories: [],
+    edges: [],
+  };
+  const importPanel = page.getByRole("region", {
+    exact: true,
+    name: "Graph import preview",
+  });
+  const importSummary = page.getByRole("region", {
+    exact: true,
+    name: "Graph import preview summary",
+  });
+  await expect(importPanel).toBeVisible();
+  await page.getByLabel("Confirm tenant id").fill(tenant);
+  await expect(page.getByLabel("Import mode")).toHaveValue("merge");
+  await expect(page.getByLabel("Conflict policy")).toHaveValue("skip");
+  await page
+    .getByLabel("Graph export JSON")
+    .fill(JSON.stringify(emptyGraphExport));
+  await page.getByRole("button", { name: "Preview import" }).click();
+  await expect(importPanel).toContainText("Merge is ready");
+  await expect(importSummary).toContainText("Incoming");
+
   await page.getByRole("button", { name: "Fit graph" }).click();
   await page.screenshot({
     fullPage: true,

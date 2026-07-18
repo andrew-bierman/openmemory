@@ -322,7 +322,6 @@ Current priorities:
   freshness, and MCP usage.
 - Expand recall quality benchmarks with larger MemoryBench-style fixtures.
 - Add larger graph performance benchmarks and production telemetry.
-- Add UI support for graph import conflict previews and overwrite decisions.
 - Deepen MCP client compatibility testing with real external clients.
 - Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
 

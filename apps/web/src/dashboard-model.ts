@@ -1,5 +1,6 @@
 import type {
   GraphEdge,
+  GraphImportPreviewResult,
   GraphStats,
   Memory,
   OAuthConnection,
@@ -267,6 +268,53 @@ export function getSourceIngestSummary(
     memoryCount: result.memories.length,
     sourceId: result.sourceId,
     typeCount: memoryTypes.length,
+  };
+}
+
+export function getGraphImportPreviewSummary(
+  preview: GraphImportPreviewResult | null,
+): GraphImportPreviewSummary {
+  if (!preview) {
+    return {
+      changedDuplicates: 0,
+      duplicateMemories: 0,
+      edgesImported: 0,
+      memoriesImported: 0,
+      memoriesOverwritten: 0,
+      memoriesSkipped: 0,
+      newMemories: 0,
+      status: "Waiting for preview",
+      tone: "neutral",
+    };
+  }
+
+  const changedDuplicates = preview.conflicts.changedMemoryIds.length;
+  const memoriesOverwritten = preview.impact.memoriesOverwritten ?? 0;
+  const tone =
+    preview.mode === "replace"
+      ? "danger"
+      : changedDuplicates > 0 && preview.conflictPolicy === "skip"
+        ? "warn"
+        : "good";
+  const status =
+    preview.mode === "replace"
+      ? "Replace will delete current graph"
+      : changedDuplicates > 0 && preview.conflictPolicy === "skip"
+        ? "Changed duplicates will be skipped"
+        : memoriesOverwritten > 0
+          ? "Changed duplicates will be overwritten"
+          : "Merge is ready";
+
+  return {
+    changedDuplicates,
+    duplicateMemories: preview.conflicts.duplicateMemoryIds.length,
+    edgesImported: preview.impact.edgesImported,
+    memoriesImported: preview.impact.memoriesImported,
+    memoriesOverwritten,
+    memoriesSkipped: preview.impact.memoriesSkipped,
+    newMemories: preview.candidates.newMemoryIds.length,
+    status,
+    tone,
   };
 }
 
@@ -615,6 +663,23 @@ export type SourceIngestSummary = {
   memoryCount: number;
   sourceId: string;
   typeCount: number;
+};
+
+export type GraphImportPreviewSummary = {
+  changedDuplicates: number;
+  duplicateMemories: number;
+  edgesImported: number;
+  memoriesImported: number;
+  memoriesOverwritten: number;
+  memoriesSkipped: number;
+  newMemories: number;
+  status:
+    | "Changed duplicates will be overwritten"
+    | "Changed duplicates will be skipped"
+    | "Merge is ready"
+    | "Replace will delete current graph"
+    | "Waiting for preview";
+  tone: "danger" | "good" | "neutral" | "warn";
 };
 
 export type ReadinessSummary = {
