@@ -1080,6 +1080,88 @@ textarea:focus-visible,
   line-height: 1.15;
 }
 
+.graph-import-panel {
+  gap: 14px;
+}
+
+.graph-import-status.neutral {
+  background: var(--secondary);
+  color: var(--muted-foreground);
+}
+
+.graph-import-status.warn {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.graph-import-status.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.graph-import-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.graph-import-payload {
+  grid-column: 1 / -1;
+}
+
+.graph-import-payload textarea {
+  min-height: 120px;
+  resize: vertical;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+}
+
+.graph-import-actions,
+.graph-import-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.graph-import-actions {
+  align-items: end;
+}
+
+.graph-import-result span,
+.conflict-list li {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--secondary);
+  padding: 8px 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.conflict-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conflict-list li {
+  display: grid;
+  gap: 3px;
+}
+
+.conflict-list span {
+  overflow-wrap: anywhere;
+  color: var(--foreground);
+  font-weight: 760;
+}
+
+.conflict-list strong {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
 .neighbor-list {
   display: grid;
   gap: 9px;
@@ -1796,6 +1878,10 @@ textarea:focus-visible,
 
   .source-result-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .graph-import-form {
+    grid-template-columns: 1fr;
   }
 
   .admin-grid {

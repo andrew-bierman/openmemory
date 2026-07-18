@@ -9,6 +9,7 @@ import {
   getActivitySummary,
   getDashboardMetrics,
   getGraphHealthSummary,
+  getGraphImportPreviewSummary,
   getGraphOperationsSummary,
   getIndexReadinessSummary,
   getKnowledgeMap,
@@ -225,6 +226,174 @@ describe("dashboard model", () => {
       memoryCount: 3,
       sourceId: "src_docs",
       typeCount: 3,
+    });
+  });
+
+  test("summarizes graph import preview decisions", () => {
+    expect(getGraphImportPreviewSummary(null)).toEqual({
+      changedDuplicates: 0,
+      duplicateMemories: 0,
+      edgesImported: 0,
+      memoriesImported: 0,
+      memoriesOverwritten: 0,
+      memoriesSkipped: 0,
+      newMemories: 0,
+      status: "Waiting for preview",
+      tone: "neutral",
+    });
+
+    expect(
+      getGraphImportPreviewSummary({
+        tenantId: "local-user",
+        mode: "merge",
+        conflictPolicy: "skip",
+        version: 1,
+        previewedAt: "2026-07-18T00:00:00.000Z",
+        incoming: { memories: 3, edges: 2 },
+        existing: {
+          memories: 4,
+          edges: 6,
+          tags: 7,
+          entities: 8,
+          ingestionJobs: 0,
+        },
+        impact: {
+          memoriesImported: 1,
+          memoriesSkipped: 2,
+          memoriesOverwritten: 0,
+          edgesImported: 2,
+          wouldDelete: {
+            memories: 0,
+            edges: 0,
+            tags: 0,
+            entities: 0,
+            ingestionJobs: 0,
+          },
+          wouldReplace: false,
+        },
+        conflicts: {
+          duplicateMemoryIds: ["mem_a", "mem_b"],
+          duplicateMemoryIdsTruncated: false,
+          changedMemoryIds: ["mem_a"],
+          changedMemoryIdsTruncated: false,
+          unchangedMemoryIds: ["mem_b"],
+          unchangedMemoryIdsTruncated: false,
+          fieldConflicts: [{ id: "mem_a", fields: ["content", "tags"] }],
+          fieldConflictsTruncated: false,
+        },
+        candidates: {
+          newMemoryIds: ["mem_c"],
+          newMemoryIdsTruncated: false,
+        },
+      }),
+    ).toMatchObject({
+      changedDuplicates: 1,
+      duplicateMemories: 2,
+      memoriesImported: 1,
+      memoriesSkipped: 2,
+      newMemories: 1,
+      status: "Changed duplicates will be skipped",
+      tone: "warn",
+    });
+
+    expect(
+      getGraphImportPreviewSummary({
+        tenantId: "local-user",
+        mode: "merge",
+        conflictPolicy: "overwrite",
+        version: 1,
+        previewedAt: "2026-07-18T00:00:00.000Z",
+        incoming: { memories: 1, edges: 0 },
+        existing: {
+          memories: 4,
+          edges: 6,
+          tags: 7,
+          entities: 8,
+          ingestionJobs: 0,
+        },
+        impact: {
+          memoriesImported: 0,
+          memoriesSkipped: 0,
+          memoriesOverwritten: 1,
+          edgesImported: 0,
+          wouldDelete: {
+            memories: 0,
+            edges: 0,
+            tags: 0,
+            entities: 0,
+            ingestionJobs: 0,
+          },
+          wouldReplace: false,
+        },
+        conflicts: {
+          duplicateMemoryIds: ["mem_a"],
+          duplicateMemoryIdsTruncated: false,
+          changedMemoryIds: ["mem_a"],
+          changedMemoryIdsTruncated: false,
+          unchangedMemoryIds: [],
+          unchangedMemoryIdsTruncated: false,
+          fieldConflicts: [{ id: "mem_a", fields: ["metadata"] }],
+          fieldConflictsTruncated: false,
+        },
+        candidates: {
+          newMemoryIds: [],
+          newMemoryIdsTruncated: false,
+        },
+      }),
+    ).toMatchObject({
+      memoriesOverwritten: 1,
+      status: "Changed duplicates will be overwritten",
+      tone: "good",
+    });
+
+    expect(
+      getGraphImportPreviewSummary({
+        tenantId: "local-user",
+        mode: "replace",
+        conflictPolicy: "skip",
+        version: 1,
+        previewedAt: "2026-07-18T00:00:00.000Z",
+        incoming: { memories: 1, edges: 0 },
+        existing: {
+          memories: 4,
+          edges: 6,
+          tags: 7,
+          entities: 8,
+          ingestionJobs: 0,
+        },
+        impact: {
+          memoriesImported: 1,
+          memoriesSkipped: 0,
+          memoriesOverwritten: 0,
+          edgesImported: 0,
+          wouldDelete: {
+            memories: 4,
+            edges: 6,
+            tags: 7,
+            entities: 8,
+            ingestionJobs: 0,
+          },
+          wouldReplace: true,
+        },
+        conflicts: {
+          duplicateMemoryIds: [],
+          duplicateMemoryIdsTruncated: false,
+          changedMemoryIds: [],
+          changedMemoryIdsTruncated: false,
+          unchangedMemoryIds: [],
+          unchangedMemoryIdsTruncated: false,
+          fieldConflicts: [],
+          fieldConflictsTruncated: false,
+        },
+        candidates: {
+          newMemoryIds: ["mem_new"],
+          newMemoryIdsTruncated: false,
+        },
+      }),
+    ).toMatchObject({
+      memoriesImported: 1,
+      status: "Replace will delete current graph",
+      tone: "danger",
     });
   });
 

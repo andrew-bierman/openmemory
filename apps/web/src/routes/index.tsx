@@ -4,6 +4,8 @@ import {
   createOpenMemoryClient,
   type GraphEdge,
   type GraphExportResult,
+  type GraphImportPreviewResult,
+  type GraphImportResult,
   type GraphStats,
   type IndexRepairResult,
   type Memory,
@@ -82,6 +84,7 @@ import {
   getActivitySummary,
   getDashboardMetrics,
   getGraphHealthSummary,
+  getGraphImportPreviewSummary,
   getGraphOperationsSummary,
   getIndexReadinessSummary,
   getLifecycleDistribution,
@@ -180,6 +183,16 @@ function Home() {
     recallQuery ?? "recent project context",
   );
   const [lastExport, setLastExport] = useState<GraphExportResult | null>(null);
+  const [importConfirmTenantId, setImportConfirmTenantId] = useState("");
+  const [importConflictPolicy, setImportConflictPolicy] = useState<
+    "skip" | "overwrite"
+  >("skip");
+  const [importMode, setImportMode] = useState<"replace" | "merge">("merge");
+  const [importPayload, setImportPayload] = useState("");
+  const [lastImportPreview, setLastImportPreview] =
+    useState<GraphImportPreviewResult | null>(null);
+  const [lastImportResult, setLastImportResult] =
+    useState<GraphImportResult | null>(null);
   const [lastIndexRepair, setLastIndexRepair] =
     useState<IndexRepairResult | null>(null);
   const [lastSourceIngest, setLastSourceIngest] =
@@ -594,6 +607,21 @@ function Home() {
     onMutate: () => setError(null),
     onSuccess: (result) => setLastExport(result),
   });
+  const importPreviewMutation = useMutation({
+    mutationFn: api.previewGraphImport,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: (result) => setLastImportPreview(result),
+  });
+  const importGraphMutation = useMutation({
+    mutationFn: api.importGraph,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: async (result) => {
+      setLastImportResult(result);
+      await invalidateDashboard();
+    },
+  });
   const repairIndexMutation = useMutation({
     mutationFn: api.repairIndex,
     onError: (caught) => setError(formatError(caught)),
@@ -623,6 +651,8 @@ function Home() {
     removeMemberMutation.isPending ||
     deleteAccountMutation.isPending ||
     exportGraphMutation.isPending ||
+    importPreviewMutation.isPending ||
+    importGraphMutation.isPending ||
     repairIndexMutation.isPending;
 
   async function remember(event: FormEvent<HTMLFormElement>) {
@@ -760,8 +790,47 @@ function Home() {
     await exportGraphMutation.mutateAsync();
   }
 
+  async function previewImportGraph(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const graphExport = parseImportPayload(importPayload);
+    if (!graphExport) {
+      return;
+    }
+
+    await importPreviewMutation.mutateAsync({
+      confirmTenantId: importConfirmTenantId.trim(),
+      conflictPolicy: importConflictPolicy,
+      export: graphExport,
+      mode: importMode,
+    });
+  }
+
+  async function importGraph() {
+    const graphExport = parseImportPayload(importPayload);
+    if (!graphExport) {
+      return;
+    }
+
+    await importGraphMutation.mutateAsync({
+      confirmTenantId: importConfirmTenantId.trim(),
+      conflictPolicy: importConflictPolicy,
+      export: graphExport,
+      mode: importMode,
+    });
+  }
+
   async function repairIndex() {
     await repairIndexMutation.mutateAsync();
+  }
+
+  function parseImportPayload(value: string) {
+    try {
+      setError(null);
+      return JSON.parse(value) as unknown;
+    } catch {
+      setError("Import payload must be valid JSON.");
+      return null;
+    }
   }
 
   const queryError = contextQuery.error
@@ -1031,6 +1100,39 @@ function Home() {
                     </span>
                   ) : null}
                 </div>
+                <GraphImportPanel
+                  conflictPolicy={importConflictPolicy}
+                  confirmTenantId={importConfirmTenantId}
+                  importMode={importMode}
+                  isImporting={importGraphMutation.isPending}
+                  isLoading={isLoading}
+                  isPreviewing={importPreviewMutation.isPending}
+                  lastImportResult={lastImportResult}
+                  lastPreview={lastImportPreview}
+                  onConflictPolicyChange={(nextPolicy) => {
+                    setImportConflictPolicy(nextPolicy);
+                    setLastImportPreview(null);
+                    setLastImportResult(null);
+                  }}
+                  onConfirmTenantIdChange={(nextTenantId) => {
+                    setImportConfirmTenantId(nextTenantId);
+                    setLastImportPreview(null);
+                    setLastImportResult(null);
+                  }}
+                  onImport={() => void importGraph()}
+                  onModeChange={(nextMode) => {
+                    setImportMode(nextMode);
+                    setLastImportPreview(null);
+                    setLastImportResult(null);
+                  }}
+                  onPayloadChange={(nextPayload) => {
+                    setImportPayload(nextPayload);
+                    setLastImportPreview(null);
+                    setLastImportResult(null);
+                  }}
+                  onPreview={previewImportGraph}
+                  payload={importPayload}
+                />
                 <MemoryDetail
                   memory={selectedMemory}
                   memories={memories}
@@ -1976,6 +2078,216 @@ function GraphOperationsPanel({
         <strong>{summary.benchmarkSize}</strong>
         <small>active graph nodes</small>
       </div>
+    </section>
+  );
+}
+
+function GraphImportPanel({
+  conflictPolicy,
+  confirmTenantId,
+  importMode,
+  isImporting,
+  isLoading,
+  isPreviewing,
+  lastImportResult,
+  lastPreview,
+  onConflictPolicyChange,
+  onConfirmTenantIdChange,
+  onImport,
+  onModeChange,
+  onPayloadChange,
+  onPreview,
+  payload,
+}: Readonly<{
+  conflictPolicy: "skip" | "overwrite";
+  confirmTenantId: string;
+  importMode: "replace" | "merge";
+  isImporting: boolean;
+  isLoading: boolean;
+  isPreviewing: boolean;
+  lastImportResult: GraphImportResult | null;
+  lastPreview: GraphImportPreviewResult | null;
+  onConflictPolicyChange: (policy: "skip" | "overwrite") => void;
+  onConfirmTenantIdChange: (tenantId: string) => void;
+  onImport: () => void;
+  onModeChange: (mode: "replace" | "merge") => void;
+  onPayloadChange: (payload: string) => void;
+  onPreview: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  payload: string;
+}>) {
+  const summary = getGraphImportPreviewSummary(lastPreview);
+  const fieldConflicts = lastPreview?.conflicts.fieldConflicts ?? [];
+  const canPreview =
+    confirmTenantId.trim().length > 0 &&
+    payload.trim().length > 0 &&
+    !isLoading &&
+    !isPreviewing;
+  const canImport =
+    Boolean(lastPreview) &&
+    lastPreview?.tenantId === confirmTenantId.trim() &&
+    !isLoading &&
+    !isImporting;
+
+  return (
+    <section
+      aria-label="Graph import preview"
+      className="operations-card graph-import-panel"
+    >
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">Restore</p>
+          <h2>Import Preview</h2>
+        </div>
+        <Badge
+          className={`graph-import-status ${summary.tone}`}
+          variant={summary.tone === "good" ? "default" : "secondary"}
+        >
+          {summary.status}
+        </Badge>
+      </div>
+      <form
+        className="graph-import-form"
+        onSubmit={(event) => void onPreview(event)}
+      >
+        <div className="field">
+          <Label htmlFor="importConfirmTenantId">Confirm tenant id</Label>
+          <Input
+            id="importConfirmTenantId"
+            onChange={(event) => onConfirmTenantIdChange(event.target.value)}
+            placeholder="tenant-id"
+            value={confirmTenantId}
+          />
+        </div>
+        <div className="field">
+          <Label htmlFor="importMode">Import mode</Label>
+          <Select
+            id="importMode"
+            onChange={(event) =>
+              onModeChange(event.target.value as "replace" | "merge")
+            }
+            value={importMode}
+          >
+            <option value="merge">Merge</option>
+            <option value="replace">Replace</option>
+          </Select>
+        </div>
+        <div className="field">
+          <Label htmlFor="importConflictPolicy">Conflict policy</Label>
+          <Select
+            disabled={importMode === "replace"}
+            id="importConflictPolicy"
+            onChange={(event) =>
+              onConflictPolicyChange(event.target.value as "skip" | "overwrite")
+            }
+            value={conflictPolicy}
+          >
+            <option value="skip">Skip changed duplicates</option>
+            <option value="overwrite">Overwrite changed duplicates</option>
+          </Select>
+        </div>
+        <div className="field graph-import-payload">
+          <Label htmlFor="importPayload">Graph export JSON</Label>
+          <Textarea
+            id="importPayload"
+            onChange={(event) => onPayloadChange(event.target.value)}
+            placeholder={`{"version":1,"exportedAt":"2026-07-18T00:00:00.000Z","memories":[],"edges":[]}`}
+            value={payload}
+          />
+        </div>
+        <div className="graph-import-actions">
+          <Button disabled={!canPreview} type="submit" variant="outline">
+            {isPreviewing ? "Previewing" : "Preview import"}
+          </Button>
+          <Button
+            disabled={!canImport}
+            onClick={() => onImport()}
+            type="button"
+            variant={
+              lastPreview?.mode === "replace" ? "destructive" : "default"
+            }
+          >
+            {isImporting ? "Importing" : "Import graph"}
+          </Button>
+        </div>
+      </form>
+      {lastPreview ? (
+        <section
+          aria-label="Graph import preview summary"
+          className="source-result-panel"
+        >
+          <div className="panel-heading">
+            <span>Previewed tenant</span>
+            <strong>{lastPreview.tenantId}</strong>
+          </div>
+          <ul className="source-result-grid graph-import-summary-grid">
+            <li>
+              <span>Incoming</span>
+              <strong>{summary.memoriesImported}</strong>
+            </li>
+            <li>
+              <span>New</span>
+              <strong>{summary.newMemories}</strong>
+            </li>
+            <li>
+              <span>Changed</span>
+              <strong>{summary.changedDuplicates}</strong>
+            </li>
+            <li>
+              <span>Edges</span>
+              <strong>{summary.edgesImported}</strong>
+            </li>
+            <li>
+              <span>Would skip</span>
+              <strong>{summary.memoriesSkipped}</strong>
+            </li>
+            <li>
+              <span>Would overwrite</span>
+              <strong>{summary.memoriesOverwritten}</strong>
+            </li>
+            <li>
+              <span>Duplicates</span>
+              <strong>{summary.duplicateMemories}</strong>
+            </li>
+            <li>
+              <span>Would delete</span>
+              <strong>{lastPreview.impact.wouldDelete.memories}</strong>
+            </li>
+          </ul>
+          {fieldConflicts.length > 0 ? (
+            <ul aria-label="Changed memory conflicts" className="conflict-list">
+              {fieldConflicts.slice(0, 5).map((conflict) => (
+                <li key={conflict.id}>
+                  <span>{conflict.id}</span>
+                  <strong>{conflict.fields.join(", ")}</strong>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : (
+        <div className="source-result-panel empty">
+          <span>No import preview</span>
+          <p>Preview an export before restoring a tenant graph.</p>
+        </div>
+      )}
+      {lastImportResult ? (
+        <section
+          aria-label="Graph import result"
+          className="graph-import-result"
+        >
+          <span>
+            Imported {lastImportResult.memoriesImported} memories and{" "}
+            {lastImportResult.edgesImported} edges.
+          </span>
+          <span>
+            Skipped {lastImportResult.memoriesSkipped ?? 0} and overwrote{" "}
+            {lastImportResult.memoriesOverwritten ?? 0}.
+          </span>
+          <span>
+            Indexed {lastImportResult.activeMemoriesIndexed} memories.
+          </span>
+        </section>
+      ) : null}
     </section>
   );
 }
