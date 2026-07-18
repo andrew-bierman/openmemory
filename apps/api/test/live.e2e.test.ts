@@ -459,21 +459,10 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       });
     } finally {
       if (cookie && cleanup) {
-        await fetchLive("/v1/account", {
-          method: "DELETE",
-          headers: {
-            cookie,
-            origin,
-            "content-type": "application/json",
-            accept: "application/json",
-          },
-          body: JSON.stringify(cleanup),
-        }).catch((error) => {
-          console.warn(`Live E2E account cleanup failed: ${String(error)}`);
-        });
+        await cleanupLiveAccount(cookie, cleanup, "Live E2E");
       }
     }
-  }, 60_000);
+  }, 180_000);
 });
 
 describe.skipIf(runLiveE2E)("live production e2e", () => {
@@ -564,20 +553,7 @@ describe.runIf(runLiveBenchmark)("live production graph benchmark", () => {
       expect(recallElapsedMs).toBeLessThan(liveRecallThresholdMs);
     } finally {
       if (cookie && cleanup) {
-        await fetchLive("/v1/account", {
-          method: "DELETE",
-          headers: {
-            cookie,
-            origin,
-            "content-type": "application/json",
-            accept: "application/json",
-          },
-          body: JSON.stringify(cleanup),
-        }).catch((error) => {
-          console.warn(
-            `Live benchmark account cleanup failed: ${String(error)}`,
-          );
-        });
+        await cleanupLiveAccount(cookie, cleanup, "Live benchmark");
       }
     }
   }, 180_000);
@@ -734,6 +710,28 @@ async function waitForSemanticIndex(cookie: string) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function cleanupLiveAccount(
+  cookie: string,
+  cleanup: { confirmEmail: string; confirmTenantId: string },
+  label: string,
+) {
+  const response = await fetchLive("/v1/account", {
+    method: "DELETE",
+    headers: {
+      cookie,
+      origin,
+      "content-type": "application/json",
+      accept: "application/json",
+    },
+    body: JSON.stringify(cleanup),
+  });
+  if (!response.ok) {
+    throw new Error(
+      `${label} account cleanup failed with ${response.status}: ${await response.text()}`,
+    );
+  }
 }
 
 async function mcpCall(accessToken: string, body: Record<string, unknown>) {

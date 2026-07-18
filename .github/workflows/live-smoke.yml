@@ -43,7 +43,7 @@ jobs:
       - name: Cleanup live smoke auth rows
         if: always() && env.HAS_CLOUDFLARE_API_TOKEN == 'true' && env.HAS_CLOUDFLARE_ACCOUNT_ID == 'true'
         run: |
-          bun --cwd apps/api wrangler d1 execute openmemory-auth --remote --config wrangler.jsonc --command "delete from oauth_client where name in ('OpenMemory Live E2E', 'OpenMemory Live Full Smoke', 'OpenMemory Screenshot MCP'); delete from user where email like 'live-e2e-%@example.com' or email like 'live-full-%@example.com' or email like 'ui-e2e-%@example.com' or email like 'ui-invite-%@example.com' or email like 'ui-shot-%@example.com';"
+          bun --cwd apps/api wrangler d1 execute openmemory-auth --remote --config wrangler.jsonc --file ../../scripts/cleanup-live-smoke-auth.sql
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
