@@ -62,6 +62,21 @@ Command:
 bun test apps/api/test
 ```
 
+Container reproduction:
+
+```sh
+bun run test:integration:docker
+```
+
+When Docker Hub credential or metadata lookup is unavailable on a maintainer
+machine, the cached-image variant reuses an existing OpenMemory test image and
+mounts the current checkout into `/workspace` before running the same local
+Wrangler integration suite:
+
+```sh
+bun run test:integration:docker:cached
+```
+
 ### Provider Contract Tests
 
 Scope:

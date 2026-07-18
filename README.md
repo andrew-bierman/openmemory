@@ -293,6 +293,14 @@ Optional clean container reproduction:
 bun run test:integration:docker
 ```
 
+If Docker Hub credential or metadata lookup is unavailable but a previously
+built OpenMemory test image exists locally, run the same Wrangler integration
+suite against the current checkout mounted into that cached image:
+
+```sh
+bun run test:integration:docker:cached
+```
+
 Optional heavier local scale check:
 
 ```sh
