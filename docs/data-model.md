@@ -118,6 +118,18 @@ Export keys use:
 The export payload contains `version`, `exportedAt`, graph `stats`, `memories`,
 and `edges`.
 
+## Tenant Purge
+
+`DELETE /v1/tenant` hard-deletes the resolved tenant's Durable Object graph data
+after the caller supplies a matching `confirmTenantId`. The operation removes
+memories, edges, memory tags, memory entities, and ingestion jobs from the
+tenant Durable Object. It also best-effort deletes matching Vectorize ids using
+the `<tenant-id>:<memory-id>` vector id convention.
+
+D1 auth/control-plane rows and R2 export objects are not deleted by this graph
+purge. Account deletion remains an operator workflow that combines OAuth/session
+revocation, D1 cleanup, optional R2 retention handling, and tenant graph purge.
+
 ## Queues and Workflows
 
 | Binding | Message | Consumer |

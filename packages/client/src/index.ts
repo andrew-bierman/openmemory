@@ -114,6 +114,21 @@ export type IndexRepairResult = {
   vectorizeConfigured: boolean;
 };
 
+export type TenantPurgeResult = {
+  tenantId: string;
+  memoriesDeleted: number;
+  edgesDeleted: number;
+  tagsDeleted: number;
+  entitiesDeleted: number;
+  ingestionJobsDeleted: number;
+  vectorIndex: {
+    attempted: number;
+    deleted: number;
+    vectorizeConfigured: boolean;
+  };
+  purgedAt: string;
+};
+
 export type ReadinessSnapshot = {
   service: "openmemory-api";
   generatedAt: string;
@@ -274,6 +289,8 @@ export function createOpenMemoryClient(
       ),
     exportGraph: () => unwrap<GraphExportResult>(client.v1.exports.post()),
     repairIndex: () => unwrap<IndexRepairResult>(client.v1.index.repair.post()),
+    purgeTenantData: (confirmTenantId: string) =>
+      unwrap<TenantPurgeResult>(client.v1.tenant.delete({ confirmTenantId })),
     ingest: (input: CreateMemoryInput) =>
       unwrap<IngestResult>(client.v1.ingest.post(input)),
     ingestSource: (input: SourceIngestInput) =>
@@ -340,6 +357,9 @@ type EdenClient = {
     };
     readiness: {
       get(): EdenResult;
+    };
+    tenant: {
+      delete(input: { confirmTenantId: string }): EdenResult;
     };
     oauth: {
       connections: {

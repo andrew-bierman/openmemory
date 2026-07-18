@@ -656,6 +656,45 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     };
   }
 
+  async purgeTenantData() {
+    const memoryIds = this.sqlState.storage.sql
+      .exec<{ id: string }>(`select id from memories order by created_at asc`)
+      .toArray()
+      .map((row) => row.id);
+    const [{ count: edgeCount = 0 } = { count: 0 }] = this.sqlState.storage.sql
+      .exec<{ count: number }>(`select count(*) as count from edges`)
+      .toArray();
+    const [{ count: tagCount = 0 } = { count: 0 }] = this.sqlState.storage.sql
+      .exec<{ count: number }>(`select count(*) as count from memory_tags`)
+      .toArray();
+    const [{ count: entityCount = 0 } = { count: 0 }] =
+      this.sqlState.storage.sql
+        .exec<{ count: number }>(
+          `select count(*) as count from memory_entities`,
+        )
+        .toArray();
+    const [{ count: ingestionJobCount = 0 } = { count: 0 }] =
+      this.sqlState.storage.sql
+        .exec<{ count: number }>(`select count(*) as count from ingestion_jobs`)
+        .toArray();
+
+    this.sqlState.storage.sql.exec(`delete from edges`);
+    this.sqlState.storage.sql.exec(`delete from memory_tags`);
+    this.sqlState.storage.sql.exec(`delete from memory_entities`);
+    this.sqlState.storage.sql.exec(`delete from ingestion_jobs`);
+    this.sqlState.storage.sql.exec(`delete from memories`);
+
+    return {
+      deletedMemoryIds: memoryIds,
+      memoriesDeleted: memoryIds.length,
+      edgesDeleted: edgeCount,
+      tagsDeleted: tagCount,
+      entitiesDeleted: entityCount,
+      ingestionJobsDeleted: ingestionJobCount,
+      purgedAt: new Date().toISOString(),
+    };
+  }
+
   async linkRelatedMemories(id: string) {
     const memory = this.getMemoryById(id);
     if (!memory || memory.entityIds.length === 0) {
