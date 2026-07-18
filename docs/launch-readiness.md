@@ -58,7 +58,7 @@ larger hosted push.
   fallback deploys, and live smoke.
 - `docs/data-model.md` documents the current D1, Durable Object, Vectorize, R2,
   Queue/Workflow, OAuth, MCP, and readiness data shape.
-- Current launch-evidence pointers are tracked in
+- Launch-evidence pointers are tracked in
   `config/launch-evidence.json` and checked by
   `bun run launch:evidence:check`.
 - Public launch copy and first-feedback triage guidance are written in
@@ -123,10 +123,14 @@ larger hosted push.
 - [x] Cloudflare Cron health monitor exists for `/health` and MCP OAuth
   protected-resource metadata, with Analytics Engine telemetry and optional
   webhook/email/PagerDuty alert dispatch.
-- [x] Current launch candidate
-  `3f1603557c3e82351ea78734889aa8a61062e7c0` has green main CI:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29663842416`.
-- [x] Current launch candidate
+- [x] Latest repository gate
+  `132a0dc175751f1bb2f90a1f4b9a0d4eb3f4bd73` has green main CI:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29664341903`.
+- [x] Latest repository gate
+  `132a0dc175751f1bb2f90a1f4b9a0d4eb3f4bd73` has a green Cloudflare Workers
+  Build:
+  `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/461e0692-86af-4cf6-bab2-e5645567e00a`.
+- [x] Latest verified runtime candidate
   `3f1603557c3e82351ea78734889aa8a61062e7c0` has green live smoke proving
   hosted auth, graph recall, readiness, R2 export, OAuth/MCP, hosted UI, remote
   Workers AI, and Vectorize semantic recall:
