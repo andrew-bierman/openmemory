@@ -65,6 +65,7 @@ import {
 import { getReadinessSnapshot } from "./readiness";
 import {
   deleteTenantVectors,
+  getSemanticIndexDiagnostic,
   indexMemory,
   semanticSearch,
 } from "./semantic-index";
@@ -912,15 +913,26 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     }
 
     const tenantId = "tenantId" in tenant ? tenant.tenantId : "unknown";
-    const memories = await graph.listMemories(100, false);
+    const before = await graph.getIndexInventory();
+    const staleVectors = await deleteTenantVectors(
+      env,
+      tenantId,
+      before.purgeableMemoryIds,
+    );
+    const memories = await graph.listIndexableMemories();
     for (const memory of memories) {
       await indexMemory(env, tenantId, memory);
     }
+    const after = await getSemanticIndexDiagnostic(env, tenantId, before);
 
     return status(202, {
       attempted: memories.length,
+      expectedVectors: before.indexableMemories,
+      purgeableMemories: before.purgeableMemories,
+      staleVectors,
       tenantId,
       vectorizeConfigured: Boolean(env.AI && env.MEMORY_VECTORS),
+      semanticIndex: after,
     });
   })
   .post(

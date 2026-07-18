@@ -838,6 +838,18 @@ type ReadinessResponse = {
   exports: {
     r2Configured: boolean;
   };
+  semanticIndex: {
+    configured: boolean;
+    workersAiConfigured: boolean;
+    vectorizeConfigured: boolean;
+    expectedVectors: number;
+    staleVectorCandidates: number;
+    checkedVectorSample: number;
+    missingVectorSample: string[];
+    staleVectorSample: string[];
+    repairRecommended: boolean;
+    status: "current" | "needs_repair" | "unchecked" | "unconfigured";
+  };
   warnings: string[];
 };
 

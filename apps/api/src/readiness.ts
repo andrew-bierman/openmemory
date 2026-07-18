@@ -3,10 +3,22 @@ import { isLocalDevelopmentRequest, type resolveSessionTenant } from "./auth";
 import { resolveAuthBaseUrl } from "./better-auth";
 import type { Env } from "./env";
 import { getRateLimitSettings } from "./operational-controls";
+import {
+  getSemanticIndexDiagnostic,
+  type SemanticIndexDiagnostic,
+} from "./semantic-index";
 
 type GraphReadiness = {
+  getIndexInventory(): Promise<IndexInventory>;
   getRelationshipCatalog(): Promise<GraphRelationshipDefinition[]>;
   getStats(): Promise<GraphStats>;
+};
+
+type IndexInventory = {
+  indexableMemories: number;
+  purgeableMemories: number;
+  indexableMemoryIds: string[];
+  purgeableMemoryIds: string[];
 };
 
 type GraphStats = {
@@ -81,6 +93,7 @@ export type ReadinessSnapshot = {
   exports: {
     r2Configured: boolean;
   };
+  semanticIndex: SemanticIndexDiagnostic;
   warnings: string[];
 };
 
@@ -97,10 +110,16 @@ export async function getReadinessSnapshot({
   sessionTenant?: Awaited<ReturnType<typeof resolveSessionTenant>>;
   tenantId: string;
 }): Promise<ReadinessSnapshot> {
-  const [stats, relationships] = await Promise.all([
+  const [stats, relationships, indexInventory] = await Promise.all([
     graph.getStats(),
     graph.getRelationshipCatalog(),
+    graph.getIndexInventory(),
   ]);
+  const semanticIndex = await getSemanticIndexDiagnostic(
+    env,
+    tenantId,
+    indexInventory,
+  );
   const authBaseUrl = resolveAuthBaseUrl(env, request);
   const resourceBaseUrl = resolveResourceBaseUrl(authBaseUrl);
   const rateLimit = getRateLimitSettings(request, env);
@@ -161,9 +180,11 @@ export async function getReadinessSnapshot({
     exports: {
       r2Configured: Boolean(env.MEMORY_EXPORTS),
     },
+    semanticIndex,
     warnings: getReadinessWarnings({
       env,
       localDevelopment,
+      semanticIndex,
       source,
       stats,
     }),
@@ -173,11 +194,13 @@ export async function getReadinessSnapshot({
 function getReadinessWarnings({
   env,
   localDevelopment,
+  semanticIndex,
   source,
   stats,
 }: {
   env: Env;
   localDevelopment: boolean;
+  semanticIndex: SemanticIndexDiagnostic;
   source: "session" | "local-header";
   stats: GraphStats;
 }) {
@@ -191,6 +214,12 @@ function getReadinessWarnings({
   }
   if (!env.MEMORY_VECTORS || !env.AI) {
     warnings.push("semantic_index_not_fully_configured");
+  }
+  if (semanticIndex.status === "needs_repair") {
+    warnings.push("semantic_index_needs_repair");
+  }
+  if (semanticIndex.status === "unchecked") {
+    warnings.push("semantic_index_unchecked");
   }
   if (!env.MEMORY_EXPORTS) {
     warnings.push("r2_exports_unavailable");

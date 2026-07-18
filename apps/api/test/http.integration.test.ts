@@ -359,6 +359,22 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(tenantBExport.key).toContain(`${tenantB}/exports/`);
 
+  const updatedMemoryB = await getJson<MemoryResponse>(
+    await worker.fetch(`/v1/memories/${memoryB.id}`, {
+      method: "PATCH",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        content: "Vectorize repair removes superseded semantic candidates.",
+        relationship: "updates",
+        tags: ["retrieval"],
+      }),
+    }),
+  );
+  expect(updatedMemoryB.id).not.toBe(memoryB.id);
+
   const repair = await getJson<IndexRepairResponse>(
     await worker.fetch("/v1/index/repair", {
       method: "POST",
@@ -367,7 +383,19 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(repair).toMatchObject({
     attempted: 2,
+    expectedVectors: 2,
+    purgeableMemories: 1,
+    semanticIndex: {
+      expectedVectors: 2,
+      staleVectorCandidates: 1,
+      status: "unchecked",
+    },
+    staleVectors: {
+      attempted: 1,
+      vectorizeConfigured: true,
+    },
     tenantId: tenantA,
+    vectorizeConfigured: true,
   });
 
   const mismatchPurge = await worker.fetch("/v1/tenant", {
@@ -399,10 +427,10 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(purge).toMatchObject({
     tenantId: tenantA,
-    memoriesDeleted: 2,
-    edgesDeleted: 1,
+    memoriesDeleted: 3,
+    edgesDeleted: 2,
     vectorIndex: {
-      attempted: 2,
+      attempted: 3,
     },
     exports: {
       prefix: `${tenantA}/exports/`,
@@ -2646,6 +2674,7 @@ type ReadinessResponse = {
     enabled: boolean;
     limitPerMinute: number;
   };
+  semanticIndex: SemanticIndexResponse;
 };
 
 type IngestResponse = {
@@ -2807,8 +2836,29 @@ type GraphImportPreviewResponse = {
 
 type IndexRepairResponse = {
   attempted: number;
+  expectedVectors: number;
+  purgeableMemories: number;
+  semanticIndex: SemanticIndexResponse;
+  staleVectors: {
+    attempted: number;
+    deleted: number;
+    vectorizeConfigured: boolean;
+  };
   tenantId: string;
   vectorizeConfigured: boolean;
+};
+
+type SemanticIndexResponse = {
+  configured: boolean;
+  workersAiConfigured: boolean;
+  vectorizeConfigured: boolean;
+  expectedVectors: number;
+  staleVectorCandidates: number;
+  checkedVectorSample: number;
+  missingVectorSample: string[];
+  staleVectorSample: string[];
+  repairRecommended: boolean;
+  status: "current" | "needs_repair" | "unchecked" | "unconfigured";
 };
 
 type TenantExportCleanupResponse = {

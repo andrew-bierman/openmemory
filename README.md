@@ -49,6 +49,9 @@ to provide the infrastructure layer behind a more portable experience:
   confidence, importance, recency, and currentness.
 - Optional semantic candidate retrieval through Workers AI embeddings and
   Cloudflare Vectorize.
+- Semantic index diagnostics that report expected current vectors, stale vector
+  candidates, sampled missing vectors, sampled stale vectors, and repair
+  recommendations.
 - Better Auth routes, OAuth 2.1/OIDC discovery, dynamic client registration,
   JWT/JWKS-backed resource tokens, and optional GitHub/Google login providers.
 - Session-backed workspace and team member management backed by Drizzle/D1.

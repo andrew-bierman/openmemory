@@ -981,6 +981,7 @@ function Home() {
           lifecycleDistribution={lifecycleDistribution}
           memories={memories}
           metrics={dashboardMetrics}
+          readiness={readiness}
           recentActivity={recentActivity}
           typeDistribution={typeDistribution}
         />
@@ -1111,7 +1112,8 @@ function Home() {
                   ) : null}
                   {lastIndexRepair ? (
                     <span className="muted">
-                      {lastIndexRepair.attempted} memories queued
+                      {lastIndexRepair.attempted} memories queued ·{" "}
+                      {lastIndexRepair.staleVectors.attempted} stale checked
                     </span>
                   ) : null}
                 </div>
@@ -1321,6 +1323,7 @@ function OperationsReadiness({
   readiness: ReadinessSnapshot | null;
 }>) {
   const summary = getReadinessSummary(readiness);
+  const semanticIndex = readiness?.semanticIndex ?? null;
   const bindingRows = readiness
     ? Object.entries(readiness.bindings).map(([key, configured]) => ({
         configured,
@@ -1372,6 +1375,18 @@ function OperationsReadiness({
           status={summary.mcpStatus}
           tone={summary.mcpStatus === "Discoverable" ? "good" : "warn"}
           value={`${readiness?.mcp.tools.length ?? 0} tools`}
+        />
+        <ReadinessCard
+          icon={<Database aria-hidden="true" />}
+          label="Semantic index"
+          status={formatSemanticIndexStatus(semanticIndex?.status)}
+          tone={
+            semanticIndex?.status === "current" ||
+            semanticIndex?.status === undefined
+              ? "good"
+              : "warn"
+          }
+          value={`${semanticIndex?.expectedVectors ?? 0} current · ${semanticIndex?.staleVectorCandidates ?? 0} stale`}
         />
         <ReadinessCard
           icon={
@@ -1446,6 +1461,44 @@ function OperationsReadiness({
           </dl>
         </section>
       </div>
+
+      <section className="operations-card">
+        <div className="panel-heading">
+          <span>Semantic index</span>
+          <Badge
+            className={
+              semanticIndex?.repairRecommended
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : undefined
+            }
+            variant="outline"
+          >
+            {formatSemanticIndexStatus(semanticIndex?.status)}
+          </Badge>
+        </div>
+        <dl className="definition-list">
+          <div>
+            <dt>Expected vectors</dt>
+            <dd>{semanticIndex?.expectedVectors ?? 0}</dd>
+          </div>
+          <div>
+            <dt>Stale candidates</dt>
+            <dd>{semanticIndex?.staleVectorCandidates ?? 0}</dd>
+          </div>
+          <div>
+            <dt>Checked sample</dt>
+            <dd>{semanticIndex?.checkedVectorSample ?? 0}</dd>
+          </div>
+          <div>
+            <dt>Missing sample</dt>
+            <dd>{semanticIndex?.missingVectorSample.join(", ") || "None"}</dd>
+          </div>
+          <div>
+            <dt>Stale sample</dt>
+            <dd>{semanticIndex?.staleVectorSample.join(", ") || "None"}</dd>
+          </div>
+        </dl>
+      </section>
 
       <section className="operations-card">
         <div className="panel-heading">
@@ -1606,18 +1659,20 @@ function DashboardOverview({
   lifecycleDistribution,
   memories,
   metrics,
+  readiness,
   recentActivity,
   typeDistribution,
 }: Readonly<{
   lifecycleDistribution: DistributionPoint[];
   memories: Memory[];
   metrics: DashboardMetrics;
+  readiness: ReadinessSnapshot | null;
   recentActivity: ActivityPoint[];
   typeDistribution: DistributionPoint[];
 }>) {
   const activitySummary = getActivitySummary(recentActivity);
   const graphHealth = getGraphHealthSummary(metrics);
-  const indexReadiness = getIndexReadinessSummary(memories);
+  const indexReadiness = getIndexReadinessSummary(memories, readiness);
   const relationshipReadiness = getRelationshipReadinessSummary(metrics);
   const typeSummary = getTypeDistributionSummary(typeDistribution);
 
@@ -2445,6 +2500,23 @@ function formatWarningLabel(value: string) {
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatSemanticIndexStatus(
+  status?: ReadinessSnapshot["semanticIndex"]["status"],
+) {
+  switch (status) {
+    case "current":
+      return "Current";
+    case "needs_repair":
+      return "Needs repair";
+    case "unchecked":
+      return "Needs check";
+    case "unconfigured":
+      return "Unconfigured";
+    default:
+      return "Loading";
+  }
 }
 
 function parseTags(value: string) {

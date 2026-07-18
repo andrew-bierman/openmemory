@@ -59,8 +59,8 @@
   graph density; `/v1/graph/relationships` exposes the relationship catalog to
   clients.
 - `/v1/readiness` exposes a tenant-scoped operational snapshot for graph,
-  relationship, auth, MCP, binding, export, and rate-limit readiness without
-  leaking secrets or memory contents.
+  relationship, semantic-index, auth, MCP, binding, export, and rate-limit
+  readiness without leaking secrets or memory contents.
 - `docs/data-model.md` records the current D1, Durable Object, Vectorize, R2,
   Queue/Workflow, OAuth, MCP, and readiness data shape.
 - Local Wrangler integration includes a moderate graph-scale recall smoke, and
@@ -89,7 +89,9 @@
   either a destructive `replace` or additive `merge`, supports explicit
   duplicate-memory overwrite, then re-indexes active imported or overwritten
   memories.
-- `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
+- `/v1/index/repair` deletes stale tenant-scoped vectors for superseded,
+  historical, or forgotten graph records before re-upserting every active latest
+  tenant memory through the embedding and Vectorize indexing path.
 - `DELETE /v1/tenant` hard-deletes the resolved tenant's Durable Object graph
   data after explicit tenant confirmation and best-effort deletes matching
   Vectorize ids and tenant-scoped R2 exports.
@@ -161,7 +163,8 @@
      transcript extraction and enrichment.
    - Improve extraction quality with Workers AI once deterministic extraction
      has enough production traces to evaluate.
-   - Store embeddings in Vectorize for every chunk and add deeper stale-index diagnostics.
+   - Store embeddings in Vectorize for every chunk and tune stale-index
+     thresholds from production diagnostics.
    - Tune deterministic reranking and evaluate an optional LLM/ML reranker.
    - Use `bun run benchmark:import` when evaluating external MemoryBench-style
      corpora.

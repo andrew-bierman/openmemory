@@ -189,8 +189,29 @@ export type GraphImportPreviewResult = {
 
 export type IndexRepairResult = {
   attempted: number;
+  expectedVectors: number;
+  purgeableMemories: number;
+  semanticIndex: SemanticIndexDiagnostic;
+  staleVectors: {
+    attempted: number;
+    deleted: number;
+    vectorizeConfigured: boolean;
+  };
   tenantId: string;
   vectorizeConfigured: boolean;
+};
+
+export type SemanticIndexDiagnostic = {
+  configured: boolean;
+  workersAiConfigured: boolean;
+  vectorizeConfigured: boolean;
+  expectedVectors: number;
+  staleVectorCandidates: number;
+  checkedVectorSample: number;
+  missingVectorSample: string[];
+  staleVectorSample: string[];
+  repairRecommended: boolean;
+  status: "current" | "needs_repair" | "unchecked" | "unconfigured";
 };
 
 export type TenantExportCleanupResult = {
@@ -305,6 +326,7 @@ export type ReadinessSnapshot = {
   exports: {
     r2Configured: boolean;
   };
+  semanticIndex: SemanticIndexDiagnostic;
   warnings: string[];
 };
 
