@@ -114,16 +114,17 @@ larger hosted push.
   protected-resource metadata, with Analytics Engine telemetry and optional
   webhook/email alert dispatch.
 - [x] Latest live smoke proves remote Workers AI and Vectorize semantic recall
-  after the deployed semantic-index metadata fix. Evidence:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29661280233`
-  on `bb97180681cd8c4d2659b9fee0a965860fae3bbf`.
+  on the current launch candidate. Evidence:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29661917115`
+  on `f7914b8ce9b78dc8e320c89c5a228593accb92e1`.
 - [x] Latest local release validation passed on
-  `bb97180681cd8c4d2659b9fee0a965860fae3bbf` with `bun run
-  release:validate`.
+  `f7914b8ce9b78dc8e320c89c5a228593accb92e1` with `bun run
+  release:validate`, including local recall MRR `1.0`, hit@3 `1.0`,
+  220-memory graph recall `5.95ms`, and 360-memory graph recall `10.85ms`.
 - [x] Latest hosted production graph benchmark passed on
-  `bb97180681cd8c4d2659b9fee0a965860fae3bbf`: 80 active memories, 79 edges,
-  recall latency `921.16ms` versus a `12000ms` threshold, with remote D1 cleanup
-  counters at zero for live-smoke and live-benchmark users.
+  `f7914b8ce9b78dc8e320c89c5a228593accb92e1`: 80 active memories, 79 edges,
+  recall latency `1055.43ms` versus a `12000ms` threshold, with remote D1
+  cleanup counters at zero for live-smoke and live-benchmark users.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
