@@ -111,14 +111,14 @@ larger hosted push.
 - [x] Live smoke workflow exists.
 - [x] Latest live smoke proves remote Workers AI and Vectorize semantic recall
   after the deployed semantic-index metadata fix. Evidence:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29660451539`
-  on `3e5c8f3549f4f2f6cd4e31a594b433f5d60bee81`.
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29661280233`
+  on `bb97180681cd8c4d2659b9fee0a965860fae3bbf`.
 - [x] Latest local release validation passed on
-  `0952adae6259cd1574a738f6a1da194dbd4fe8d1` with `bun run
+  `bb97180681cd8c4d2659b9fee0a965860fae3bbf` with `bun run
   release:validate`.
 - [x] Latest hosted production graph benchmark passed on
-  `0952adae6259cd1574a738f6a1da194dbd4fe8d1`: 80 active memories, 79 edges,
-  recall latency `874.9ms` versus a `12000ms` threshold, with remote D1 cleanup
+  `bb97180681cd8c4d2659b9fee0a965860fae3bbf`: 80 active memories, 79 edges,
+  recall latency `921.16ms` versus a `12000ms` threshold, with remote D1 cleanup
   counters at zero for live-smoke and live-benchmark users.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
