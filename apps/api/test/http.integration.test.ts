@@ -410,6 +410,32 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(await invalidImport.json()).toMatchObject({
     error: "invalid_graph_export",
   });
+  const danglingMerge = await worker.fetch("/v1/imports", {
+    method: "POST",
+    headers: {
+      ...tenantHeaders(tenantA),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      confirmTenantId: tenantA,
+      mode: "merge",
+      export: {
+        ...graphExportPayload,
+        edges: [
+          {
+            ...matchingEdges[0],
+            sourceId: memoryA.id,
+            targetId: "missing-memory",
+          },
+        ],
+      },
+    }),
+  });
+  expect(danglingMerge.status).toBe(400);
+  expect(await danglingMerge.json()).toMatchObject({
+    error: "graph_import_failed",
+    message: "graph_export_contains_dangling_edges",
+  });
   const restored = await getJson<GraphImportResponse>(
     await worker.fetch("/v1/imports", {
       method: "POST",
@@ -458,6 +484,77 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
       targetId: memoryA.id,
       relationship: "supports",
       weight: 0.8,
+    }),
+  );
+  const mergedMemory = {
+    ...memoryA,
+    id: `mem_merge_${crypto.randomUUID().replace(/-/g, "")}`,
+    content: "Merged graph imports should preserve existing memories.",
+    tags: ["merge"],
+    metadata: { merged: true },
+    entityIds: ["merged-graph"],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  const mergePayload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    memories: [memoryA, mergedMemory],
+    edges: [
+      {
+        ...matchingEdges[0],
+        sourceId: mergedMemory.id,
+        targetId: memoryA.id,
+        relationship: "extends",
+        weight: 0.7,
+      },
+    ],
+  };
+  const merged = await getJson<GraphImportResponse>(
+    await worker.fetch("/v1/imports", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        confirmTenantId: tenantA,
+        mode: "merge",
+        export: mergePayload,
+      }),
+    }),
+  );
+  expect(merged).toMatchObject({
+    tenantId: tenantA,
+    mode: "merge",
+    version: 1,
+    memoriesImported: 1,
+    memoriesSkipped: 1,
+    edgesImported: 1,
+    activeMemoriesIndexed: 1,
+    merged: {
+      memoriesSkipped: 1,
+    },
+  });
+  const mergedList = await getJson<MemoryResponse[]>(
+    await worker.fetch("/v1/memories", {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(mergedList.map((memory) => memory.id).sort()).toEqual(
+    [memoryA.id, memoryB.id, mergedMemory.id].sort(),
+  );
+  const mergedNeighbors = await getJson<EdgeResponse[]>(
+    await worker.fetch(`/v1/graph/${memoryA.id}/neighbors`, {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(mergedNeighbors).toContainEqual(
+    expect.objectContaining({
+      sourceId: mergedMemory.id,
+      targetId: memoryA.id,
+      relationship: "extends",
+      weight: 0.7,
     }),
   );
   const tenantBListAfterPurge = await getJson<MemoryResponse[]>(
@@ -2321,12 +2418,16 @@ type GraphExportResponse = {
 
 type GraphImportResponse = {
   tenantId: string;
-  mode: "replace";
+  mode: "replace" | "merge";
   version: 1;
   memoriesImported: number;
+  memoriesSkipped?: number;
   edgesImported: number;
   activeMemoriesIndexed: number;
-  replaced: {
+  merged?: {
+    memoriesSkipped: number;
+  };
+  replaced?: {
     memoriesDeleted: number;
     edgesDeleted: number;
     tagsDeleted: number;

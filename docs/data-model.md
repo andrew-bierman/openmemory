@@ -118,12 +118,17 @@ Export keys use:
 The export payload contains `version`, `exportedAt`, graph `stats`, `memories`,
 and `edges`.
 
-`POST /v1/imports` restores an OpenMemory graph export into the resolved tenant
-after the caller supplies a matching `confirmTenantId` and `mode: "replace"`.
-Restore is intentionally destructive: it purges the current tenant Durable
-Object graph, best-effort deletes stale Vectorize ids, imports validated memory
-and edge records with their original IDs and timestamps, then re-indexes active
-latest memories.
+`POST /v1/imports` imports an OpenMemory graph export into the resolved tenant
+after the caller supplies a matching `confirmTenantId`.
+
+- `mode: "replace"` is intentionally destructive: it purges the current tenant
+  Durable Object graph, best-effort deletes stale Vectorize ids, imports
+  validated memory and edge records with their original IDs and timestamps, then
+  re-indexes active latest memories.
+- `mode: "merge"` is additive: it skips incoming memories whose IDs already
+  exist in the tenant, imports new memories, upserts export edges, validates
+  that every edge endpoint exists in either the current graph or incoming
+  export, and re-indexes only newly imported active latest memories.
 
 ## Tenant Purge
 

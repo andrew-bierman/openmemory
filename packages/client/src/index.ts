@@ -110,12 +110,16 @@ export type GraphExportResult = {
 
 export type GraphImportResult = {
   tenantId: string;
-  mode: "replace";
+  mode: "replace" | "merge";
   version: 1;
   memoriesImported: number;
   edgesImported: number;
   activeMemoriesIndexed: number;
-  replaced: {
+  memoriesSkipped?: number;
+  merged?: {
+    memoriesSkipped: number;
+  };
+  replaced?: {
     memoriesDeleted: number;
     edgesDeleted: number;
     tagsDeleted: number;
@@ -355,9 +359,13 @@ export function createOpenMemoryClient(
         client.v1.oauth.connections({ clientId }).delete(),
       ),
     exportGraph: () => unwrap<GraphExportResult>(client.v1.exports.post()),
-    importGraph: (input: { confirmTenantId: string; export: unknown }) =>
+    importGraph: (input: {
+      confirmTenantId: string;
+      export: unknown;
+      mode?: "replace" | "merge";
+    }) =>
       unwrap<GraphImportResult>(
-        client.v1.imports.post({ ...input, mode: "replace" }),
+        client.v1.imports.post({ ...input, mode: input.mode ?? "replace" }),
       ),
     repairIndex: () => unwrap<IndexRepairResult>(client.v1.index.repair.post()),
     purgeTenantData: (confirmTenantId: string) =>
@@ -449,7 +457,7 @@ type EdenClient = {
     imports: {
       post(input: {
         confirmTenantId: string;
-        mode: "replace";
+        mode: "replace" | "merge";
         export: unknown;
       }): EdenResult;
     };

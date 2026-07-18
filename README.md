@@ -173,7 +173,7 @@ Useful endpoints:
 - `GET /v1/graph/relationships`
 - `GET /v1/graph/:id/neighbors`
 - `POST /v1/exports`
-- `POST /v1/imports`
+- `POST /v1/imports` with `mode: "replace"` or `mode: "merge"`
 - `POST /v1/index/repair`
 - `DELETE /v1/tenant`
 - `GET /v1/oauth/connections`

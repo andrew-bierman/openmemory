@@ -699,13 +699,10 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
 
   async restoreGraph(input: unknown) {
     const graphExport = GraphExportPayloadSchema.parse(input);
-    const memoryIds = new Set(graphExport.memories.map((memory) => memory.id));
-    const danglingEdges = graphExport.edges.filter(
-      (edge) => !memoryIds.has(edge.sourceId) || !memoryIds.has(edge.targetId),
+    assertNoDanglingEdges(
+      graphExport,
+      new Set(graphExport.memories.map((memory) => memory.id)),
     );
-    if (danglingEdges.length > 0) {
-      throw new Error("graph_export_contains_dangling_edges");
-    }
 
     const purged = await this.purgeTenantData();
     for (const memory of graphExport.memories) {
@@ -722,6 +719,50 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       memoriesImported: graphExport.memories.length,
       edgesImported: graphExport.edges.length,
       purged,
+      version: graphExport.version,
+    };
+  }
+
+  async mergeGraph(input: unknown) {
+    const graphExport = GraphExportPayloadSchema.parse(input);
+    const existingMemoryIds = new Set(
+      this.sqlState.storage.sql
+        .exec<{ id: string }>(`select id from memories`)
+        .toArray()
+        .map((row) => row.id),
+    );
+    const allowedMemoryIds = new Set([
+      ...existingMemoryIds,
+      ...graphExport.memories.map((memory) => memory.id),
+    ]);
+    assertNoDanglingEdges(graphExport, allowedMemoryIds);
+
+    let memoriesImported = 0;
+    let memoriesSkipped = 0;
+    const importedMemoryIds: string[] = [];
+    for (const memory of graphExport.memories) {
+      if (existingMemoryIds.has(memory.id)) {
+        memoriesSkipped += 1;
+        continue;
+      }
+      this.insertMemory(memory);
+      this.upsertTags(memory.id, memory.tags);
+      this.upsertEntities(memory.id, memory.entityIds);
+      existingMemoryIds.add(memory.id);
+      memoriesImported += 1;
+      importedMemoryIds.push(memory.id);
+    }
+
+    for (const edge of graphExport.edges) {
+      this.insertEdge(edge);
+    }
+
+    return {
+      importedAt: new Date().toISOString(),
+      memoriesImported,
+      memoriesSkipped,
+      importedMemoryIds,
+      edgesImported: graphExport.edges.length,
       version: graphExport.version,
     };
   }
@@ -1135,6 +1176,20 @@ function rowToEdge(row: EdgeRow) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function assertNoDanglingEdges(
+  graphExport: GraphExportPayload,
+  allowedMemoryIds: Set<string>,
+) {
+  const danglingEdges = graphExport.edges.filter(
+    (edge) =>
+      !allowedMemoryIds.has(edge.sourceId) ||
+      !allowedMemoryIds.has(edge.targetId),
+  );
+  if (danglingEdges.length > 0) {
+    throw new Error("graph_export_contains_dangling_edges");
+  }
 }
 
 function rowToIngestionJob(row: IngestionJobRow) {
