@@ -6,10 +6,14 @@ type LaunchEvidence = {
     liveBenchmarkRun: string;
     releaseValidationCommit: string;
   };
-  currentCandidate: {
+  latestRepositoryGate: {
+    commit: string;
+    mainCiRun: string;
+    workersBuildUrl: string;
+  };
+  latestVerifiedRuntimeCandidate: {
     commit: string;
     liveSmokeRun: string;
-    mainCiRun: string;
     remoteCleanupCounters: Record<string, number>;
   };
   screenshotDirectory: string;
@@ -27,18 +31,28 @@ const releaseQualification = await readFile(releaseQualificationPath, "utf8");
 
 assertIncludes(
   launchReadiness,
-  evidence.currentCandidate.commit,
-  "docs/launch-readiness.md must mention the current candidate commit.",
+  evidence.latestRepositoryGate.commit,
+  "docs/launch-readiness.md must mention the latest repository-gate commit.",
 );
 assertIncludes(
   launchReadiness,
-  evidence.currentCandidate.mainCiRun,
-  "docs/launch-readiness.md must mention the current main CI run.",
+  evidence.latestRepositoryGate.mainCiRun,
+  "docs/launch-readiness.md must mention the latest main CI run.",
 );
 assertIncludes(
   launchReadiness,
-  evidence.currentCandidate.liveSmokeRun,
-  "docs/launch-readiness.md must mention the current live-smoke run.",
+  evidence.latestRepositoryGate.workersBuildUrl,
+  "docs/launch-readiness.md must mention the latest Workers Build URL.",
+);
+assertIncludes(
+  launchReadiness,
+  evidence.latestVerifiedRuntimeCandidate.commit,
+  "docs/launch-readiness.md must mention the latest verified runtime candidate commit.",
+);
+assertIncludes(
+  launchReadiness,
+  evidence.latestVerifiedRuntimeCandidate.liveSmokeRun,
+  "docs/launch-readiness.md must mention the latest live-smoke run.",
 );
 assertIncludes(
   launchReadiness,
@@ -57,7 +71,7 @@ assertIncludes(
 );
 
 for (const [name, count] of Object.entries(
-  evidence.currentCandidate.remoteCleanupCounters,
+  evidence.latestVerifiedRuntimeCandidate.remoteCleanupCounters,
 )) {
   assert(
     Number.isInteger(count) && count >= 0,
@@ -71,10 +85,10 @@ for (const [name, count] of Object.entries(
 }
 
 console.log(
-  `Launch evidence is documented for ${evidence.currentCandidate.commit.slice(
+  `Launch evidence is documented for repo ${evidence.latestRepositoryGate.commit.slice(
     0,
     7,
-  )}.`,
+  )} and runtime ${evidence.latestVerifiedRuntimeCandidate.commit.slice(0, 7)}.`,
 );
 
 function assertEvidence(value: unknown): asserts value is LaunchEvidence {
@@ -84,26 +98,43 @@ function assertEvidence(value: unknown): asserts value is LaunchEvidence {
   );
   const evidence = value as Partial<LaunchEvidence>;
   assert(
-    typeof evidence.currentCandidate === "object" &&
-      evidence.currentCandidate !== null,
-    "currentCandidate is required.",
+    typeof evidence.latestRepositoryGate === "object" &&
+      evidence.latestRepositoryGate !== null,
+    "latestRepositoryGate is required.",
   );
   assert(
-    /^[0-9a-f]{40}$/.test(String(evidence.currentCandidate.commit)),
-    "currentCandidate.commit must be a full Git SHA.",
+    /^[0-9a-f]{40}$/.test(String(evidence.latestRepositoryGate.commit)),
+    "latestRepositoryGate.commit must be a full Git SHA.",
   );
   assert(
-    /^\d+$/.test(String(evidence.currentCandidate.mainCiRun)),
-    "currentCandidate.mainCiRun must be a GitHub run id.",
+    /^\d+$/.test(String(evidence.latestRepositoryGate.mainCiRun)),
+    "latestRepositoryGate.mainCiRun must be a GitHub run id.",
   );
   assert(
-    /^\d+$/.test(String(evidence.currentCandidate.liveSmokeRun)),
-    "currentCandidate.liveSmokeRun must be a GitHub run id.",
+    typeof evidence.latestRepositoryGate.workersBuildUrl === "string" &&
+      evidence.latestRepositoryGate.workersBuildUrl.startsWith("https://"),
+    "latestRepositoryGate.workersBuildUrl must be a URL.",
   );
   assert(
-    typeof evidence.currentCandidate.remoteCleanupCounters === "object" &&
-      evidence.currentCandidate.remoteCleanupCounters !== null,
-    "currentCandidate.remoteCleanupCounters is required.",
+    typeof evidence.latestVerifiedRuntimeCandidate === "object" &&
+      evidence.latestVerifiedRuntimeCandidate !== null,
+    "latestVerifiedRuntimeCandidate is required.",
+  );
+  assert(
+    /^[0-9a-f]{40}$/.test(
+      String(evidence.latestVerifiedRuntimeCandidate.commit),
+    ),
+    "latestVerifiedRuntimeCandidate.commit must be a full Git SHA.",
+  );
+  assert(
+    /^\d+$/.test(String(evidence.latestVerifiedRuntimeCandidate.liveSmokeRun)),
+    "latestVerifiedRuntimeCandidate.liveSmokeRun must be a GitHub run id.",
+  );
+  assert(
+    typeof evidence.latestVerifiedRuntimeCandidate.remoteCleanupCounters ===
+      "object" &&
+      evidence.latestVerifiedRuntimeCandidate.remoteCleanupCounters !== null,
+    "latestVerifiedRuntimeCandidate.remoteCleanupCounters is required.",
   );
   assert(
     typeof evidence.benchmarkEvidence === "object" &&
