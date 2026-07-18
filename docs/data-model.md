@@ -121,7 +121,8 @@ and `edges`.
 `POST /v1/imports/preview` validates an OpenMemory graph export against the
 resolved tenant after the caller supplies a matching `confirmTenantId`. It
 returns incoming counts, existing graph counts, bounded duplicate/new memory ID
-lists, and the expected replace/merge impact without mutating the graph.
+lists, field-level duplicate conflict summaries, and the expected replace/merge
+impact without mutating the graph.
 
 `POST /v1/imports` imports an OpenMemory graph export into the resolved tenant
 after the same tenant confirmation and validation.
@@ -134,6 +135,10 @@ after the same tenant confirmation and validation.
   exist in the tenant, imports new memories, upserts export edges, validates
   that every edge endpoint exists in either the current graph or incoming
   export, and re-indexes only newly imported active latest memories.
+- `conflictPolicy: "overwrite"` can be used with merge after previewing
+  conflicts. It replaces changed duplicate memory records by ID, refreshes
+  their tags/entities, upserts export edges, and re-indexes overwritten active
+  latest memories. The default policy is `skip`.
 
 ## Tenant Purge
 

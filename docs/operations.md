@@ -199,8 +199,9 @@ Current limitations:
   deletion also best-effort removes the deleted tenant's export objects when
   the R2 binding is available.
 - Durable Object graph import supports tenant-scoped preview, destructive
-  `replace`, and additive `merge` from OpenMemory export payloads; field-level
-  diff conflict resolution is not implemented.
+  `replace`, additive `merge`, and explicit duplicate-memory overwrite from
+  OpenMemory export payloads. Automatic semantic merge of two changed records
+  is not implemented.
 
 Recommended operator controls before broader public launch:
 
@@ -239,9 +240,11 @@ current tenant graph should be wiped before restoring the export.
    ```
 
    Confirm the previewed `existing`, `incoming`, `impact`, `conflicts`, and
-   `candidates` fields match the recovery plan. Preview is read-only, but it
-   validates the same tenant confirmation, export shape, and dangling edge
-   rules as import.
+   `candidates` fields match the recovery plan. In merge mode, `conflicts`
+   separates unchanged duplicate IDs from changed duplicate IDs and lists the
+   changed field names without returning memory content. Preview is read-only,
+   but it validates the same tenant confirmation, export shape, and dangling
+   edge rules as import.
 
 4. Call:
 
@@ -269,7 +272,13 @@ current tenant graph should be wiped before restoring the export.
 
    Set `"mode": "merge"` to preserve current tenant graph data and import only
    new memory IDs from the export. Merge validates that every incoming edge
-   points to either an existing memory or an incoming memory.
+   points to either an existing memory or an incoming memory. The default
+   conflict policy is `"skip"`, so changed duplicate memories keep the current
+   tenant record.
+
+   Use `"conflictPolicy": "overwrite"` only after previewing changed duplicate
+   IDs. It replaces duplicate memory records by ID, refreshes tags/entities,
+   upserts export edges, and re-indexes overwritten active latest memories.
 
 5. Verify `/v1/graph/stats`, `/v1/search`, and `/v1/readiness` for the tenant.
 

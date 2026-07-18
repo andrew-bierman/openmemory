@@ -24,6 +24,8 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const IMPORT_PREVIEW_DETAIL_LIMIT = 25;
 
 type GraphImportMode = "replace" | "merge";
+type GraphImportConflictPolicy = "skip" | "overwrite";
+type ImportMemory = GraphExportPayload["memories"][number];
 
 type SearchWithSemanticIds = Partial<SearchInput> & {
   q: string;
@@ -726,12 +728,20 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     };
   }
 
-  async previewGraphImport(input: unknown, mode: GraphImportMode) {
+  async previewGraphImport(
+    input: unknown,
+    mode: GraphImportMode,
+    conflictPolicy: GraphImportConflictPolicy = "skip",
+  ) {
     const graphExport = GraphExportPayloadSchema.parse(input);
-    const existingMemoryIds = this.sqlState.storage.sql
-      .exec<{ id: string }>(`select id from memories order by created_at asc`)
+    const existingMemories = this.sqlState.storage.sql
+      .exec<MemoryRow>(`select * from memories order by created_at asc`)
       .toArray()
-      .map((row) => row.id);
+      .map(rowToMemory);
+    const existingMemoryIds = existingMemories.map((memory) => memory.id);
+    const existingMemoryById = new Map(
+      existingMemories.map((memory) => [memory.id, memory]),
+    );
     const existingMemoryIdSet = new Set(existingMemoryIds);
     const incomingMemoryIds = graphExport.memories.map((memory) => memory.id);
     const incomingMemoryIdSet = new Set(incomingMemoryIds);
@@ -748,11 +758,26 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     const newMemoryIds = incomingMemoryIds.filter(
       (id) => !existingMemoryIdSet.has(id),
     );
+    const duplicateDiffs = getDuplicateMemoryDiffs(
+      graphExport.memories,
+      existingMemoryById,
+    );
+    const changedMemoryIds = duplicateDiffs
+      .filter((diff) => diff.fields.length > 0)
+      .map((diff) => diff.id);
+    const unchangedMemoryIds = duplicateDiffs
+      .filter((diff) => diff.fields.length === 0)
+      .map((diff) => diff.id);
     const memoriesImported =
       mode === "merge" ? newMemoryIds.length : graphExport.memories.length;
+    const memoriesOverwritten =
+      mode === "merge" && conflictPolicy === "overwrite"
+        ? changedMemoryIds.length
+        : 0;
 
     return {
       mode,
+      conflictPolicy,
       version: graphExport.version,
       previewedAt: new Date().toISOString(),
       incoming: {
@@ -771,7 +796,9 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
             }
           : {
               memoriesImported,
-              memoriesSkipped: skippedExistingMemoryIds.length,
+              memoriesSkipped:
+                skippedExistingMemoryIds.length - memoriesOverwritten,
+              memoriesOverwritten,
               edgesImported: graphExport.edges.length,
               wouldDelete: {
                 memories: 0,
@@ -786,6 +813,17 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
         duplicateMemoryIds: limitPreviewIds(skippedExistingMemoryIds),
         duplicateMemoryIdsTruncated:
           skippedExistingMemoryIds.length > IMPORT_PREVIEW_DETAIL_LIMIT,
+        changedMemoryIds: limitPreviewIds(changedMemoryIds),
+        changedMemoryIdsTruncated:
+          changedMemoryIds.length > IMPORT_PREVIEW_DETAIL_LIMIT,
+        unchangedMemoryIds: limitPreviewIds(unchangedMemoryIds),
+        unchangedMemoryIdsTruncated:
+          unchangedMemoryIds.length > IMPORT_PREVIEW_DETAIL_LIMIT,
+        fieldConflicts: duplicateDiffs
+          .filter((diff) => diff.fields.length > 0)
+          .slice(0, IMPORT_PREVIEW_DETAIL_LIMIT),
+        fieldConflictsTruncated:
+          changedMemoryIds.length > IMPORT_PREVIEW_DETAIL_LIMIT,
       },
       candidates: {
         newMemoryIds: limitPreviewIds(newMemoryIds),
@@ -795,13 +833,20 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     };
   }
 
-  async mergeGraph(input: unknown) {
+  async mergeGraph(
+    input: unknown,
+    conflictPolicy: GraphImportConflictPolicy = "skip",
+  ) {
     const graphExport = GraphExportPayloadSchema.parse(input);
+    const existingMemories = this.sqlState.storage.sql
+      .exec<MemoryRow>(`select * from memories`)
+      .toArray()
+      .map(rowToMemory);
     const existingMemoryIds = new Set(
-      this.sqlState.storage.sql
-        .exec<{ id: string }>(`select id from memories`)
-        .toArray()
-        .map((row) => row.id),
+      existingMemories.map((memory) => memory.id),
+    );
+    const existingMemoryById = new Map(
+      existingMemories.map((memory) => [memory.id, memory]),
     );
     const allowedMemoryIds = new Set([
       ...existingMemoryIds,
@@ -811,9 +856,23 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
 
     let memoriesImported = 0;
     let memoriesSkipped = 0;
+    let memoriesOverwritten = 0;
     const importedMemoryIds: string[] = [];
+    const overwrittenMemoryIds: string[] = [];
     for (const memory of graphExport.memories) {
       if (existingMemoryIds.has(memory.id)) {
+        const existingMemory = existingMemoryById.get(memory.id);
+        const changedFields = existingMemory
+          ? diffMemoryFields(existingMemory, memory)
+          : [];
+        if (conflictPolicy === "overwrite" && changedFields.length > 0) {
+          this.upsertMemory(memory);
+          this.upsertTags(memory.id, memory.tags);
+          this.upsertEntities(memory.id, memory.entityIds);
+          memoriesOverwritten += 1;
+          overwrittenMemoryIds.push(memory.id);
+          continue;
+        }
         memoriesSkipped += 1;
         continue;
       }
@@ -833,7 +892,9 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       importedAt: new Date().toISOString(),
       memoriesImported,
       memoriesSkipped,
+      memoriesOverwritten,
       importedMemoryIds,
+      overwrittenMemoryIds,
       edgesImported: graphExport.edges.length,
       version: graphExport.version,
     };
@@ -1075,8 +1136,19 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
   }
 
   private insertMemory(memory: MemoryRecord) {
+    this.writeMemory("insert", memory);
+  }
+
+  private upsertMemory(memory: MemoryRecord) {
+    this.writeMemory("insert or replace", memory);
+  }
+
+  private writeMemory(
+    statement: "insert" | "insert or replace",
+    memory: MemoryRecord,
+  ) {
     this.sqlState.storage.sql.exec(
-      `insert into memories (
+      `${statement} into memories (
         id, content, source, conversation_id, tags_json, metadata_json, type, status,
         is_latest, confidence, importance, valid_from, valid_until, supersedes_id,
         entity_ids_json, forgotten_at, forget_reason, created_at, updated_at
@@ -1294,6 +1366,61 @@ function assertNoDanglingEdges(
 function limitPreviewIds(ids: string[]) {
   return ids.slice(0, IMPORT_PREVIEW_DETAIL_LIMIT);
 }
+
+function getDuplicateMemoryDiffs(
+  incomingMemories: ImportMemory[],
+  existingMemoryById: Map<string, ImportMemory>,
+) {
+  return incomingMemories.flatMap((incoming) => {
+    const existing = existingMemoryById.get(incoming.id);
+    if (!existing) {
+      return [];
+    }
+
+    return [
+      {
+        id: incoming.id,
+        fields: diffMemoryFields(existing, incoming),
+      },
+    ];
+  });
+}
+
+function diffMemoryFields(existing: ImportMemory, incoming: ImportMemory) {
+  const fields: string[] = [];
+  for (const field of MEMORY_IMPORT_COMPARE_FIELDS) {
+    if (
+      canonicalMemoryField(existing[field]) !==
+      canonicalMemoryField(incoming[field])
+    ) {
+      fields.push(field);
+    }
+  }
+  return fields;
+}
+
+function canonicalMemoryField(value: unknown) {
+  return JSON.stringify(value ?? null);
+}
+
+const MEMORY_IMPORT_COMPARE_FIELDS = [
+  "content",
+  "source",
+  "conversationId",
+  "tags",
+  "metadata",
+  "type",
+  "status",
+  "isLatest",
+  "confidence",
+  "importance",
+  "validFrom",
+  "validUntil",
+  "supersedesId",
+  "entityIds",
+  "forgottenAt",
+  "forgetReason",
+] as const satisfies ReadonlyArray<keyof ImportMemory>;
 
 function rowToIngestionJob(row: IngestionJobRow) {
   return {

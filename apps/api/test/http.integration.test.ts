@@ -608,10 +608,18 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
+  const changedMemoryA = {
+    ...memoryA,
+    content: "Memory A was intentionally overwritten during graph restore.",
+    tags: ["restored", "overwrite"],
+    metadata: { restored: true },
+    entityIds: ["restored-memory-a"],
+    updatedAt: new Date().toISOString(),
+  };
   const mergePayload = {
     version: 1,
     exportedAt: new Date().toISOString(),
-    memories: [memoryA, mergedMemory],
+    memories: [changedMemoryA, mergedMemory],
     edges: [
       {
         ...matchingEdges[0],
@@ -639,6 +647,7 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(mergePreview).toMatchObject({
     tenantId: tenantA,
     mode: "merge",
+    conflictPolicy: "skip",
     version: 1,
     incoming: {
       memories: 2,
@@ -651,6 +660,7 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     impact: {
       memoriesImported: 1,
       memoriesSkipped: 1,
+      memoriesOverwritten: 0,
       edgesImported: 1,
       wouldDelete: {
         memories: 0,
@@ -661,6 +671,17 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     conflicts: {
       duplicateMemoryIds: [memoryA.id],
       duplicateMemoryIdsTruncated: false,
+      changedMemoryIds: [memoryA.id],
+      changedMemoryIdsTruncated: false,
+      unchangedMemoryIds: [],
+      unchangedMemoryIdsTruncated: false,
+      fieldConflicts: [
+        {
+          id: memoryA.id,
+          fields: ["content", "tags", "metadata", "entityIds"],
+        },
+      ],
+      fieldConflictsTruncated: false,
     },
     candidates: {
       newMemoryIds: [mergedMemory.id],
@@ -687,10 +708,12 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     version: 1,
     memoriesImported: 1,
     memoriesSkipped: 1,
+    memoriesOverwritten: 0,
     edgesImported: 1,
     activeMemoriesIndexed: 1,
     merged: {
       memoriesSkipped: 1,
+      memoriesOverwritten: 0,
     },
   });
   const mergedList = await getJson<MemoryResponse[]>(
@@ -701,6 +724,13 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(mergedList.map((memory) => memory.id).sort()).toEqual(
     [memoryA.id, memoryB.id, mergedMemory.id].sort(),
   );
+  const skippedDuplicate = await getJson<MemoryResponse>(
+    await worker.fetch(`/v1/memories/${memoryA.id}`, {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(skippedDuplicate.content).toBe(memoryA.content);
+  expect(skippedDuplicate.tags).toEqual(memoryA.tags);
   const mergedNeighbors = await getJson<EdgeResponse[]>(
     await worker.fetch(`/v1/graph/${memoryA.id}/neighbors`, {
       headers: tenantHeaders(tenantA),
@@ -714,6 +744,85 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
       weight: 0.7,
     }),
   );
+  const overwritePreview = await getJson<GraphImportPreviewResponse>(
+    await worker.fetch("/v1/imports/preview", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        confirmTenantId: tenantA,
+        mode: "merge",
+        conflictPolicy: "overwrite",
+        export: {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          memories: [changedMemoryA],
+          edges: [],
+        },
+      }),
+    }),
+  );
+  expect(overwritePreview).toMatchObject({
+    tenantId: tenantA,
+    mode: "merge",
+    conflictPolicy: "overwrite",
+    impact: {
+      memoriesImported: 0,
+      memoriesSkipped: 0,
+      memoriesOverwritten: 1,
+      edgesImported: 0,
+    },
+    conflicts: {
+      changedMemoryIds: [memoryA.id],
+    },
+  });
+  const overwritten = await getJson<GraphImportResponse>(
+    await worker.fetch("/v1/imports", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        confirmTenantId: tenantA,
+        mode: "merge",
+        conflictPolicy: "overwrite",
+        export: {
+          version: 1,
+          exportedAt: new Date().toISOString(),
+          memories: [changedMemoryA],
+          edges: [],
+        },
+      }),
+    }),
+  );
+  expect(overwritten).toMatchObject({
+    tenantId: tenantA,
+    mode: "merge",
+    memoriesImported: 0,
+    memoriesSkipped: 0,
+    memoriesOverwritten: 1,
+    edgesImported: 0,
+    activeMemoriesIndexed: 1,
+    merged: {
+      memoriesSkipped: 0,
+      memoriesOverwritten: 1,
+    },
+  });
+  const overwrittenMemory = await getJson<MemoryResponse>(
+    await worker.fetch(`/v1/memories/${memoryA.id}`, {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(overwrittenMemory).toMatchObject({
+    id: memoryA.id,
+    content: changedMemoryA.content,
+    tags: changedMemoryA.tags,
+    metadata: changedMemoryA.metadata,
+    entityIds: changedMemoryA.entityIds,
+  });
   const tenantBListAfterPurge = await getJson<MemoryResponse[]>(
     await worker.fetch("/v1/memories", {
       headers: tenantHeaders(tenantB),
@@ -2623,10 +2732,12 @@ type GraphImportResponse = {
   version: 1;
   memoriesImported: number;
   memoriesSkipped?: number;
+  memoriesOverwritten?: number;
   edgesImported: number;
   activeMemoriesIndexed: number;
   merged?: {
     memoriesSkipped: number;
+    memoriesOverwritten: number;
   };
   replaced?: {
     memoriesDeleted: number;
@@ -2647,6 +2758,7 @@ type GraphImportResponse = {
 type GraphImportPreviewResponse = {
   tenantId: string;
   mode: "replace" | "merge";
+  conflictPolicy: "skip" | "overwrite";
   version: 1;
   previewedAt: string;
   incoming: {
@@ -2663,6 +2775,7 @@ type GraphImportPreviewResponse = {
   impact: {
     memoriesImported: number;
     memoriesSkipped: number;
+    memoriesOverwritten?: number;
     edgesImported: number;
     wouldDelete: {
       memories: number;
@@ -2676,6 +2789,15 @@ type GraphImportPreviewResponse = {
   conflicts: {
     duplicateMemoryIds: string[];
     duplicateMemoryIdsTruncated: boolean;
+    changedMemoryIds: string[];
+    changedMemoryIdsTruncated: boolean;
+    unchangedMemoryIds: string[];
+    unchangedMemoryIdsTruncated: boolean;
+    fieldConflicts: Array<{
+      id: string;
+      fields: string[];
+    }>;
+    fieldConflictsTruncated: boolean;
   };
   candidates: {
     newMemoryIds: string[];

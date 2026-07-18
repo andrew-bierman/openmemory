@@ -192,6 +192,9 @@ const accountDeletionBody = t.Object({
 const graphImportBody = t.Object({
   confirmTenantId: t.String({ minLength: 1, maxLength: 200 }),
   mode: t.Union([t.Literal("replace"), t.Literal("merge")]),
+  conflictPolicy: t.Optional(
+    t.Union([t.Literal("skip"), t.Literal("overwrite")]),
+  ),
   export: t.Unknown(),
 });
 
@@ -784,6 +787,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         const preview = await graph.previewGraphImport(
           graphExport.data,
           body.mode,
+          body.conflictPolicy ?? "skip",
         );
 
         return {
@@ -826,11 +830,17 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
 
       try {
         if (body.mode === "merge") {
-          const merged = await graph.mergeGraph(graphExport.data);
-          const importedMemoryIds = new Set(merged.importedMemoryIds);
+          const merged = await graph.mergeGraph(
+            graphExport.data,
+            body.conflictPolicy ?? "skip",
+          );
+          const indexedMemoryIds = new Set([
+            ...merged.importedMemoryIds,
+            ...merged.overwrittenMemoryIds,
+          ]);
           const activeMemories = graphExport.data.memories.filter(
             (memory) =>
-              importedMemoryIds.has(memory.id) &&
+              indexedMemoryIds.has(memory.id) &&
               memory.status === "active" &&
               memory.isLatest,
           );
@@ -844,10 +854,12 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
             version: merged.version,
             memoriesImported: merged.memoriesImported,
             memoriesSkipped: merged.memoriesSkipped,
+            memoriesOverwritten: merged.memoriesOverwritten,
             edgesImported: merged.edgesImported,
             activeMemoriesIndexed: activeMemories.length,
             merged: {
               memoriesSkipped: merged.memoriesSkipped,
+              memoriesOverwritten: merged.memoriesOverwritten,
             },
             importedAt: merged.importedAt,
           });

@@ -116,8 +116,10 @@ export type GraphImportResult = {
   edgesImported: number;
   activeMemoriesIndexed: number;
   memoriesSkipped?: number;
+  memoriesOverwritten?: number;
   merged?: {
     memoriesSkipped: number;
+    memoriesOverwritten: number;
   };
   replaced?: {
     memoriesDeleted: number;
@@ -138,6 +140,7 @@ export type GraphImportResult = {
 export type GraphImportPreviewResult = {
   tenantId: string;
   mode: "replace" | "merge";
+  conflictPolicy: "skip" | "overwrite";
   version: 1;
   previewedAt: string;
   incoming: {
@@ -154,6 +157,7 @@ export type GraphImportPreviewResult = {
   impact: {
     memoriesImported: number;
     memoriesSkipped: number;
+    memoriesOverwritten?: number;
     edgesImported: number;
     wouldDelete: {
       memories: number;
@@ -167,6 +171,15 @@ export type GraphImportPreviewResult = {
   conflicts: {
     duplicateMemoryIds: string[];
     duplicateMemoryIdsTruncated: boolean;
+    changedMemoryIds: string[];
+    changedMemoryIdsTruncated: boolean;
+    unchangedMemoryIds: string[];
+    unchangedMemoryIdsTruncated: boolean;
+    fieldConflicts: Array<{
+      id: string;
+      fields: string[];
+    }>;
+    fieldConflictsTruncated: boolean;
   };
   candidates: {
     newMemoryIds: string[];
@@ -402,19 +415,26 @@ export function createOpenMemoryClient(
       confirmTenantId: string;
       export: unknown;
       mode?: "replace" | "merge";
+      conflictPolicy?: "skip" | "overwrite";
     }) =>
       unwrap<GraphImportResult>(
-        client.v1.imports.post({ ...input, mode: input.mode ?? "replace" }),
+        client.v1.imports.post({
+          ...input,
+          mode: input.mode ?? "replace",
+          conflictPolicy: input.conflictPolicy ?? "skip",
+        }),
       ),
     previewGraphImport: (input: {
       confirmTenantId: string;
       export: unknown;
       mode?: "replace" | "merge";
+      conflictPolicy?: "skip" | "overwrite";
     }) =>
       unwrap<GraphImportPreviewResult>(
         client.v1.imports.preview.post({
           ...input,
           mode: input.mode ?? "replace",
+          conflictPolicy: input.conflictPolicy ?? "skip",
         }),
       ),
     repairIndex: () => unwrap<IndexRepairResult>(client.v1.index.repair.post()),
@@ -509,12 +529,14 @@ type EdenClient = {
         post(input: {
           confirmTenantId: string;
           mode: "replace" | "merge";
+          conflictPolicy?: "skip" | "overwrite";
           export: unknown;
         }): EdenResult;
       };
       post(input: {
         confirmTenantId: string;
         mode: "replace" | "merge";
+        conflictPolicy?: "skip" | "overwrite";
         export: unknown;
       }): EdenResult;
     };

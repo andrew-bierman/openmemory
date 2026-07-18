@@ -173,8 +173,10 @@ Useful endpoints:
 - `GET /v1/graph/relationships`
 - `GET /v1/graph/:id/neighbors`
 - `POST /v1/exports`
-- `POST /v1/imports/preview` with `mode: "replace"` or `mode: "merge"`
-- `POST /v1/imports` with `mode: "replace"` or `mode: "merge"`
+- `POST /v1/imports/preview` with `mode: "replace"` or `mode: "merge"` and
+  optional `conflictPolicy: "skip" | "overwrite"`
+- `POST /v1/imports` with `mode: "replace"` or `mode: "merge"` and optional
+  `conflictPolicy: "skip" | "overwrite"`
 - `POST /v1/index/repair`
 - `DELETE /v1/tenant`
 - `GET /v1/oauth/connections`
@@ -320,8 +322,7 @@ Current priorities:
   freshness, and MCP usage.
 - Expand recall quality benchmarks with larger MemoryBench-style fixtures.
 - Add larger graph performance benchmarks and production telemetry.
-- Add field-level graph import conflict resolution after the preview surface has
-  enough operator feedback.
+- Add UI support for graph import conflict previews and overwrite decisions.
 - Deepen MCP client compatibility testing with real external clients.
 - Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
 
