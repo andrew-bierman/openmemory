@@ -44,8 +44,9 @@
   PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh,
   recall, forget, browser-session readiness access, profile/workspace updates,
-  team member invite/remove, seeded OAuth/MCP connection revocation, and
-  confirmed account deletion.
+  team member invite/remove, browser OAuth callback capture for MCP bearer-token
+  exchange, seeded OAuth/MCP connection revocation, and confirmed account
+  deletion.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
 - `/v1/sources/async` creates durable ingestion jobs, buffers requests through
   Cloudflare Queues, and runs the same graph/indexing pipeline through a
@@ -76,6 +77,11 @@
   TypeScript SDK `StreamableHTTPClientTransport` across named request profiles
   for the official SDK, MCP Inspector, Cursor, Claude-style clients, and
   ChatGPT-style connector clients.
+- Local and live browser E2E also register OAuth clients with randomized
+  localhost callback listeners, accept consent in the browser, exchange PKCE
+  codes for MCP bearer tokens, and call MCP. Live browser E2E proves
+  bearer-token MCP access; local browser E2E keeps the development tenant
+  header for localhost MCP routing.
 - Workers Analytics Engine captures `openmemory.request`,
   `openmemory.request_error`, rate-limit, 5xx, and async worker failure events,
   with saved SQL in `docs/observability-queries.sql` and executable threshold
@@ -169,7 +175,9 @@
 
 2. MCP production flow
    - Manually test full interactive OAuth callback flows in MCP Inspector,
-     Cursor, Claude, and ChatGPT connector surfaces before broad hosted launch.
+     Cursor, Claude, and ChatGPT connector surfaces before broad hosted launch;
+     the generic browser callback redirect/token exchange path is now covered
+     by local and live E2E.
    - Expand OAuth lifecycle UI from connection revocation into full client
      registration/management if we need first-party clients.
 

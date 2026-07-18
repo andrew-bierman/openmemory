@@ -12,11 +12,11 @@ MCP runtime for tool access.
 > Status: alpha. The core memory API, graph store, OAuth-backed MCP endpoint,
 > recall flow, source ingestion, async ingestion jobs, exports, restore, repair
 > path, dashboard, extraction workers, and local integration suite are working. The
-> hosted profile/onboarding UI, named MCP request-profile dogfooding, larger
-> recall benchmarks, typed relationship diagnostics, production telemetry, and
-> release validation gates are working. Manual external OAuth callback
-> dogfooding and higher-volume production operations remain active roadmap
-> items.
+> hosted profile/onboarding UI, named MCP request-profile dogfooding, browser
+> OAuth callback verification, larger recall benchmarks, typed relationship
+> diagnostics, production telemetry, and release validation gates are working.
+> Manual vendor-surface MCP dogfooding and higher-volume production operations
+> remain active roadmap items.
 
 ## Why OpenMemory
 
@@ -280,10 +280,12 @@ TypeScript SDK `StreamableHTTPClientTransport`.
 
 The local browser E2E suite starts the API and TanStack Start app on explicit
 non-default ports and exercises the dashboard, charts, memory table, source
-ingest, graph explorer, operations readiness, admin settings, and MCP setup
-panel. The hosted browser smoke additionally covers Better Auth signup,
-profile/workspace updates, team member invite/remove, seeded OAuth connection
-revocation, readiness, recall, forget, and confirmed account deletion.
+ingest, graph explorer, operations readiness, admin settings, MCP setup panel,
+and a real browser OAuth callback listener for MCP bearer-token exchange. The
+hosted browser smoke additionally covers Better Auth signup, profile/workspace
+updates, team member invite/remove, browser OAuth callback verification, seeded
+OAuth connection revocation, readiness, recall, forget, and confirmed account
+deletion.
 
 Optional clean container reproduction:
 
@@ -331,7 +333,8 @@ bun run test:e2e:ui
 
 The live checks require a reachable deployment and any environment required by
 the target workflow. They cover hosted auth, graph recall, readiness snapshots,
-R2 export, OAuth/MCP, and browser-session readiness access.
+R2 export, OAuth/MCP, browser OAuth callback capture, and browser-session
+readiness access.
 
 ## Roadmap
 
@@ -345,7 +348,8 @@ Current priorities:
 - Expand recall quality benchmarks with larger MemoryBench-style fixtures.
 - Compare recurring hosted graph benchmark artifacts with local benchmark
   reports before broad hosted usage.
-- Deepen MCP client compatibility testing with real external clients.
+- Deepen MCP client compatibility testing in real vendor surfaces after the
+  generic browser callback verifier is green.
 - Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
 
 See [docs/roadmap.md](docs/roadmap.md) for the current working baseline and

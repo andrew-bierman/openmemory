@@ -1,4 +1,5 @@
-import { type APIResponse, expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+import { verifyMcpOAuthCallbackFlow } from "./mcp-oauth-callback";
 
 test.skip(
   process.env.OPENMEMORY_LIVE_E2E !== "true",
@@ -8,6 +9,7 @@ test.skip(
 test("hosted UI signs up, stores memory, and recalls context", async ({
   page,
 }) => {
+  test.setTimeout(120_000);
   const email = `ui-e2e-${crypto.randomUUID()}@example.com`;
   const inviteEmail = `ui-invite-${crypto.randomUUID()}@example.com`;
   const password = "password1234";
@@ -121,27 +123,16 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
   await invitedMember.getByRole("button", { name: "Remove" }).click();
   await expect(invitedMember).toHaveCount(0);
 
-  const oauthClientResponse = await page.request.post(
-    "/api/auth/oauth2/register",
-    {
-      headers: {
-        accept: "application/json",
-        origin: new URL(page.url()).origin,
-      },
-      data: {
-        client_name: "OpenMemory Live Full Smoke",
-        redirect_uris: ["http://127.0.0.1/callback"],
-        token_endpoint_auth_method: "none",
-        grant_types: ["authorization_code", "refresh_token"],
-        response_types: ["code"],
-        scope: "openid profile memory:read memory:write",
-      },
-    },
-  );
-  const oauthClientBody = await oauthClientResponse.text();
-  expect(oauthClientResponse.ok(), oauthClientBody).toBe(true);
-  const oauthClient = JSON.parse(oauthClientBody) as { client_id: string };
-  await authorizeOAuthClient(page, oauthClient.client_id);
+  const oauthClient = await verifyMcpOAuthCallbackFlow(page, {
+    baseUrl: new URL(page.url()).origin,
+    clientName: "OpenMemory Live Full Smoke",
+    statePrefix: "live-ui-e2e",
+    memoryText: `OAuth callback verifier stores MCP context ${crypto.randomUUID()}`,
+  });
+  await page.goto("/?view=admin");
+  await expect(
+    page.getByRole("heading", { name: "User profile" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: /Refresh/ }).click();
   const oauthCard = page.locator(".admin-card").filter({
     hasText: "MCP client access",
@@ -149,10 +140,10 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
   await expect(oauthCard).toContainText("OpenMemory Live Full Smoke");
   await expect(oauthCard).toContainText("memory:read");
   await oauthCard
-    .locator("article", { hasText: oauthClient.client_id })
+    .locator("article", { hasText: oauthClient.clientId })
     .getByRole("button", { name: "Revoke" })
     .click();
-  await expect(oauthCard).not.toContainText(oauthClient.client_id);
+  await expect(oauthCard).not.toContainText(oauthClient.clientId);
 
   await page.getByLabel("Confirm email").fill(account.user.email);
   await page.getByLabel("Confirm tenant id").fill(account.workspace.tenantId);
@@ -171,103 +162,3 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
 
   expect(errors).toEqual([]);
 });
-
-async function authorizeOAuthClient(page: Page, clientId: string) {
-  const baseUrl = new URL(page.url()).origin;
-  const scope = "openid profile memory:read memory:write";
-  const verifier = `openmemory-${crypto.randomUUID()}-${crypto.randomUUID()}`;
-  const authorization = await oauthRedirectUrl(
-    await page.request.get(
-      `/api/auth/oauth2/authorize?${new URLSearchParams({
-        response_type: "code",
-        client_id: clientId,
-        redirect_uri: "http://127.0.0.1/callback",
-        scope,
-        state: "live-ui-e2e",
-        prompt: "consent",
-        code_challenge: await pkceChallenge(verifier),
-        code_challenge_method: "S256",
-      })}`,
-      {
-        headers: {
-          accept: "application/json",
-          origin: baseUrl,
-        },
-        maxRedirects: 0,
-      },
-    ),
-    baseUrl,
-  );
-  const callback =
-    authorization.pathname === "/consent"
-      ? new URL(
-          (
-            (await expectOkJson(
-              await page.request.post("/api/auth/oauth2/consent", {
-                data: {
-                  accept: true,
-                  scope,
-                  oauth_query: authorization.search.slice(1),
-                },
-                headers: {
-                  accept: "application/json",
-                  origin: baseUrl,
-                },
-              }),
-            )) as { url: string }
-          ).url,
-          baseUrl,
-        )
-      : authorization;
-  const code = callback.searchParams.get("code");
-  expect(code).toBeTruthy();
-
-  const tokenResponse = await page.request.post("/api/auth/oauth2/token", {
-    form: {
-      grant_type: "authorization_code",
-      client_id: clientId,
-      code: code ?? "",
-      code_verifier: verifier,
-      redirect_uri: "http://127.0.0.1/callback",
-      resource: `${baseUrl}/mcp`,
-    },
-    headers: {
-      accept: "application/json",
-      origin: baseUrl,
-    },
-  });
-  const token = (await expectOkJson(tokenResponse)) as {
-    access_token: string;
-    token_type: string;
-  };
-  expect(token.access_token).toBeTruthy();
-  expect(token.token_type).toBe("Bearer");
-}
-
-async function oauthRedirectUrl(response: APIResponse, baseUrl: string) {
-  const location = response.headers().location;
-  if (location) {
-    return new URL(location, baseUrl);
-  }
-
-  const body = (await expectOkJson(response)) as { url: string };
-  return new URL(body.url, baseUrl);
-}
-
-async function expectOkJson(response: APIResponse) {
-  const body = await response.text();
-  expect(response.ok(), body).toBe(true);
-  return JSON.parse(body) as unknown;
-}
-
-async function pkceChallenge(verifier: string) {
-  const hash = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(verifier),
-  );
-  return Buffer.from(hash)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
