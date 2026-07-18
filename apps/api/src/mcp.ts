@@ -16,6 +16,7 @@ import {
 } from "./auth";
 import { resolveAuthBaseUrl } from "./better-auth";
 import type { Env } from "./env";
+import { getRequiredMcpScopesForRequest } from "./mcp-scopes";
 import type { MemoryGraph } from "./memory-graph";
 
 export function createOpenMemoryMcpHandler(): (
@@ -307,8 +308,22 @@ async function verifyMcpBearerToken(
       },
     });
     const scopes = new Set(String(payload.scope ?? "").split(" "));
-    if (!scopes.has("memory:read")) {
-      return { response: json({ error: "invalid_scope" }, 403) };
+    const requiredScopes = await getRequiredMcpScopesForRequest(
+      request.clone(),
+    );
+    const missingScope = [...requiredScopes].find(
+      (scope) => !scopes.has(scope),
+    );
+    if (missingScope) {
+      return {
+        response: json(
+          {
+            error: "invalid_scope",
+            required_scope: missingScope,
+          },
+          403,
+        ),
+      };
     }
     return { payload };
   } catch (error) {
