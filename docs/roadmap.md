@@ -135,6 +135,9 @@
    - Expand hosted navigation polish from alpha feedback.
    - Keep the hosted TanStack Start UI as a companion dashboard/control plane; the API and MCP integrations remain the primary product surfaces.
    - Use shadcn dashboard templates, defaults, and theme tokens as the baseline; defer Apple/SwiftUI-specific styling until the product structure is stronger.
+   - Replace the static pre-rendered dashboard shell with a pure client shell or
+     Worker-side SSR if React hydration warning #418 becomes noisy in real user
+     monitoring.
    - Expand charts for recall quality, memory growth, stale/superseded memories,
      indexing health, MCP usage, and graph operation latency.
    - Continue hardening the `react-force-graph` explorer and evaluate Sigma.js + Graphology, Reagraph, or React Flow only if graph size and layout requirements outgrow the current approach.
