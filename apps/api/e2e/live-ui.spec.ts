@@ -78,5 +78,19 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
     "forget",
   ]);
 
+  const accountResponse = await page.request.get("/v1/account");
+  expect(accountResponse.ok()).toBe(true);
+  const account = (await accountResponse.json()) as {
+    user: { email: string };
+    workspace: { tenantId: string };
+  };
+  const accountDeletionResponse = await page.request.delete("/v1/account", {
+    data: {
+      confirmEmail: account.user.email,
+      confirmTenantId: account.workspace.tenantId,
+    },
+  });
+  expect(accountDeletionResponse.ok()).toBe(true);
+
   expect(errors).toEqual([]);
 });
