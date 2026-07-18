@@ -15,7 +15,8 @@
     "test:benchmark": "bun run --cwd ../.. build:web-shell && vitest run test/http.integration.test.ts -t \"recall benchmark|graph stats and recall stay bounded\"",
     "test:scale": "bun run --cwd ../.. build:web-shell && OPENMEMORY_SCALE_GRAPH_SIZE=${OPENMEMORY_SCALE_GRAPH_SIZE:-360} vitest run test/http.integration.test.ts -t \"graph stats and recall stay bounded\"",
     "test:integration": "bun run --cwd ../.. build:web-shell && vitest run test/http.integration.test.ts",
-    "test:live": "OPENMEMORY_LIVE_E2E=true vitest run test/live.e2e.test.ts"
+    "test:live": "OPENMEMORY_LIVE_E2E=true vitest run test/live.e2e.test.ts",
+    "test:live:benchmark": "OPENMEMORY_LIVE_BENCHMARK=true vitest run test/live.e2e.test.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.6.14",

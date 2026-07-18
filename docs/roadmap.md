@@ -107,6 +107,9 @@
 - Local graph performance coverage exercises a 220-memory tenant graph, and the
   dashboard exposes graph operations status from active node and edge density
   signals.
+- The `Live Production Benchmark` workflow runs a bounded synthetic hosted
+  graph benchmark, writes JSONL recall-latency evidence, and uploads it as a
+  GitHub Actions artifact for production comparison.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 - `infra/cloudflare/r2-lifecycle.json` and `bun run setup:r2-lifecycle`
   configure the R2 export bucket to expire tenant graph exports after 90 days.
@@ -122,9 +125,10 @@
 - RAG quality is still basic:
   - no LLM/ML reranker
 - Graph performance has larger local smoke coverage, release benchmark
-  artifacts, graph-specific product signals, relationship diagnostics, and
-  production request telemetry, but still needs recurring high-volume
-  production observations before a hosted SaaS launch.
+  artifacts, graph-specific product signals, relationship diagnostics,
+  production request telemetry, and a recurring hosted synthetic benchmark, but
+  still needs trend review across multiple production runs before a hosted SaaS
+  launch.
 - Graph restore supports preview, whole-tenant replace, additive merge, and
   explicit duplicate overwrite recovery, but not automatic semantic merge of
   two changed memory records.
@@ -158,7 +162,8 @@
    - Tune deterministic reranking and evaluate an optional LLM/ML reranker.
    - Use `bun run benchmark:import` when evaluating external MemoryBench-style
      corpora.
-   - Add higher-volume graph performance benchmarks and production telemetry.
+   - Compare hosted benchmark artifacts across production deploys and tune
+     graph/RAG thresholds from observed trends.
 
 4. Web app expansion
    - Expand hosted navigation polish from alpha feedback.
