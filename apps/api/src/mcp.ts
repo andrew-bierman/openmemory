@@ -80,7 +80,11 @@ async function handleMcpRequest(
 
   const graph = getGraph(env, tenant.tenantId) as unknown as Pick<
     MemoryGraph,
-    "createMemory" | "forgetMemory" | "getContext" | "getProfile"
+    | "createMemory"
+    | "forgetMemory"
+    | "getContext"
+    | "getProfile"
+    | "listMemories"
   >;
   const server = new McpServer({
     name: "openmemory",
@@ -166,6 +170,104 @@ async function handleMcpRequest(
     async () => {
       const profile = await graph.getProfile();
       return textTool(profile.summary);
+    },
+  );
+
+  server.registerResource(
+    "profile",
+    "openmemory://profile",
+    {
+      title: "OpenMemory Profile",
+      description: "Stable and current profile context for this tenant.",
+      mimeType: "text/markdown",
+      annotations: {
+        audience: ["assistant"],
+        priority: 0.9,
+      },
+    },
+    async (uri) => {
+      const profile = await graph.getProfile();
+      return textResource(uri, profile.summary);
+    },
+  );
+
+  server.registerResource(
+    "recent",
+    "openmemory://recent",
+    {
+      title: "Recent OpenMemory Memories",
+      description: "Recent active memories for this tenant.",
+      mimeType: "application/json",
+      annotations: {
+        audience: ["assistant"],
+        priority: 0.7,
+      },
+    },
+    async (uri) => {
+      const memories = await graph.listMemories(10, false);
+      return textResource(
+        uri,
+        JSON.stringify(
+          memories.map((memory) => ({
+            id: memory.id,
+            content: memory.content,
+            tags: memory.tags,
+            type: memory.type,
+            updatedAt: memory.updatedAt,
+          })),
+          null,
+          2,
+        ),
+        "application/json",
+      );
+    },
+  );
+
+  server.registerPrompt(
+    "context",
+    {
+      title: "OpenMemory Context",
+      description:
+        "Inject profile and relevant memory context into an AI conversation.",
+      argsSchema: {
+        query: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "Optional task or question to recall targeted context for.",
+          ),
+        limit: z
+          .string()
+          .optional()
+          .describe("Maximum recalled memories to include, from 1 to 30."),
+      },
+    },
+    async ({ query = "current user context", limit }) => {
+      const parsedLimit = normalizePromptLimit(limit);
+      const context = await graph.getContext(
+        ContextSchema.parse({
+          q: query,
+          limit: parsedLimit,
+          includeProfile: true,
+          includeHistorical: false,
+        }),
+      );
+
+      return {
+        description: "Profile plus relevant OpenMemory recall context.",
+        messages: [
+          {
+            role: "user" as const,
+            content: {
+              type: "text" as const,
+              text:
+                context.context ||
+                "No matching OpenMemory context is available yet.",
+            },
+          },
+        ],
+      };
     },
   );
 
@@ -276,6 +378,29 @@ function textTool(text: string) {
       },
     ],
   };
+}
+
+function textResource(uri: URL, text: string, mimeType = "text/markdown") {
+  return {
+    contents: [
+      {
+        uri: uri.toString(),
+        mimeType,
+        text,
+      },
+    ],
+  };
+}
+
+function normalizePromptLimit(value: string | undefined) {
+  if (!value) {
+    return 8;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed)
+    ? Math.max(1, Math.min(Math.trunc(parsed), 30))
+    : 8;
 }
 
 function json(data: unknown, status: number) {

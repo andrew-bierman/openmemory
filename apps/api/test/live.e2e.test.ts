@@ -327,6 +327,53 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       );
       expect(profileText).toContain("Live E2E can write through MCP.");
 
+      const resources = JSON.stringify(
+        await mcpCall(token.access_token, {
+          jsonrpc: "2.0",
+          id: "resources",
+          method: "resources/list",
+        }),
+      );
+      expect(resources).toContain("openmemory://profile");
+      expect(resources).toContain("openmemory://recent");
+
+      for (const uri of ["openmemory://profile", "openmemory://recent"]) {
+        const resource = JSON.stringify(
+          await mcpCall(token.access_token, {
+            jsonrpc: "2.0",
+            id: uri,
+            method: "resources/read",
+            params: { uri },
+          }),
+        );
+        expect(resource).toContain("Live E2E can write through MCP.");
+      }
+
+      const prompts = JSON.stringify(
+        await mcpCall(token.access_token, {
+          jsonrpc: "2.0",
+          id: "prompts",
+          method: "prompts/list",
+        }),
+      );
+      expect(prompts).toContain("context");
+
+      const contextPrompt = JSON.stringify(
+        await mcpCall(token.access_token, {
+          jsonrpc: "2.0",
+          id: "context-prompt",
+          method: "prompts/get",
+          params: {
+            name: "context",
+            arguments: {
+              query: "Live E2E MCP",
+              limit: "5",
+            },
+          },
+        }),
+      );
+      expect(contextPrompt).toContain("Live E2E can write through MCP.");
+
       const forgetText = mcpText(
         await mcpCall(token.access_token, {
           jsonrpc: "2.0",

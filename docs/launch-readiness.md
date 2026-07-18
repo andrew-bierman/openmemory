@@ -32,7 +32,7 @@ larger hosted push.
   integration with Queues and Workflows.
 - The official MCP TypeScript SDK client is dogfooded in CI, and named
   Inspector, Cursor, Claude, and ChatGPT-style request profiles are
-  smoke-tested and documented.
+  smoke-tested and documented across tools, resources, and prompts.
 - Operational headers and request IDs are live on `/health`.
 - Workers Analytics Engine receives request, error, rate-limit, and async
   worker telemetry when deployed with the `OPENMEMORY_ANALYTICS` binding.
@@ -70,6 +70,7 @@ larger hosted push.
 - [x] Production tenant headers rejected; OAuth-backed identity is required.
 - [x] Better Auth session and OAuth flows covered by local and live tests.
 - [x] MCP endpoint exposes `remember`, `recall`, `profile`, and `forget`.
+- [x] MCP endpoint exposes profile/recent resources and a context prompt.
 - [x] Graph memory CRUD, recall, source chunks, exports, restore, and repair
   paths work.
 - [x] Tenant graph purge supports account-deletion workflows with explicit
@@ -82,7 +83,8 @@ larger hosted push.
   settings.
 - [x] First-party hosted web app has fully polished authenticated navigation,
   account settings, team/tenant management, and confirmed account deletion.
-- [x] MCP protocol compatibility matrix is tested and documented.
+- [x] MCP protocol compatibility matrix is tested and documented for tools,
+  resources, prompts, and named request profiles.
 - [x] Named external MCP clients are dogfooded and documented.
 - [x] Async source ingestion uses Queues and Workflows.
 - [x] Entity and relationship extraction workers are implemented.

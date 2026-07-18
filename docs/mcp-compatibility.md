@@ -23,15 +23,17 @@ scopes, expected tools, and this compatibility matrix stay in sync.
 | `notifications/initialized` | Supported | Integration tests assert the initialized notification is accepted as a 2xx request. |
 | `tools/list` | Supported | Integration tests assert `remember`, `recall`, `profile`, and `forget` are advertised. |
 | `tools/call` | Supported | Local and live tests call `remember`, `recall`, `profile`, and `forget`. |
-| `resources/list` | Not exposed | Integration tests verify the server returns a valid JSON-RPC response for optional resource discovery. |
-| `prompts/list` | Not exposed | Integration tests verify the server returns a valid JSON-RPC response for optional prompt discovery. |
+| `resources/list` | Supported | Local and live tests assert `openmemory://profile` and `openmemory://recent` are advertised. |
+| `resources/read` | Supported | Local and live tests read `openmemory://profile` and `openmemory://recent` and assert tenant memory context appears. |
+| `prompts/list` | Supported | Local and live tests assert the `context` prompt is advertised. |
+| `prompts/get` | Supported | Local and live tests call `context` and assert graph-aware tenant memory context appears. |
 | Server-sent streaming tool results | Not required today | Tools return JSON responses. Streaming can be added later for long-running ingest or recall. |
 
 ## Named Client Dogfooding
 
 | Client | Status | Evidence | Notes |
 | --- | --- | --- | --- |
-| Official MCP TypeScript SDK `StreamableHTTPClientTransport` | Tested in CI | `bun run test:mcp:sdk` starts local Wrangler, connects to `/mcp`, lists tools, calls `remember`, and calls `recall`. | Uses the local tenant header because CI cannot complete browser OAuth. Production clients should use OAuth. |
+| Official MCP TypeScript SDK `StreamableHTTPClientTransport` | Tested in CI | `bun run test:mcp:sdk` starts local Wrangler, connects to `/mcp`, lists tools/resources/prompts, calls `remember` and `recall`, reads `openmemory://profile` and `openmemory://recent`, and gets the `context` prompt. | Uses the local tenant header because CI cannot complete browser OAuth. Production clients should use OAuth. |
 | MCP Inspector | Config-shape smoke in CI | `bun run test:mcp:sdk` runs an `mcp-inspector-config-shape` request profile with Inspector-like headers through the official transport. | Manual UI OAuth callback dogfooding remains useful before broad hosted launch. |
 | Cursor | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `cursor-remote-mcp-config-shape` profile against `/mcp`. | Requires the user/client OAuth flow against the deployed Worker in real Cursor. |
 | Claude remote MCP connector / Messages API MCP connector | Config-shape smoke in CI | `bun run test:mcp:sdk` runs a `claude-remote-mcp-config-shape` profile against `/mcp`. | Requires provider-side OAuth configuration in real Claude surfaces. |
@@ -65,13 +67,15 @@ Clients should run the normal MCP handshake:
 5. Send `initialize`.
 6. Send `notifications/initialized`.
 7. Call `tools/list`.
-8. Call `tools/call` for `remember`, `recall`, `profile`, or `forget`.
+8. Call `resources/list` and `resources/read` for `openmemory://profile` or
+   `openmemory://recent`.
+9. Call `prompts/list` and `prompts/get` for `context`.
+10. Call `tools/call` for `remember`, `recall`, `profile`, or `forget`.
 
 ## Known Gaps
 
 - Manual external-client OAuth callback dogfooding remains recommended before a
   high-volume hosted launch, but named Inspector, Cursor, Claude, and
   ChatGPT-style streamable HTTP request shapes are now smoke-tested in CI.
-- OpenMemory does not currently expose MCP resources or prompts.
 - MCP runs in the monolithic API Worker. Move to a dedicated `McpAgent` Worker
   only if session-specific state or independent scaling becomes necessary.
