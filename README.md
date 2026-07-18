@@ -54,7 +54,8 @@ to provide the infrastructure layer behind a more portable experience:
 - Streamable HTTP MCP endpoint with `remember`, `recall`, `profile`, and
   `forget` tools.
 - Authenticated OAuth/MCP connection listing and revocation.
-- Worker-hosted dashboard for capture, recall, forgetting, and local inspection.
+- Worker-hosted TanStack dashboard for capture, recall, forgetting, and local
+  inspection.
 - TanStack Start web app with a polished hosted-dashboard direction, shared
   shadcn-style UI package, hosted profile editing, onboarding empty states,
   memory health metrics, charts, graph operations signals, and an
@@ -64,8 +65,8 @@ to provide the infrastructure layer behind a more portable experience:
 ## Architecture
 
 ```txt
-apps/web        TanStack Start app and richer product UI
-apps/api        Cloudflare Worker API, dashboard, Better Auth, MCP endpoint
+apps/web        TanStack Start app and hosted product UI assets
+apps/api        Cloudflare Worker API, Better Auth, MCP endpoint
 packages/client Eden Treaty client for typed API access
 packages/core   Shared memory, graph, recall, and auth domain logic
 packages/ui     shadcn-style shared UI primitives
@@ -73,8 +74,9 @@ packages/ui     shadcn-style shared UI primitives
 
 Runtime services:
 
-- **Cloudflare Workers + Elysia**: HTTP API, dashboard, auth routes, and MCP
-  transport.
+- **Cloudflare Workers + Elysia**: HTTP API, auth routes, and MCP transport.
+- **Cloudflare Worker Assets**: hosted TanStack dashboard shell served from the
+  same Worker origin as the API.
 - **Durable Objects + SQLite**: isolated per-user memory graph databases.
 - **Durable Objects**: global application rate limiting.
 - **D1 + Drizzle**: Better Auth and control-plane schema.
@@ -87,9 +89,12 @@ Runtime services:
   extraction.
 
 The default deployment shape is intentionally monolithic: API routes, Better
-Auth, hosted dashboard, and `/mcp` ship as one Worker. MCP uses Cloudflare
-Agents' `createMcpHandler`; split it into a dedicated `McpAgent` Worker only if
-session-specific MCP state or separate operational scaling becomes necessary.
+Auth, hosted TanStack dashboard assets, and `/mcp` ship as one Worker. The build
+renders `apps/web/dist/client/index.html` from the TanStack server bundle, then
+Worker Assets serves it while API/auth/MCP paths remain Worker-first. MCP uses
+Cloudflare Agents' `createMcpHandler`; split it into a dedicated `McpAgent`
+Worker only if session-specific MCP state or separate operational scaling
+becomes necessary.
 
 Cloudflare AI Search is tracked as an optional managed-search layer, not the
 core graph/RAG substrate.

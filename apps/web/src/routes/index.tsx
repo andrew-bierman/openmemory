@@ -65,6 +65,11 @@ import {
   type AuthUser,
 } from "../admin-components";
 import {
+  DEFAULT_API_URL,
+  getProductionDefaultApiUrl,
+  isLocalApiUrl,
+} from "../connection-defaults";
+import {
   KnowledgeMap,
   MemoryDataTable,
   type MemoryTableSorting,
@@ -88,8 +93,6 @@ import {
   getTypeDistributionSummary,
 } from "../dashboard-model";
 import { Route as rootRoute } from "./__root";
-
-const DEFAULT_API_URL = "http://127.0.0.1:54150";
 
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
@@ -177,8 +180,16 @@ function Home() {
     useState<SourceIngestResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const usesLocalTenant = isLocalApiUrl(apiUrl);
+  const productionDefaultApiUrl = getBrowserProductionDefaultApiUrl();
+  const isResolvingProductionApiUrl =
+    hasLoadedApiUrl &&
+    apiUrl === DEFAULT_API_URL &&
+    productionDefaultApiUrl !== null;
   const hasLoadedConnection =
-    hasLoadedApiUrl && hasLoadedTenantId && hasLoadedToken;
+    hasLoadedApiUrl &&
+    hasLoadedTenantId &&
+    hasLoadedToken &&
+    !isResolvingProductionApiUrl;
   const queryClient = useQueryClient();
   const apiBaseUrl = cleanBaseUrl(apiUrl);
   const queryScope = useMemo(
@@ -261,6 +272,22 @@ function Home() {
   const context = contextQuery.data ?? null;
   const profile = profileQuery.data?.summary ?? "";
   const sessionUser = sessionQuery.data ?? null;
+
+  useEffect(() => {
+    if (
+      !hasLoadedApiUrl ||
+      (apiUrl !== DEFAULT_API_URL &&
+        hasStoredLocalStorageValue("openmemory:apiUrl"))
+    ) {
+      return;
+    }
+
+    const productionApiUrl = productionDefaultApiUrl;
+    if (productionApiUrl && apiUrl !== productionApiUrl) {
+      setApiUrl(productionApiUrl);
+    }
+  }, [apiUrl, hasLoadedApiUrl, productionDefaultApiUrl, setApiUrl]);
+
   const dashboardMetrics = useMemo(
     () => getDashboardMetrics(memories, graphStats, oauthConnections),
     [memories, graphStats, oauthConnections],
@@ -2038,6 +2065,22 @@ function parseTags(value: string) {
     .filter(Boolean);
 }
 
+function getBrowserProductionDefaultApiUrl() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return getProductionDefaultApiUrl(window.location);
+}
+
+function hasStoredLocalStorageValue(key: string) {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return window.localStorage.getItem(key) !== null;
+}
+
 function useLocalStorage(key: string, initialValue: string) {
   const [value, setValue] = useState(initialValue);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -2098,17 +2141,6 @@ async function authRequest(
 
 function cleanBaseUrl(apiUrl: string) {
   return apiUrl.replace(/\/+$/, "");
-}
-
-function isLocalApiUrl(apiUrl: string) {
-  try {
-    const hostname = new URL(apiUrl).hostname;
-    return (
-      hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
-    );
-  } catch {
-    return false;
-  }
 }
 
 function parseView(value: unknown): View {

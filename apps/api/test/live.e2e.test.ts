@@ -19,7 +19,10 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
 
     const dashboard = await fetchLive("/");
     expect(dashboard.status).toBe(200);
-    expect(await dashboard.text()).toContain("OpenMemory");
+    const dashboardHtml = await dashboard.text();
+    expect(dashboardHtml).toContain("Memory Dashboard");
+    expect(dashboardHtml).toContain("Operations");
+    expect(dashboardHtml).toContain("/assets/");
 
     const signUp = await fetchLive("/api/auth/sign-up/email", {
       method: "POST",
