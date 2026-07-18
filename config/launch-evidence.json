@@ -1,0 +1,27 @@
+{
+  "currentCandidate": {
+    "commit": "3f1603557c3e82351ea78734889aa8a61062e7c0",
+    "mainCiRun": "29663842416",
+    "liveSmokeRun": "29663910810",
+    "liveSmokeUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29663910810",
+    "mainCiUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29663842416",
+    "remoteCleanupCounters": {
+      "oauth_client": 0,
+      "live_users": 0,
+      "live_benchmark_users": 0
+    }
+  },
+  "benchmarkEvidence": {
+    "releaseValidationCommit": "f7914b8ce9b78dc8e320c89c5a228593accb92e1",
+    "releaseValidationLocalRecallMrr": 1,
+    "releaseValidationHitAt3": 1,
+    "releaseValidationGraphRecallMs": 5.95,
+    "releaseValidationScaleRecallMs": 10.85,
+    "liveBenchmarkRun": "29662033364",
+    "liveBenchmarkActiveMemories": 80,
+    "liveBenchmarkEdges": 79,
+    "liveBenchmarkRecallMs": 1055.43,
+    "liveBenchmarkThresholdMs": 12000
+  },
+  "screenshotDirectory": ".tmp/screenshots/launch-readiness"
+}

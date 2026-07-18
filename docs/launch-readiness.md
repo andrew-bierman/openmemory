@@ -58,6 +58,9 @@ larger hosted push.
   fallback deploys, and live smoke.
 - `docs/data-model.md` documents the current D1, Durable Object, Vectorize, R2,
   Queue/Workflow, OAuth, MCP, and readiness data shape.
+- Current launch-evidence pointers are tracked in
+  `config/launch-evidence.json` and checked by
+  `bun run launch:evidence:check`.
 - Public launch copy and first-feedback triage guidance are written in
   `docs/launch-announcement.md`.
 
@@ -120,18 +123,24 @@ larger hosted push.
 - [x] Cloudflare Cron health monitor exists for `/health` and MCP OAuth
   protected-resource metadata, with Analytics Engine telemetry and optional
   webhook/email/PagerDuty alert dispatch.
-- [x] Latest live smoke proves remote Workers AI and Vectorize semantic recall
-  on the current launch candidate. Evidence:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29661917115`
-  on `f7914b8ce9b78dc8e320c89c5a228593accb92e1`.
-- [x] Latest local release validation passed on
+- [x] Current launch candidate
+  `3f1603557c3e82351ea78734889aa8a61062e7c0` has green main CI:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29663842416`.
+- [x] Current launch candidate
+  `3f1603557c3e82351ea78734889aa8a61062e7c0` has green live smoke proving
+  hosted auth, graph recall, readiness, R2 export, OAuth/MCP, hosted UI, remote
+  Workers AI, and Vectorize semantic recall:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29663910810`.
+- [x] Remote D1 cleanup counters after current live smoke are zero:
+  `oauth_client=0`, `live_users=0`, `live_benchmark_users=0`.
+- [x] Latest full local release validation evidence passed on
   `f7914b8ce9b78dc8e320c89c5a228593accb92e1` with `bun run
   release:validate`, including local recall MRR `1.0`, hit@3 `1.0`,
   220-memory graph recall `5.95ms`, and 360-memory graph recall `10.85ms`.
-- [x] Latest hosted production graph benchmark passed on
-  `f7914b8ce9b78dc8e320c89c5a228593accb92e1`: 80 active memories, 79 edges,
-  recall latency `1055.43ms` versus a `12000ms` threshold, with remote D1
-  cleanup counters at zero for live-smoke and live-benchmark users.
+- [x] Latest hosted production graph benchmark evidence passed in
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29662033364`:
+  80 active memories, 79 edges, recall latency `1055.43ms` versus a `12000ms`
+  threshold.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
