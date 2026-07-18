@@ -51,8 +51,8 @@ if (args.includes("--self-test")) {
 }
 
 const { inputPaths, outPath } = parseArgs(args);
-const rows = await readBenchmarkRows(inputPaths);
-const report = renderTrendReport(rows, inputPaths);
+const { duplicateCount, rows } = await readBenchmarkRows(inputPaths);
+const report = renderTrendReport(rows, inputPaths, duplicateCount);
 await writeReport(outPath, report);
 console.log(`Wrote benchmark trend summary to ${outPath}`);
 
@@ -86,7 +86,7 @@ async function readBenchmarkRows(inputPaths: string[]) {
     inputPaths.length > 0
       ? inputPaths
       : await collectDefaultBenchmarkReports(".tmp/benchmark-reports");
-  const rows: BenchmarkRow[] = [];
+  const rawRows: BenchmarkRow[] = [];
 
   for (const path of paths) {
     const resolvedPath = resolve(path);
@@ -105,7 +105,7 @@ async function readBenchmarkRows(inputPaths: string[]) {
       try {
         const row = JSON.parse(trimmed);
         if (isBenchmarkRow(row)) {
-          rows.push(row);
+          rawRows.push(row);
         }
       } catch (error) {
         throw new Error(
@@ -115,11 +115,12 @@ async function readBenchmarkRows(inputPaths: string[]) {
     }
   }
 
-  return rows.sort((left, right) =>
+  const sortedRows = rawRows.sort((left, right) =>
     String(left.generatedAt ?? "").localeCompare(
       String(right.generatedAt ?? ""),
     ),
   );
+  return dedupeBenchmarkRows(sortedRows);
 }
 
 async function collectDefaultBenchmarkReports(root: string) {
@@ -129,13 +130,18 @@ async function collectDefaultBenchmarkReports(root: string) {
     .filter((entry) => entry.endsWith(".jsonl"));
 }
 
-function renderTrendReport(rows: BenchmarkRow[], inputPaths: string[]) {
+function renderTrendReport(
+  rows: BenchmarkRow[],
+  inputPaths: string[],
+  duplicateCount = 0,
+) {
   const generatedAt = new Date().toISOString();
   const lines = [
     "# Benchmark Trend Summary",
     "",
     `Generated at: ${generatedAt}`,
     `Rows analyzed: ${rows.length}`,
+    `Duplicate rows ignored: ${duplicateCount}`,
     `Inputs: ${inputPaths.length > 0 ? inputPaths.join(", ") : ".tmp/benchmark-reports/*.jsonl"}`,
     "",
   ];
@@ -258,6 +264,33 @@ function groupRowsByType(rows: BenchmarkRow[]) {
   return groups;
 }
 
+function dedupeBenchmarkRows(rows: BenchmarkRow[]) {
+  const seen = new Set<string>();
+  const dedupedRows: BenchmarkRow[] = [];
+  let duplicateCount = 0;
+
+  for (const row of rows) {
+    const key = stableBenchmarkKey(row);
+    if (seen.has(key)) {
+      duplicateCount += 1;
+      continue;
+    }
+    seen.add(key);
+    dedupedRows.push(row);
+  }
+
+  return {
+    duplicateCount,
+    rows: dedupedRows,
+  };
+}
+
+function stableBenchmarkKey(row: BenchmarkRow) {
+  return JSON.stringify(
+    Object.entries(row).sort(([left], [right]) => left.localeCompare(right)),
+  );
+}
+
 function fail(message: string): never {
   throw new Error(message);
 }
@@ -278,6 +311,13 @@ async function runSelfTest() {
           importElapsedMs: 900,
         },
         {
+          generatedAt: "2026-07-18T00:00:00.000Z",
+          type: "live-production-graph-scale",
+          recallElapsedMs: 420,
+          recallElapsedThresholdMs: 12_000,
+          importElapsedMs: 900,
+        },
+        {
           generatedAt: "2026-07-18T01:00:00.000Z",
           type: "live-production-graph-scale",
           recallElapsedMs: 390,
@@ -288,10 +328,18 @@ async function runSelfTest() {
         .map((row) => JSON.stringify(row))
         .join("\n"),
     );
-    const report = renderTrendReport(await readBenchmarkRows([input]), [input]);
+    const result = await readBenchmarkRows([input]);
+    const report = renderTrendReport(
+      result.rows,
+      [input],
+      result.duplicateCount,
+    );
     await writeReport(output, report);
     if (!report.includes("Rows analyzed: 2")) {
       fail("Self-test report did not include row count.");
+    }
+    if (!report.includes("Duplicate rows ignored: 1")) {
+      fail("Self-test report did not include ignored duplicate count.");
     }
     if (!report.includes("Recall latency: latest 390")) {
       fail("Self-test report did not include latest latency.");

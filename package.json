@@ -29,7 +29,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --local --config wrangler.jsonc",
     "db:migrate:remote": "bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --remote --config wrangler.jsonc",
-    "check": "bun run security:secrets && bun run security:secrets:self-test && bun run observability:alerts:self-test && bun run mcp:profiles:check && bun run launch:evidence:check && biome check . && turbo run check-types test",
+    "check": "bun run security:secrets && bun run security:secrets:self-test && bun run observability:alerts:self-test && bun run mcp:profiles:check && bun run benchmark:trend:self-test && bun run launch:evidence:check && biome check . && turbo run check-types test",
     "check-types": "turbo run check-types",
     "format": "biome check --write .",
     "security:secrets": "bun scripts/secret-scan.ts",
