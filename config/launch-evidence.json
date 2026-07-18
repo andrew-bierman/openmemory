@@ -1,5 +1,5 @@
 {
-  "latestRepositoryGate": {
+  "documentedRepositoryGate": {
     "commit": "ae433710f37b7d784833c47d37b1d8da5dd8276e",
     "mainCiRun": "29664533575",
     "mainCiUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29664533575",
