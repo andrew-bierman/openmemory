@@ -130,7 +130,8 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   );
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(page.getByText("1 of 4 rows")).toBeVisible();
-  await page.goto("/");
+  await page.goto("/", { waitUntil: "networkidle" });
+  await expect(page.getByText("4 of 4 rows")).toBeVisible();
   await expect(page.locator("tbody tr")).toHaveCount(4);
 
   await page
