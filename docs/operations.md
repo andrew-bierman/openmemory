@@ -194,17 +194,19 @@ Alpha retention policy:
 
 Current limitations:
 
-- R2 export lifecycle expiration is not configured in code, though
-  tenant/account deletion now best-effort removes the deleted tenant's export
-  objects when the R2 binding is available.
+- R2 export lifecycle expiration is configured by
+  [r2-lifecycle.json](../infra/cloudflare/r2-lifecycle.json). Tenant/account
+  deletion also best-effort removes the deleted tenant's export objects when
+  the R2 binding is available.
 - Durable Object graph restore is implemented as a tenant-scoped destructive
   replace from an OpenMemory export payload; merge/diff restore is not
   implemented.
 
 Recommended operator controls before broader public launch:
 
-- Configure R2 lifecycle rules for export retention, such as deleting alpha
-  exports after 30 to 90 days unless a longer retention window is required.
+- Keep the R2 lifecycle policy applied with `bun run setup:r2-lifecycle` after
+  bucket creation or policy changes. The alpha policy deletes exports after 90
+  days and aborts incomplete multipart uploads after 7 days.
 - For user-initiated account deletion, call `DELETE /v1/account` from an
   authenticated session with `confirmEmail` and `confirmTenantId`. It purges
   the tenant graph, best-effort deletes Vectorize ids and R2 export objects,

@@ -49,6 +49,7 @@ The script creates:
 - D1 database bound as `AUTH_DB`
 - Vectorize index bound as `MEMORY_VECTORS`
 - R2 bucket bound as `MEMORY_EXPORTS`
+- R2 lifecycle policy from `infra/cloudflare/r2-lifecycle.json`
 - Workers Analytics Engine dataset bound as `OPENMEMORY_ANALYTICS`
 - Queue producer/consumer resources for async source ingestion and memory
   extraction
@@ -59,6 +60,15 @@ The Worker already has Durable Object migrations and the
 `SOURCE_INGESTION_WORKFLOW` binding in `apps/api/wrangler.jsonc` and root
 `wrangler.jsonc`. Cloudflare creates the Workflow from that Worker config during
 deploy.
+
+To re-apply or verify R2 lifecycle policy after bucket changes:
+
+```sh
+bun run setup:r2-lifecycle
+```
+
+The alpha policy expires tenant graph exports after 90 days and aborts
+incomplete multipart uploads after 7 days.
 
 ## Required Secrets
 

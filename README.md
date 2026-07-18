@@ -126,6 +126,13 @@ Set up Cloudflare resources in a fresh account:
 bun run setup:cloudflare
 ```
 
+The setup script also applies the R2 lifecycle policy. Re-apply or verify it
+after bucket changes with:
+
+```sh
+bun run setup:r2-lifecycle
+```
+
 Database helpers:
 
 ```sh

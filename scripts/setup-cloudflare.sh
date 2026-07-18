@@ -31,6 +31,9 @@ echo "Creating R2 bucket ${R2_BUCKET}..."
 bun --cwd apps/api wrangler r2 bucket create "${R2_BUCKET}" \
   --config wrangler.jsonc
 
+echo "Applying R2 lifecycle policy to ${R2_BUCKET}..."
+OPENMEMORY_R2_BUCKET="${R2_BUCKET}" OPENMEMORY_WRANGLER_CONFIG="${CONFIG}" bash scripts/apply-r2-lifecycle.sh
+
 echo "Creating async processing Queues..."
 bun --cwd apps/api wrangler queues create "${EXTRACTION_QUEUE}" \
   --config wrangler.jsonc
