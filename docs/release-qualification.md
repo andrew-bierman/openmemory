@@ -120,6 +120,14 @@ The workflow uploads the generated `.tmp/benchmark-reports/*.jsonl` files as a
 `benchmark-reports` artifact so release reviewers can compare graph latency and
 recall-quality evidence across candidate commits.
 
+Launch-readiness evidence pointers live in
+`config/launch-evidence.json`. Keep that manifest and
+`docs/launch-readiness.md` synchronized when promoting a candidate:
+
+```sh
+bun run launch:evidence:check
+```
+
 ## Optional Live Gate
 
 Run this only when production secrets and Cloudflare resources are configured:
