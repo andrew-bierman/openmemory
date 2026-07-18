@@ -161,7 +161,12 @@ after the same tenant confirmation and validation.
 - `conflictPolicy: "overwrite"` can be used with merge after previewing
   conflicts. It replaces changed duplicate memory records by ID, refreshes
   their tags/entities, upserts export edges, and re-indexes overwritten active
-  latest memories. The default policy is `skip`.
+  latest memories.
+- `conflictPolicy: "semantic_merge"` can be used with merge after previewing
+  conflicts. It keeps the existing memory ID and lifecycle state, combines
+  changed content with an imported-update section, unions tags/entities, merges
+  metadata with an `openmemoryImportMerge` provenance record, and re-indexes
+  the synthesized active latest memory. The default policy is `skip`.
 
 ## Tenant Purge
 

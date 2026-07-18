@@ -24,7 +24,7 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const IMPORT_PREVIEW_DETAIL_LIMIT = 25;
 
 type GraphImportMode = "replace" | "merge";
-type GraphImportConflictPolicy = "skip" | "overwrite";
+type GraphImportConflictPolicy = "skip" | "overwrite" | "semantic_merge";
 type ImportMemory = GraphExportPayload["memories"][number];
 
 type SearchWithSemanticIds = Partial<SearchInput> & {
@@ -819,6 +819,10 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       mode === "merge" && conflictPolicy === "overwrite"
         ? changedMemoryIds.length
         : 0;
+    const memoriesMerged =
+      mode === "merge" && conflictPolicy === "semantic_merge"
+        ? changedMemoryIds.length
+        : 0;
 
     return {
       mode,
@@ -842,8 +846,11 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
           : {
               memoriesImported,
               memoriesSkipped:
-                skippedExistingMemoryIds.length - memoriesOverwritten,
+                skippedExistingMemoryIds.length -
+                memoriesOverwritten -
+                memoriesMerged,
               memoriesOverwritten,
+              memoriesMerged,
               edgesImported: graphExport.edges.length,
               wouldDelete: {
                 memories: 0,
@@ -902,8 +909,10 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     let memoriesImported = 0;
     let memoriesSkipped = 0;
     let memoriesOverwritten = 0;
+    let memoriesMerged = 0;
     const importedMemoryIds: string[] = [];
     const overwrittenMemoryIds: string[] = [];
+    const mergedMemoryIds: string[] = [];
     for (const memory of graphExport.memories) {
       if (existingMemoryIds.has(memory.id)) {
         const existingMemory = existingMemoryById.get(memory.id);
@@ -916,6 +925,23 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
           this.upsertEntities(memory.id, memory.entityIds);
           memoriesOverwritten += 1;
           overwrittenMemoryIds.push(memory.id);
+          continue;
+        }
+        if (conflictPolicy === "semantic_merge" && changedFields.length > 0) {
+          if (!existingMemory) {
+            memoriesSkipped += 1;
+            continue;
+          }
+          const mergedMemory = mergeDuplicateMemory(
+            existingMemory,
+            memory,
+            changedFields,
+          );
+          this.upsertMemory(mergedMemory);
+          this.upsertTags(mergedMemory.id, mergedMemory.tags);
+          this.upsertEntities(mergedMemory.id, mergedMemory.entityIds);
+          memoriesMerged += 1;
+          mergedMemoryIds.push(mergedMemory.id);
           continue;
         }
         memoriesSkipped += 1;
@@ -938,8 +964,10 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       memoriesImported,
       memoriesSkipped,
       memoriesOverwritten,
+      memoriesMerged,
       importedMemoryIds,
       overwrittenMemoryIds,
+      mergedMemoryIds,
       edgesImported: graphExport.edges.length,
       version: graphExport.version,
     };
@@ -1446,6 +1474,85 @@ function diffMemoryFields(existing: ImportMemory, incoming: ImportMemory) {
 
 function canonicalMemoryField(value: unknown) {
   return JSON.stringify(value ?? null);
+}
+
+function mergeDuplicateMemory(
+  existing: ImportMemory,
+  incoming: ImportMemory,
+  changedFields: string[],
+): ImportMemory {
+  const mergedAt = new Date().toISOString();
+  const content = mergeMemoryContent(existing.content, incoming.content);
+  const tags = mergeUnique([...existing.tags, ...incoming.tags]).slice(0, 50);
+  const entityIds = mergeUnique([
+    ...existing.entityIds,
+    ...incoming.entityIds,
+  ]).slice(0, 50);
+
+  return {
+    ...existing,
+    content,
+    source:
+      existing.source === incoming.source
+        ? existing.source
+        : "openmemory-import-merge",
+    conversationId: existing.conversationId ?? incoming.conversationId,
+    tags,
+    metadata: {
+      ...existing.metadata,
+      ...incoming.metadata,
+      openmemoryImportMerge: {
+        strategy: "semantic_merge",
+        mergedAt,
+        changedFields,
+        existingUpdatedAt: existing.updatedAt,
+        incomingUpdatedAt: incoming.updatedAt,
+        existingSource: existing.source,
+        incomingSource: incoming.source,
+      },
+    },
+    type: existing.type === "fact" ? incoming.type : existing.type,
+    status: existing.status,
+    isLatest: existing.isLatest,
+    confidence: Math.max(existing.confidence, incoming.confidence),
+    importance: Math.max(existing.importance, incoming.importance),
+    validFrom: earliestDate(existing.validFrom, incoming.validFrom),
+    validUntil: latestDate(existing.validUntil, incoming.validUntil),
+    entityIds,
+    forgottenAt: existing.forgottenAt,
+    forgetReason: existing.forgetReason,
+    createdAt: existing.createdAt,
+    updatedAt: mergedAt,
+  };
+}
+
+function mergeMemoryContent(existingContent: string, incomingContent: string) {
+  if (existingContent.trim() === incomingContent.trim()) {
+    return existingContent;
+  }
+
+  const merged = `${existingContent.trim()}\n\nImported update:\n${incomingContent.trim()}`;
+  return merged.length <= 200_000 ? merged : merged.slice(0, 200_000);
+}
+
+function earliestDate(left?: string, right?: string) {
+  if (!left) {
+    return right;
+  }
+  if (!right) {
+    return left;
+  }
+  return left <= right ? left : right;
+}
+
+function latestDate(left?: string, right?: string) {
+  if (!left) {
+    return right;
+  }
+  if (!right) {
+    return left;
+  }
+  return left >= right ? left : right;
 }
 
 const MEMORY_IMPORT_COMPARE_FIELDS = [

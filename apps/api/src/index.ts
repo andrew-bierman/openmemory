@@ -193,7 +193,11 @@ const graphImportBody = t.Object({
   confirmTenantId: t.String({ minLength: 1, maxLength: 200 }),
   mode: t.Union([t.Literal("replace"), t.Literal("merge")]),
   conflictPolicy: t.Optional(
-    t.Union([t.Literal("skip"), t.Literal("overwrite")]),
+    t.Union([
+      t.Literal("skip"),
+      t.Literal("overwrite"),
+      t.Literal("semantic_merge"),
+    ]),
   ),
   export: t.Unknown(),
 });
@@ -836,13 +840,24 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           const indexedMemoryIds = new Set([
             ...merged.importedMemoryIds,
             ...merged.overwrittenMemoryIds,
+            ...merged.mergedMemoryIds,
           ]);
-          const activeMemories = graphExport.data.memories.filter(
-            (memory) =>
-              indexedMemoryIds.has(memory.id) &&
-              memory.status === "active" &&
-              memory.isLatest,
-          );
+          const activeMemories =
+            merged.mergedMemoryIds.length > 0
+              ? (
+                  await Promise.all(
+                    [...indexedMemoryIds].map((id) => graph.getMemory(id)),
+                  )
+                ).filter(
+                  (memory) =>
+                    memory && memory.status === "active" && memory.isLatest,
+                )
+              : graphExport.data.memories.filter(
+                  (memory) =>
+                    indexedMemoryIds.has(memory.id) &&
+                    memory.status === "active" &&
+                    memory.isLatest,
+                );
           for (const memory of activeMemories) {
             await indexMemory(env, tenantId, memory);
           }
@@ -854,11 +869,13 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
             memoriesImported: merged.memoriesImported,
             memoriesSkipped: merged.memoriesSkipped,
             memoriesOverwritten: merged.memoriesOverwritten,
+            memoriesMerged: merged.memoriesMerged,
             edgesImported: merged.edgesImported,
             activeMemoriesIndexed: activeMemories.length,
             merged: {
               memoriesSkipped: merged.memoriesSkipped,
               memoriesOverwritten: merged.memoriesOverwritten,
+              memoriesMerged: merged.memoriesMerged,
             },
             importedAt: merged.importedAt,
           });
