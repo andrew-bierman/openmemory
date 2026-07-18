@@ -7,6 +7,8 @@ import {
   createMemoryId,
   ForgetMemorySchema,
   GraphEdgeSchema,
+  type GraphExportPayload,
+  GraphExportPayloadSchema,
   GraphRelationshipCatalog,
   getGraphRelationshipDefinition,
   type MemoryRecord,
@@ -695,6 +697,35 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     };
   }
 
+  async restoreGraph(input: unknown) {
+    const graphExport = GraphExportPayloadSchema.parse(input);
+    const memoryIds = new Set(graphExport.memories.map((memory) => memory.id));
+    const danglingEdges = graphExport.edges.filter(
+      (edge) => !memoryIds.has(edge.sourceId) || !memoryIds.has(edge.targetId),
+    );
+    if (danglingEdges.length > 0) {
+      throw new Error("graph_export_contains_dangling_edges");
+    }
+
+    const purged = await this.purgeTenantData();
+    for (const memory of graphExport.memories) {
+      this.insertMemory(memory);
+      this.upsertTags(memory.id, memory.tags);
+      this.upsertEntities(memory.id, memory.entityIds);
+    }
+    for (const edge of graphExport.edges) {
+      this.insertEdge(edge);
+    }
+
+    return {
+      importedAt: new Date().toISOString(),
+      memoriesImported: graphExport.memories.length,
+      edgesImported: graphExport.edges.length,
+      purged,
+      version: graphExport.version,
+    };
+  }
+
   async linkRelatedMemories(id: string) {
     const memory = this.getMemoryById(id);
     if (!memory || memory.entityIds.length === 0) {
@@ -929,6 +960,21 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       memory.forgetReason ?? null,
       memory.createdAt,
       memory.updatedAt,
+    );
+  }
+
+  private insertEdge(edge: GraphExportPayload["edges"][number]) {
+    this.sqlState.storage.sql.exec(
+      `insert or replace into edges
+       (source_id, target_id, relationship, weight, metadata_json, created_at, updated_at)
+       values (?, ?, ?, ?, ?, ?, ?)`,
+      edge.sourceId,
+      edge.targetId,
+      edge.relationship,
+      edge.weight,
+      JSON.stringify(edge.metadata),
+      edge.createdAt,
+      edge.updatedAt,
     );
   }
 

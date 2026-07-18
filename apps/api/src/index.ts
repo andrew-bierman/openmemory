@@ -10,6 +10,7 @@ import {
   createSourceId,
   ForgetMemorySchema,
   GraphEdgeSchema,
+  GraphExportPayloadSchema,
   IngestSourceSchema,
   normalizeTenantId,
   SearchSchema,
@@ -186,6 +187,12 @@ const tenantPurgeBody = t.Object({
 const accountDeletionBody = t.Object({
   confirmEmail: t.String({ minLength: 3, maxLength: 320 }),
   confirmTenantId: t.String({ minLength: 1, maxLength: 200 }),
+});
+
+const graphImportBody = t.Object({
+  confirmTenantId: t.String({ minLength: 1, maxLength: 200 }),
+  mode: t.Literal("replace"),
+  export: t.Unknown(),
 });
 
 const edgeBody = t.Object({
@@ -748,6 +755,72 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       writtenToR2: Boolean(env.MEMORY_EXPORTS),
     });
   })
+  .post(
+    "/v1/imports",
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+
+      const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+      if (normalizeTenantId(body.confirmTenantId) !== tenantId) {
+        return status(409, {
+          error: "tenant_confirmation_mismatch" as const,
+          message:
+            "confirmTenantId must match the resolved tenant before data is restored.",
+        });
+      }
+
+      const graphExport = GraphExportPayloadSchema.safeParse(body.export);
+      if (!graphExport.success) {
+        return status(400, {
+          error: "invalid_graph_export" as const,
+          message: "The import payload must be an OpenMemory graph export.",
+        });
+      }
+
+      try {
+        const restored = await graph.restoreGraph(graphExport.data);
+        const vectorIndex = await deleteTenantVectors(
+          env,
+          tenantId,
+          restored.purged.deletedMemoryIds,
+        );
+        const activeMemories = graphExport.data.memories.filter(
+          (memory) => memory.status === "active" && memory.isLatest,
+        );
+        for (const memory of activeMemories) {
+          await indexMemory(env, tenantId, memory);
+        }
+
+        return status(201, {
+          tenantId,
+          mode: body.mode,
+          version: restored.version,
+          memoriesImported: restored.memoriesImported,
+          edgesImported: restored.edgesImported,
+          activeMemoriesIndexed: activeMemories.length,
+          replaced: {
+            memoriesDeleted: restored.purged.memoriesDeleted,
+            edgesDeleted: restored.purged.edgesDeleted,
+            tagsDeleted: restored.purged.tagsDeleted,
+            entitiesDeleted: restored.purged.entitiesDeleted,
+            ingestionJobsDeleted: restored.purged.ingestionJobsDeleted,
+            vectorIndex,
+            purgedAt: restored.purged.purgedAt,
+          },
+          importedAt: restored.importedAt,
+        });
+      } catch (error) {
+        return status(400, {
+          error: "graph_import_failed" as const,
+          message: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+    },
+    { body: graphImportBody },
+  )
   .post("/v1/index/repair", async ({ headers, request, status }) => {
     const { tenant, graph } = await withTenant(request, headers);
     if (!graph) {

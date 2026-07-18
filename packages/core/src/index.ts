@@ -190,6 +190,42 @@ export const GraphEdgeSchema = z.object({
   metadata: MemoryMetadataSchema,
 });
 
+export const MemoryRecordSchema = z.object({
+  id: z.string().min(1).max(200),
+  content: z.string().min(1).max(200_000),
+  source: z.string().min(1).max(120),
+  conversationId: z.string().min(1).max(200).optional(),
+  tags: z.array(z.string().min(1).max(80)).max(50),
+  metadata: MemoryMetadataSchema,
+  type: MemoryTypeSchema,
+  status: MemoryStatusSchema,
+  isLatest: z.boolean(),
+  confidence: z.number().min(0).max(1),
+  importance: z.number().min(0).max(1),
+  validFrom: z.string().datetime().optional(),
+  validUntil: z.string().datetime().optional(),
+  supersedesId: z.string().min(1).max(200).optional(),
+  entityIds: z.array(z.string().min(1).max(160)).max(50),
+  forgottenAt: z.string().datetime().optional(),
+  forgetReason: z.string().min(1).max(500).optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const GraphEdgeRecordSchema = GraphEdgeSchema.extend({
+  weight: z.number().min(0).max(1),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+});
+
+export const GraphExportPayloadSchema = z.object({
+  version: z.literal(1),
+  exportedAt: z.string().datetime(),
+  stats: z.unknown().optional(),
+  memories: z.array(MemoryRecordSchema).max(10_000),
+  edges: z.array(GraphEdgeRecordSchema).max(50_000),
+});
+
 export const UpdateMemorySchema = z.object({
   content: z.string().min(1).max(200_000),
   relationship: z.enum(["updates", "extends", "derives"]).default("updates"),
@@ -254,6 +290,8 @@ export type MemoryRecord = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type GraphExportPayload = z.infer<typeof GraphExportPayloadSchema>;
 
 export type SearchResult = MemoryRecord & {
   score: number;

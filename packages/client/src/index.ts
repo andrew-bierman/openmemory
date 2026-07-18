@@ -108,6 +108,29 @@ export type GraphExportResult = {
   writtenToR2: boolean;
 };
 
+export type GraphImportResult = {
+  tenantId: string;
+  mode: "replace";
+  version: 1;
+  memoriesImported: number;
+  edgesImported: number;
+  activeMemoriesIndexed: number;
+  replaced: {
+    memoriesDeleted: number;
+    edgesDeleted: number;
+    tagsDeleted: number;
+    entitiesDeleted: number;
+    ingestionJobsDeleted: number;
+    vectorIndex: {
+      attempted: number;
+      deleted: number;
+      vectorizeConfigured: boolean;
+    };
+    purgedAt: string;
+  };
+  importedAt: string;
+};
+
 export type IndexRepairResult = {
   attempted: number;
   tenantId: string;
@@ -332,6 +355,10 @@ export function createOpenMemoryClient(
         client.v1.oauth.connections({ clientId }).delete(),
       ),
     exportGraph: () => unwrap<GraphExportResult>(client.v1.exports.post()),
+    importGraph: (input: { confirmTenantId: string; export: unknown }) =>
+      unwrap<GraphImportResult>(
+        client.v1.imports.post({ ...input, mode: "replace" }),
+      ),
     repairIndex: () => unwrap<IndexRepairResult>(client.v1.index.repair.post()),
     purgeTenantData: (confirmTenantId: string) =>
       unwrap<TenantPurgeResult>(client.v1.tenant.delete({ confirmTenantId })),
@@ -418,6 +445,13 @@ type EdenClient = {
     };
     exports: {
       post(): EdenResult;
+    };
+    imports: {
+      post(input: {
+        confirmTenantId: string;
+        mode: "replace";
+        export: unknown;
+      }): EdenResult;
     };
     index: {
       repair: {
