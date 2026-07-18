@@ -274,13 +274,6 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         headers: { "content-type": "text/html" },
       }),
   )
-  .get(
-    "/",
-    () =>
-      new Response(DASHBOARD_HTML, {
-        headers: { "content-type": "text/html" },
-      }),
-  )
   .get("/health", () => ({
     ok: true,
     service: "openmemory-api",
@@ -997,80 +990,6 @@ const PAGE_STYLE = `
   pre { white-space:pre-wrap; margin:0; color:#273444; line-height:1.5; }
   @media (max-width: 900px) { header { align-items:flex-start; flex-direction:column; padding:16px; } .app-shell, section { grid-template-columns:1fr; } aside { border-right:0; border-bottom:1px solid var(--line); } }
 `;
-
-const DASHBOARD_HTML = `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>OpenMemory</title>
-  <style>${PAGE_STYLE}</style>
-</head>
-<body>
-  <header>
-    <h1>OpenMemory</h1>
-    <div class="row"><span class="meta" id="session"></span><button id="refresh" class="ghost">Refresh</button><a href="/login"><button class="ghost">Account</button></a><button id="signOut" class="secondary">Sign out</button></div>
-  </header>
-  <main class="app-shell">
-    <aside>
-      <div id="authNotice" class="panel hidden">
-        <div class="stack">
-          <strong>Sign in required</strong>
-          <span class="meta">The deployed dashboard uses Better Auth session cookies.</span>
-          <a href="/login"><button type="button">Sign in</button></a>
-        </div>
-      </div>
-      <form id="remember" class="stack">
-        <div><label for="content">Memory</label><textarea id="content" placeholder="Save a fact, preference, decision, episode, or insight"></textarea></div>
-        <div class="row"><select id="type"><option>fact</option><option>preference</option><option>decision</option><option>episode</option><option>insight</option></select><input id="tags" placeholder="tags, comma separated" /></div>
-        <button>Remember</button>
-      </form>
-      <form id="searchForm" class="stack">
-        <div><label for="query">Recall</label><input id="query" placeholder="What context do you need?" /></div>
-        <button class="secondary">Search</button>
-      </form>
-    </aside>
-    <section>
-      <div class="stack">
-        <div class="panel"><h2>Memories</h2><div id="memories" class="list"></div></div>
-      </div>
-      <div class="stack">
-        <div class="panel"><h2>Profile</h2><pre id="profile"></pre></div>
-        <div class="panel"><h2>Context</h2><pre id="context"></pre></div>
-      </div>
-    </section>
-  </main>
-  <script>
-    const localHeaders = location.hostname === "localhost" || location.hostname === "127.0.0.1" ? { "x-openmemory-user-id": "local-user" } : {};
-    async function api(path, init = {}) { const response = await fetch(path, { ...init, credentials: "include", headers: { "content-type": "application/json", ...localHeaders, ...(init.headers || {}) } }); if (!response.ok) throw new Error(await response.text()); return response.json(); }
-    async function loadSession() {
-      const response = await fetch("/api/auth/get-session", { credentials: "include" });
-      const data = response.ok ? await response.json() : null;
-      const user = data && data.user ? data.user : null;
-      document.querySelector("#session").textContent = user ? user.email : "Not signed in";
-      document.querySelector("#authNotice").classList.toggle("hidden", Boolean(user) || Boolean(localHeaders["x-openmemory-user-id"]));
-      return user;
-    }
-    function renderMemory(memory) {
-      return '<article class="memory"><div>' + escapeHtml(memory.content) + '</div><div class="meta"><span class="pill">' + memory.type + '</span><span class="pill">' + memory.status + '</span><span>' + memory.tags.join(", ") + '</span></div><div class="row"><button class="secondary" data-forget="' + memory.id + '">Forget</button></div></article>';
-    }
-    async function refresh() {
-      await loadSession();
-      const memories = await api('/v1/memories');
-      document.querySelector("#memories").innerHTML = memories.map(renderMemory).join("") || '<div class="meta">No memories yet.</div>';
-      const profile = await api('/v1/profile');
-      document.querySelector("#profile").textContent = profile.summary;
-    }
-    document.querySelector("#remember").onsubmit = async (event) => { event.preventDefault(); await api('/v1/memories', { method:'POST', body: JSON.stringify({ content: content.value, type: type.value, tags: tags.value.split(',').map(t => t.trim()).filter(Boolean) }) }); content.value=''; await refresh(); };
-    document.querySelector("#searchForm").onsubmit = async (event) => { event.preventDefault(); const data = await api('/v1/context', { method:'POST', body: JSON.stringify({ q: query.value, limit: 8 }) }); document.querySelector("#context").textContent = data.context; };
-    document.addEventListener("click", async (event) => { const button = event.target.closest("[data-forget]"); if (!button) return; await api('/v1/memories/' + button.dataset.forget, { method:'DELETE', body: JSON.stringify({ reason:'dashboard' }) }); await refresh(); });
-    document.querySelector("#refresh").onclick = refresh;
-    document.querySelector("#signOut").onclick = async () => { await fetch("/api/auth/sign-out", { method: "POST", credentials: "include" }); location.href = "/login"; };
-    function escapeHtml(value) { return value.replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
-    refresh().catch(error => document.querySelector("#memories").textContent = error.message);
-  </script>
-</body>
-</html>`;
 
 const LOGIN_HTML = `<!doctype html>
 <html lang="en">

@@ -28,19 +28,28 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
   await page.getByRole("button", { name: "Create account" }).click();
 
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.locator("#session")).toContainText(email);
+  await expect(
+    page.getByRole("heading", { name: "Memory Dashboard" }),
+  ).toBeVisible();
+  await expect(page.getByText(email)).toBeVisible();
+  await expect(page.getByLabel("API URL")).toHaveValue(/workers\.dev|https?:/);
 
   await page.locator("#content").fill(memory);
   await page.locator("#tags").fill("ui-e2e");
   await page.getByRole("button", { name: "Remember" }).click();
-  await expect(page.locator("#memories")).toContainText(memory);
+  await expect(page.locator("tbody")).toContainText(memory);
 
-  await page.getByRole("button", { name: "Refresh" }).click();
-  await expect(page.locator("#memories")).toContainText(memory);
+  await page.getByRole("button", { name: /Refresh/ }).click();
+  await expect(page.locator("tbody")).toContainText(memory);
 
-  await page.locator("#query").fill("Graph Indexing UI E2E");
-  await page.getByRole("button", { name: "Search" }).click();
-  await expect(page.locator("#context")).toContainText("Graph Indexing");
+  await page.getByLabel("Recall query").fill("Graph Indexing UI E2E");
+  await page
+    .locator(".toolbar")
+    .getByRole("button", { name: "Recall", exact: true })
+    .click();
+  await expect(page.locator("pre.context").first()).toContainText(
+    "Graph Indexing",
+  );
 
   const [deleteResponse] = await Promise.all([
     page.waitForResponse(
@@ -48,14 +57,10 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
         response.url().includes("/v1/memories/") &&
         response.request().method() === "DELETE",
     ),
-    page
-      .locator("#memories")
-      .getByRole("button", { name: "Forget" })
-      .first()
-      .click(),
+    page.getByRole("button", { name: "Forget" }).first().click(),
   ]);
   expect(deleteResponse.ok()).toBe(true);
-  await expect(page.locator("#memories")).not.toContainText(memory);
+  await expect(page.locator("tbody")).not.toContainText(memory);
 
   const readinessResponse = await page.request.get("/v1/readiness");
   expect(readinessResponse.ok()).toBe(true);

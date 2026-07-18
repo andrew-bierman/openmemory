@@ -6,6 +6,24 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
+  "assets": {
+    "directory": "./apps/web/dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": [
+      "/api",
+      "/api/*",
+      "/v1",
+      "/v1/*",
+      "/mcp",
+      "/mcp/*",
+      "/health",
+      "/login",
+      "/consent",
+      "/consent/*",
+      "/.well-known",
+      "/.well-known/*"
+    ]
+  },
   "migrations": [
     {
       "tag": "v1",

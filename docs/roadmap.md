@@ -11,6 +11,9 @@
 - Better Auth OAuth Provider exposes auth routes and OAuth/OIDC discovery.
 - Drizzle defines the D1 auth/control-plane schema and generates migrations.
 - `apps/web` is a TanStack Start app that can create, list, forget, and recall memories against the API.
+- Production `/` serves the generated TanStack dashboard shell through
+  Cloudflare Worker Assets while API, auth, MCP, health, login, consent, and
+  discovery routes remain Worker-first.
 - `packages/client` exposes the Eden Treaty client foundation.
 - `packages/ui` contains shadcn-style shared UI primitives.
 - `bun run check` passes across Biome, Turbo, TypeScript, Vitest, and Wrangler-backed API integration tests.
@@ -129,9 +132,6 @@
    - Add higher-volume graph performance benchmarks and production telemetry.
 
 4. Web app expansion
-   - Mount or deploy the richer TanStack Start dashboard so the production URL
-     serves the same Operations, graph explorer, admin, MCP, and chart surfaces
-     covered by local E2E.
    - Expand hosted navigation polish from alpha feedback.
    - Keep the hosted TanStack Start UI as a companion dashboard/control plane; the API and MCP integrations remain the primary product surfaces.
    - Use shadcn dashboard templates, defaults, and theme tokens as the baseline; defer Apple/SwiftUI-specific styling until the product structure is stronger.

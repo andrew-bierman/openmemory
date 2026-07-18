@@ -5,7 +5,8 @@
 The API is deployed to Cloudflare Workers:
 
 - `https://openmemory-api.abbierman101.workers.dev`
-- HTTP API, Better Auth routes, the hosted dashboard, and `/mcp` currently deploy as one Worker.
+- HTTP API, Better Auth routes, the TanStack hosted dashboard, static web
+  assets, and `/mcp` currently deploy as one Worker.
 - D1 `openmemory-auth` is bound as `AUTH_DB`.
 - Durable Object `MemoryGraph` is bound as `MEMORY_GRAPHS`.
 - Vectorize `openmemory-vectors` is bound as `MEMORY_VECTORS`.
@@ -18,6 +19,12 @@ Default to a single Worker deploy for now:
 
 - The backend is the workhorse and owns memory graph logic, auth, Vectorize, exports, and MCP tools.
 - The hosted UI is a companion dashboard/control plane served from the same origin so cookies, OAuth redirects, and MCP discovery stay simple.
+- The root `wrangler.jsonc` serves `apps/web/dist/client` through Cloudflare
+  Worker Assets. API, auth, MCP, health, login, consent, and well-known routes
+  are listed in `assets.run_worker_first` so they still hit the Elysia Worker.
+- `bun run build` renders the TanStack server bundle once into
+  `apps/web/dist/client/index.html`, giving Worker Assets a production shell
+  without committing generated files.
 - The MCP endpoint uses Cloudflare Agents' `createMcpHandler`, which is Cloudflare's lightweight Worker-native path for streamable HTTP MCP servers.
 
 Split MCP into a dedicated Cloudflare Agents `McpAgent` Worker only when we need session-specific Agent state, separate scaling/isolation, or a different release cadence. The persistent OpenMemory state currently lives in Durable Objects, so a separate MCP Agent would mostly add operational surface area rather than new durability.
@@ -114,6 +121,9 @@ The default CI workflow runs:
 bun run check
 bun run build
 ```
+
+`bun run build` runs the package builds and then `bun run web:shell`, which
+renders the TanStack dashboard shell expected by Worker Assets.
 
 CI also has an explicit local Wrangler integration job:
 

@@ -460,7 +460,10 @@ test("worker API supports memory lifecycle, profile context, MCP, and dashboard"
 
   const dashboard = await worker.fetch("/");
   expect(dashboard.status).toBe(200);
-  expect(await dashboard.text()).toContain("OpenMemory");
+  const dashboardHtml = await dashboard.text();
+  expect(dashboardHtml).toContain("Memory Dashboard");
+  expect(dashboardHtml).toContain("Operations");
+  expect(dashboardHtml).toContain("/assets/");
 }, 45_000);
 
 test("MCP streamable HTTP compatibility covers handshake and optional surfaces", async () => {
