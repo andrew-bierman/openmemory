@@ -184,7 +184,7 @@ For optional live-smoke cleanup and the fallback manual deploy workflow, configu
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-The API token needs permission to operate D1 migrations and, for the fallback deploy workflow, deploy Workers for the target Cloudflare account.
+The API token needs permission to operate D1 migrations and, for the fallback deploy workflow, deploy Workers for the target Cloudflare account. The live-smoke cleanup step runs `scripts/cleanup-live-smoke-auth.sql` against D1 after every smoke attempt when those secrets are present.
 
 ## Docker Test Runner
 
