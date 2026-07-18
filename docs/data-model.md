@@ -162,8 +162,9 @@ after the same tenant confirmation and validation.
 after the caller supplies a matching `confirmTenantId`. The operation removes
 memories, edges, memory tags, memory entities, and ingestion jobs from the
 tenant Durable Object. It also best-effort deletes matching Vectorize ids using
-the `<tenant-id>:<memory-id>` vector id convention and best-effort deletes R2
-export objects under `<tenant-id>/exports/`.
+the `t_<tenant-hash>:<memory-id>` vector id convention, which keeps hosted
+tenant IDs under Cloudflare Vectorize's 64-byte vector-id limit, and best-effort
+deletes R2 export objects under `<tenant-id>/exports/`.
 
 `DELETE /v1/account` is the session-backed account deletion path. It requires
 matching `confirmEmail` and `confirmTenantId`, purges the tenant graph first,

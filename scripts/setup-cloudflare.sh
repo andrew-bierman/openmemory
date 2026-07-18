@@ -27,6 +27,10 @@ bun --cwd apps/api wrangler vectorize create "${VECTOR_INDEX}" \
   --preset "${VECTOR_PRESET}" \
   --config wrangler.jsonc
 
+OPENMEMORY_VECTOR_INDEX="${VECTOR_INDEX}" \
+  OPENMEMORY_WRANGLER_CONFIG="wrangler.jsonc" \
+  bash scripts/setup-vectorize-metadata.sh
+
 echo "Creating R2 bucket ${R2_BUCKET}..."
 bun --cwd apps/api wrangler r2 bucket create "${R2_BUCKET}" \
   --config wrangler.jsonc
