@@ -297,6 +297,60 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(exported.edgeCount).toBeGreaterThanOrEqual(1);
   expect(exported.bytes).toBeGreaterThan(500);
 
+  const replacePreviewPayload = {
+    ...graphExportPayload,
+    memories: [memoryA],
+    edges: [],
+  };
+  const replacePreview = await getJson<GraphImportPreviewResponse>(
+    await worker.fetch("/v1/imports/preview", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        confirmTenantId: tenantA,
+        mode: "replace",
+        export: replacePreviewPayload,
+      }),
+    }),
+  );
+  expect(replacePreview).toMatchObject({
+    tenantId: tenantA,
+    mode: "replace",
+    version: 1,
+    incoming: {
+      memories: 1,
+      edges: 0,
+    },
+    existing: {
+      memories: 2,
+      edges: 1,
+    },
+    impact: {
+      memoriesImported: 1,
+      memoriesSkipped: 0,
+      edgesImported: 0,
+      wouldDelete: {
+        memories: 2,
+        edges: 1,
+      },
+      wouldReplace: true,
+    },
+  });
+  expect(replacePreview.candidates.newMemoryIds).toEqual([]);
+  const afterReplacePreviewStats = await getJson<GraphStatsResponse>(
+    await worker.fetch("/v1/graph/stats", {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(afterReplacePreviewStats).toMatchObject({
+    activeMemories: 2,
+    totalMemories: 2,
+    totalEdges: 1,
+  });
+
   const tenantBExport = await getJson<GraphExportResponse>(
     await worker.fetch("/v1/exports", {
       method: "POST",
@@ -378,6 +432,22 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     entityCount: 0,
     tagCount: 0,
   });
+  const mismatchedPreview = await worker.fetch("/v1/imports/preview", {
+    method: "POST",
+    headers: {
+      ...tenantHeaders(tenantA),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      confirmTenantId: tenantB,
+      mode: "replace",
+      export: graphExportPayload,
+    }),
+  });
+  expect(mismatchedPreview.status).toBe(409);
+  expect(await mismatchedPreview.json()).toMatchObject({
+    error: "tenant_confirmation_mismatch",
+  });
   const mismatchedImport = await worker.fetch("/v1/imports", {
     method: "POST",
     headers: {
@@ -409,6 +479,48 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(invalidImport.status).toBe(400);
   expect(await invalidImport.json()).toMatchObject({
     error: "invalid_graph_export",
+  });
+  const invalidPreview = await worker.fetch("/v1/imports/preview", {
+    method: "POST",
+    headers: {
+      ...tenantHeaders(tenantA),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      confirmTenantId: tenantA,
+      mode: "replace",
+      export: { version: 1, exportedAt: new Date().toISOString() },
+    }),
+  });
+  expect(invalidPreview.status).toBe(400);
+  expect(await invalidPreview.json()).toMatchObject({
+    error: "invalid_graph_export",
+  });
+  const danglingPreview = await worker.fetch("/v1/imports/preview", {
+    method: "POST",
+    headers: {
+      ...tenantHeaders(tenantA),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      confirmTenantId: tenantA,
+      mode: "merge",
+      export: {
+        ...graphExportPayload,
+        edges: [
+          {
+            ...matchingEdges[0],
+            sourceId: memoryA.id,
+            targetId: "missing-memory",
+          },
+        ],
+      },
+    }),
+  });
+  expect(danglingPreview.status).toBe(400);
+  expect(await danglingPreview.json()).toMatchObject({
+    error: "graph_import_failed",
+    message: "graph_export_contains_dangling_edges",
   });
   const danglingMerge = await worker.fetch("/v1/imports", {
     method: "POST",
@@ -510,6 +622,51 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
       },
     ],
   };
+  const mergePreview = await getJson<GraphImportPreviewResponse>(
+    await worker.fetch("/v1/imports/preview", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        confirmTenantId: tenantA,
+        mode: "merge",
+        export: mergePayload,
+      }),
+    }),
+  );
+  expect(mergePreview).toMatchObject({
+    tenantId: tenantA,
+    mode: "merge",
+    version: 1,
+    incoming: {
+      memories: 2,
+      edges: 1,
+    },
+    existing: {
+      memories: 2,
+      edges: 1,
+    },
+    impact: {
+      memoriesImported: 1,
+      memoriesSkipped: 1,
+      edgesImported: 1,
+      wouldDelete: {
+        memories: 0,
+        edges: 0,
+      },
+      wouldReplace: false,
+    },
+    conflicts: {
+      duplicateMemoryIds: [memoryA.id],
+      duplicateMemoryIdsTruncated: false,
+    },
+    candidates: {
+      newMemoryIds: [mergedMemory.id],
+      newMemoryIdsTruncated: false,
+    },
+  });
   const merged = await getJson<GraphImportResponse>(
     await worker.fetch("/v1/imports", {
       method: "POST",
@@ -2441,6 +2598,45 @@ type GraphImportResponse = {
     purgedAt: string;
   };
   importedAt: string;
+};
+
+type GraphImportPreviewResponse = {
+  tenantId: string;
+  mode: "replace" | "merge";
+  version: 1;
+  previewedAt: string;
+  incoming: {
+    memories: number;
+    edges: number;
+  };
+  existing: {
+    memories: number;
+    edges: number;
+    tags: number;
+    entities: number;
+    ingestionJobs: number;
+  };
+  impact: {
+    memoriesImported: number;
+    memoriesSkipped: number;
+    edgesImported: number;
+    wouldDelete: {
+      memories: number;
+      edges: number;
+      tags: number;
+      entities: number;
+      ingestionJobs: number;
+    };
+    wouldReplace: boolean;
+  };
+  conflicts: {
+    duplicateMemoryIds: string[];
+    duplicateMemoryIdsTruncated: boolean;
+  };
+  candidates: {
+    newMemoryIds: string[];
+    newMemoryIdsTruncated: boolean;
+  };
 };
 
 type IndexRepairResponse = {

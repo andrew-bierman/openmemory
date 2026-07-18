@@ -77,6 +77,9 @@
 - The `Live Smoke` workflow runs hourly against production as the alpha alert
   path for API, auth, readiness, MCP, and hosted UI regressions.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
+- `/v1/imports/preview` validates replace or merge imports and reports incoming
+  counts, existing graph counts, duplicate IDs, new IDs, and expected impact
+  without mutating tenant graph data.
 - `/v1/imports` imports a validated OpenMemory graph export into a tenant as
   either a destructive `replace` or additive `merge`, then re-indexes active
   imported memories.
@@ -117,8 +120,8 @@
 - Graph performance has larger local smoke coverage, graph-specific product
   signals, relationship diagnostics, and production request telemetry, but
   still needs high-volume production benchmarks before a hosted SaaS launch.
-- Graph restore supports whole-tenant replace and additive merge recovery, but
-  not field-level diff conflict resolution.
+- Graph restore supports preview, whole-tenant replace, and additive merge
+  recovery, but not field-level diff conflict resolution.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the
   preferred deploy path; the manual GitHub deploy workflow remains a fallback
   and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.

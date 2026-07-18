@@ -21,6 +21,9 @@ import type { ExtractedRelationship } from "./memory-signals";
 import type { RateLimitResult } from "./operational-controls";
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
+const IMPORT_PREVIEW_DETAIL_LIMIT = 25;
+
+type GraphImportMode = "replace" | "merge";
 
 type SearchWithSemanticIds = Partial<SearchInput> & {
   q: string;
@@ -723,6 +726,75 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     };
   }
 
+  async previewGraphImport(input: unknown, mode: GraphImportMode) {
+    const graphExport = GraphExportPayloadSchema.parse(input);
+    const existingMemoryIds = this.sqlState.storage.sql
+      .exec<{ id: string }>(`select id from memories order by created_at asc`)
+      .toArray()
+      .map((row) => row.id);
+    const existingMemoryIdSet = new Set(existingMemoryIds);
+    const incomingMemoryIds = graphExport.memories.map((memory) => memory.id);
+    const incomingMemoryIdSet = new Set(incomingMemoryIds);
+    const allowedMemoryIds =
+      mode === "merge"
+        ? new Set([...existingMemoryIds, ...incomingMemoryIds])
+        : incomingMemoryIdSet;
+    assertNoDanglingEdges(graphExport, allowedMemoryIds);
+
+    const existingCounts = this.getImportPreviewExistingCounts();
+    const skippedExistingMemoryIds = incomingMemoryIds.filter((id) =>
+      existingMemoryIdSet.has(id),
+    );
+    const newMemoryIds = incomingMemoryIds.filter(
+      (id) => !existingMemoryIdSet.has(id),
+    );
+    const memoriesImported =
+      mode === "merge" ? newMemoryIds.length : graphExport.memories.length;
+
+    return {
+      mode,
+      version: graphExport.version,
+      previewedAt: new Date().toISOString(),
+      incoming: {
+        memories: graphExport.memories.length,
+        edges: graphExport.edges.length,
+      },
+      existing: existingCounts,
+      impact:
+        mode === "replace"
+          ? {
+              memoriesImported,
+              memoriesSkipped: 0,
+              edgesImported: graphExport.edges.length,
+              wouldDelete: existingCounts,
+              wouldReplace: true,
+            }
+          : {
+              memoriesImported,
+              memoriesSkipped: skippedExistingMemoryIds.length,
+              edgesImported: graphExport.edges.length,
+              wouldDelete: {
+                memories: 0,
+                edges: 0,
+                tags: 0,
+                entities: 0,
+                ingestionJobs: 0,
+              },
+              wouldReplace: false,
+            },
+      conflicts: {
+        duplicateMemoryIds: limitPreviewIds(skippedExistingMemoryIds),
+        duplicateMemoryIdsTruncated:
+          skippedExistingMemoryIds.length > IMPORT_PREVIEW_DETAIL_LIMIT,
+      },
+      candidates: {
+        newMemoryIds: limitPreviewIds(newMemoryIds),
+        newMemoryIdsTruncated:
+          newMemoryIds.length > IMPORT_PREVIEW_DETAIL_LIMIT,
+      },
+    };
+  }
+
   async mergeGraph(input: unknown) {
     const graphExport = GraphExportPayloadSchema.parse(input);
     const existingMemoryIds = new Set(
@@ -764,6 +836,33 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       importedMemoryIds,
       edgesImported: graphExport.edges.length,
       version: graphExport.version,
+    };
+  }
+
+  private getImportPreviewExistingCounts() {
+    const [{ count: memories = 0 } = { count: 0 }] = this.sqlState.storage.sql
+      .exec<{ count: number }>(`select count(*) as count from memories`)
+      .toArray();
+    const [{ count: edges = 0 } = { count: 0 }] = this.sqlState.storage.sql
+      .exec<{ count: number }>(`select count(*) as count from edges`)
+      .toArray();
+    const [{ count: tags = 0 } = { count: 0 }] = this.sqlState.storage.sql
+      .exec<{ count: number }>(`select count(*) as count from memory_tags`)
+      .toArray();
+    const [{ count: entities = 0 } = { count: 0 }] = this.sqlState.storage.sql
+      .exec<{ count: number }>(`select count(*) as count from memory_entities`)
+      .toArray();
+    const [{ count: ingestionJobs = 0 } = { count: 0 }] =
+      this.sqlState.storage.sql
+        .exec<{ count: number }>(`select count(*) as count from ingestion_jobs`)
+        .toArray();
+
+    return {
+      memories,
+      edges,
+      tags,
+      entities,
+      ingestionJobs,
     };
   }
 
@@ -1190,6 +1289,10 @@ function assertNoDanglingEdges(
   if (danglingEdges.length > 0) {
     throw new Error("graph_export_contains_dangling_edges");
   }
+}
+
+function limitPreviewIds(ids: string[]) {
+  return ids.slice(0, IMPORT_PREVIEW_DETAIL_LIMIT);
 }
 
 function rowToIngestionJob(row: IngestionJobRow) {

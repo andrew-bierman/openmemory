@@ -756,6 +756,50 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     });
   })
   .post(
+    "/v1/imports/preview",
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+
+      const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+      if (normalizeTenantId(body.confirmTenantId) !== tenantId) {
+        return status(409, {
+          error: "tenant_confirmation_mismatch" as const,
+          message:
+            "confirmTenantId must match the resolved tenant before data is restored.",
+        });
+      }
+
+      const graphExport = GraphExportPayloadSchema.safeParse(body.export);
+      if (!graphExport.success) {
+        return status(400, {
+          error: "invalid_graph_export" as const,
+          message: "The import payload must be an OpenMemory graph export.",
+        });
+      }
+
+      try {
+        const preview = await graph.previewGraphImport(
+          graphExport.data,
+          body.mode,
+        );
+
+        return {
+          tenantId,
+          ...preview,
+        };
+      } catch (error) {
+        return status(400, {
+          error: "graph_import_failed" as const,
+          message: error instanceof Error ? error.message : "unknown_error",
+        });
+      }
+    },
+    { body: graphImportBody },
+  )
+  .post(
     "/v1/imports",
     async ({ body, headers, request, status }) => {
       const { tenant, graph } = await withTenant(request, headers);
