@@ -14,6 +14,8 @@ const testTmpRoot = existsSync("/Volumes/CrucialX10")
   : join(tmpdir(), "openmemory-mcp-sdk-smoke");
 
 type ClientProfile = {
+  expectedPrompts: string[];
+  expectedResources: string[];
   expectedTools: string[];
   id: string;
   userAgent: string;
@@ -55,12 +57,24 @@ async function runSdkSmoke(baseUrl: string, profile: ClientProfile) {
     for (const tool of profile.expectedTools) {
       assertIncludes(toolNames, tool);
     }
+    const resources = await client.listResources();
+    const resourceUris = resources.resources.map((resource) => resource.uri);
+    for (const resource of profile.expectedResources) {
+      assertIncludes(resourceUris, resource);
+    }
+
+    const prompts = await client.listPrompts();
+    const promptNames = prompts.prompts.map((prompt) => prompt.name);
+    for (const prompt of profile.expectedPrompts) {
+      assertIncludes(promptNames, prompt);
+    }
 
     await client.callTool({
       name: "remember",
       arguments: {
         content: "MCP SDK smoke confirms OpenMemory streamable HTTP.",
         tags: ["mcp", "sdk"],
+        type: "fact",
       },
     });
     const recalled = await client.callTool({
@@ -74,6 +88,37 @@ async function runSdkSmoke(baseUrl: string, profile: ClientProfile) {
     if (!recalledText.includes("streamable HTTP")) {
       throw new Error(
         `Recall result did not include stored memory: ${recalledText}`,
+      );
+    }
+
+    const profileResource = await client.readResource({
+      uri: "openmemory://profile",
+    });
+    if (!JSON.stringify(profileResource).includes("streamable HTTP")) {
+      throw new Error(
+        `Profile resource did not include stored memory: ${JSON.stringify(profileResource)}`,
+      );
+    }
+
+    const recentResource = await client.readResource({
+      uri: "openmemory://recent",
+    });
+    if (!JSON.stringify(recentResource).includes("streamable HTTP")) {
+      throw new Error(
+        `Recent resource did not include stored memory: ${JSON.stringify(recentResource)}`,
+      );
+    }
+
+    const contextPrompt = await client.getPrompt({
+      name: "context",
+      arguments: {
+        query: "streamable HTTP SDK smoke",
+        limit: "5",
+      },
+    });
+    if (!JSON.stringify(contextPrompt).includes("streamable HTTP")) {
+      throw new Error(
+        `Context prompt did not include stored memory: ${JSON.stringify(contextPrompt)}`,
       );
     }
   } finally {
@@ -98,12 +143,16 @@ async function loadProfiles(): Promise<ClientProfile[]> {
     if (
       !profile.id ||
       !profile.userAgent ||
+      !Array.isArray(profile.expectedPrompts) ||
+      !Array.isArray(profile.expectedResources) ||
       !Array.isArray(profile.expectedTools)
     ) {
       throw new Error(`Invalid MCP client profile: ${JSON.stringify(profile)}`);
     }
 
     return {
+      expectedPrompts: profile.expectedPrompts,
+      expectedResources: profile.expectedResources,
       expectedTools: profile.expectedTools,
       id: profile.id,
       userAgent: profile.userAgent,

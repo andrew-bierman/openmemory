@@ -38,6 +38,15 @@ https://openmemory-api.abbierman101.workers.dev/.well-known/oauth-protected-reso
 - `profile`: returns stable and current profile context.
 - `forget`: soft-forgets a memory by id.
 
+## Resources
+
+- `openmemory://profile`: stable and current profile context for the authenticated tenant.
+- `openmemory://recent`: the most recent active memories for the authenticated tenant.
+
+## Prompts
+
+- `context`: returns profile plus relevant recall context for a client-provided task or question.
+
 ## Generic Client Config
 
 Use this shape for MCP clients that support streamable HTTP plus OAuth:
@@ -91,8 +100,9 @@ The TanStack app MCP panel shows the streamable HTTP URL, OAuth issuer,
 authorization metadata URL, protected resource metadata URL, and the same
 connection list and revoke actions.
 
-See [MCP compatibility](mcp-compatibility.md) for the protocol matrix, tested
-client request shapes, and known external-client dogfooding gaps.
+See [MCP compatibility](mcp-compatibility.md) for the protocol matrix, tools,
+resources, prompts, tested client request shapes, and known external-client
+dogfooding gaps.
 
 For a repeatable local named-client check, run:
 

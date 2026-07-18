@@ -1,6 +1,9 @@
 {
   "$schema": "https://openmemory.local/schemas/mcp-client-profiles.schema.json",
   "baseUrl": "https://openmemory-api.abbierman101.workers.dev",
+  "expectedPrompts": ["context"],
+  "expectedResources": ["openmemory://profile", "openmemory://recent"],
+  "expectedTools": ["remember", "recall", "profile", "forget"],
   "profiles": [
     {
       "id": "official-typescript-sdk",
@@ -8,6 +11,8 @@
       "status": "tested-in-ci",
       "transport": "streamable-http",
       "userAgent": "OpenMemory-MCP-SDK-Smoke",
+      "expectedPrompts": ["context"],
+      "expectedResources": ["openmemory://profile", "openmemory://recent"],
       "expectedTools": ["remember", "recall", "profile", "forget"],
       "notes": "Uses StreamableHTTPClientTransport locally in CI."
     },
@@ -17,6 +22,8 @@
       "status": "config-shape-smoke",
       "transport": "streamable-http",
       "userAgent": "MCP-Inspector/OpenMemory-Smoke",
+      "expectedPrompts": ["context"],
+      "expectedResources": ["openmemory://profile", "openmemory://recent"],
       "expectedTools": ["remember", "recall", "profile", "forget"],
       "notes": "Manual UI OAuth callback dogfooding remains useful before broad hosted launch."
     },
@@ -26,6 +33,8 @@
       "status": "config-shape-smoke",
       "transport": "streamable-http",
       "userAgent": "Cursor/OpenMemory-Smoke",
+      "expectedPrompts": ["context"],
+      "expectedResources": ["openmemory://profile", "openmemory://recent"],
       "expectedTools": ["remember", "recall", "profile", "forget"],
       "notes": "Requires the user/client OAuth flow against the deployed Worker in real Cursor."
     },
@@ -35,6 +44,8 @@
       "status": "config-shape-smoke",
       "transport": "streamable-http",
       "userAgent": "Claude-MCP/OpenMemory-Smoke",
+      "expectedPrompts": ["context"],
+      "expectedResources": ["openmemory://profile", "openmemory://recent"],
       "expectedTools": ["remember", "recall", "profile", "forget"],
       "notes": "Requires provider-side OAuth configuration in real Claude surfaces."
     },
@@ -44,6 +55,8 @@
       "status": "config-shape-smoke",
       "transport": "streamable-http",
       "userAgent": "ChatGPT-Connector/OpenMemory-Smoke",
+      "expectedPrompts": ["context"],
+      "expectedResources": ["openmemory://profile", "openmemory://recent"],
       "expectedTools": ["remember", "recall", "profile", "forget"],
       "notes": "Requires provider-side OAuth configuration in real ChatGPT connector surfaces."
     }

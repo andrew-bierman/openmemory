@@ -1098,20 +1098,94 @@ test("MCP streamable HTTP compatibility covers handshake and optional surfaces",
   expect(JSON.stringify(tools.result)).toContain("profile");
   expect(JSON.stringify(tools.result)).toContain("forget");
 
-  for (const method of ["resources/list", "prompts/list"]) {
-    const response = await getJson<JsonRpcResponse>(
+  const remember = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "remember",
+        method: "tools/call",
+        params: {
+          name: "remember",
+          arguments: {
+            content:
+              "MCP resources and prompts expose OpenMemory launch context.",
+            tags: ["mcp", "resources"],
+            type: "fact",
+          },
+        },
+      }),
+    }),
+  );
+  expect(JSON.stringify(remember.result)).toContain("Stored");
+
+  const resources = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "resources",
+        method: "resources/list",
+      }),
+    }),
+  );
+  expect(resources.error).toBeUndefined();
+  expect(JSON.stringify(resources.result)).toContain("openmemory://profile");
+  expect(JSON.stringify(resources.result)).toContain("openmemory://recent");
+
+  for (const uri of ["openmemory://profile", "openmemory://recent"]) {
+    const resource = await getJson<JsonRpcResponse>(
       await worker.fetch("/mcp", {
         method: "POST",
         headers,
         body: JSON.stringify({
           jsonrpc: "2.0",
-          id: method,
-          method,
+          id: uri,
+          method: "resources/read",
+          params: { uri },
         }),
       }),
     );
-    expect(response.result ?? response.error).toBeTruthy();
+    expect(resource.error).toBeUndefined();
+    expect(JSON.stringify(resource.result)).toContain("launch context");
   }
+
+  const prompts = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "prompts",
+        method: "prompts/list",
+      }),
+    }),
+  );
+  expect(prompts.error).toBeUndefined();
+  expect(JSON.stringify(prompts.result)).toContain("context");
+
+  const contextPrompt = await getJson<JsonRpcResponse>(
+    await worker.fetch("/mcp", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "context-prompt",
+        method: "prompts/get",
+        params: {
+          name: "context",
+          arguments: {
+            query: "launch context",
+            limit: "5",
+          },
+        },
+      }),
+    }),
+  );
+  expect(contextPrompt.error).toBeUndefined();
+  expect(JSON.stringify(contextPrompt.result)).toContain("launch context");
 }, 45_000);
 
 test("worker emits operational headers and rate limits repeated requests", async () => {

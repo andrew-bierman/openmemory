@@ -3,12 +3,17 @@ import { resolve } from "node:path";
 
 type McpProfileConfig = {
   baseUrl: string;
+  expectedPrompts: string[];
+  expectedResources: string[];
+  expectedTools: string[];
   oauth: {
     authorizationServerPath: string;
     protectedResourcePath: string;
     scopes: string[];
   };
   profiles: Array<{
+    expectedPrompts: string[];
+    expectedResources: string[];
     expectedTools: string[];
     id: string;
     label: string;
@@ -20,6 +25,8 @@ type McpProfileConfig = {
   serverPath: string;
 };
 
+const REQUIRED_PROMPTS = ["context"];
+const REQUIRED_RESOURCES = ["openmemory://profile", "openmemory://recent"];
 const REQUIRED_TOOLS = ["remember", "recall", "profile", "forget"];
 const REQUIRED_SCOPES = ["openid", "profile", "memory:read", "memory:write"];
 const configPath = resolve("config/mcp-client-profiles.json");
@@ -58,6 +65,36 @@ for (const scope of REQUIRED_SCOPES) {
   assert(config.oauth.scopes.includes(scope), `Missing OAuth scope ${scope}.`);
 }
 
+for (const prompt of REQUIRED_PROMPTS) {
+  assert(
+    config.expectedPrompts.includes(prompt),
+    `Missing MCP prompt ${prompt}.`,
+  );
+  assert(
+    docs.includes(prompt),
+    `docs/mcp-compatibility.md must mention ${prompt}.`,
+  );
+}
+
+for (const resource of REQUIRED_RESOURCES) {
+  assert(
+    config.expectedResources.includes(resource),
+    `Missing MCP resource ${resource}.`,
+  );
+  assert(
+    docs.includes(resource),
+    `docs/mcp-compatibility.md must mention ${resource}.`,
+  );
+}
+
+for (const tool of REQUIRED_TOOLS) {
+  assert(config.expectedTools.includes(tool), `Missing MCP tool ${tool}.`);
+  assert(
+    docs.includes(tool),
+    `docs/mcp-compatibility.md must mention ${tool}.`,
+  );
+}
+
 const ids = new Set<string>();
 for (const profile of config.profiles) {
   assert(!ids.has(profile.id), `Duplicate MCP profile id ${profile.id}.`);
@@ -75,6 +112,18 @@ for (const profile of config.profiles) {
     profile.transport === "streamable-http",
     `${profile.id} must use streamable-http.`,
   );
+  for (const prompt of config.expectedPrompts) {
+    assert(
+      profile.expectedPrompts.includes(prompt),
+      `${profile.id} must expect prompt ${prompt}.`,
+    );
+  }
+  for (const resource of config.expectedResources) {
+    assert(
+      profile.expectedResources.includes(resource),
+      `${profile.id} must expect resource ${resource}.`,
+    );
+  }
   for (const tool of REQUIRED_TOOLS) {
     assert(
       profile.expectedTools.includes(tool),
@@ -106,6 +155,18 @@ function assertProfileConfig(
   const config = value as Partial<McpProfileConfig>;
   assert(typeof config.baseUrl === "string", "baseUrl is required.");
   assert(typeof config.serverPath === "string", "serverPath is required.");
+  assert(
+    Array.isArray(config.expectedPrompts),
+    "expectedPrompts must be an array.",
+  );
+  assert(
+    Array.isArray(config.expectedResources),
+    "expectedResources must be an array.",
+  );
+  assert(
+    Array.isArray(config.expectedTools),
+    "expectedTools must be an array.",
+  );
   assert(Array.isArray(config.profiles), "profiles must be an array.");
   assert(
     typeof config.oauth === "object" && config.oauth !== null,
@@ -135,6 +196,14 @@ function assertProfileConfig(
     assert(
       typeof candidate.userAgent === "string",
       `${candidate.id} userAgent is required.`,
+    );
+    assert(
+      Array.isArray(candidate.expectedPrompts),
+      `${candidate.id} expectedPrompts must be an array.`,
+    );
+    assert(
+      Array.isArray(candidate.expectedResources),
+      `${candidate.id} expectedResources must be an array.`,
     );
     assert(
       Array.isArray(candidate.expectedTools),
