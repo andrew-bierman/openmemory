@@ -40,6 +40,8 @@
     "test:benchmark:live": "OPENMEMORY_BENCHMARK_REPORT=.tmp/benchmark-reports/live-production.jsonl bun run --cwd apps/api test:live:benchmark",
     "test:scale:local": "OPENMEMORY_BENCHMARK_REPORT=.tmp/benchmark-reports/scale-local.jsonl bun run --cwd apps/api test:scale",
     "benchmark:import": "bun scripts/import-memorybench-fixture.ts",
+    "benchmark:trend": "bun scripts/benchmark-trend-report.ts",
+    "benchmark:trend:self-test": "bun scripts/benchmark-trend-report.ts --self-test",
     "test:mcp:sdk": "bun run build:web-shell && bun scripts/mcp-sdk-smoke.ts",
     "test:integration:local": "bun run --cwd apps/api test:integration",
     "test:integration:docker": "docker compose -f docker-compose.test.yml run --build --rm local-wrangler-integration",

@@ -134,7 +134,16 @@ Use the `Live Production Benchmark` workflow for recurring hosted graph
 performance evidence. It runs the same live benchmark command, defaults to an
 80-memory synthetic graph, runs on a daily schedule, and uploads
 `live-production-benchmark` artifacts for comparison across production
-deployments.
+deployments. The workflow restores recent successful benchmark artifacts,
+combines them with the current run, and uploads
+`.tmp/benchmark-reports/live-production-summary.md` with latest, average, best,
+worst, threshold, and run-over-run delta summaries.
+
+To generate the same summary from local JSONL files:
+
+```sh
+bun run benchmark:trend -- .tmp/benchmark-reports/live-production.jsonl --out .tmp/benchmark-reports/live-production-summary.md
+```
 
 ## Release Evidence
 
@@ -144,6 +153,7 @@ For each release, record:
 - local gate result
 - live gate result, if run
 - live production benchmark result, if run
+- live production benchmark trend summary, if run
 - Cloudflare Workers Build result
 - R2 lifecycle policy verification result
 - known skipped checks or production limitations
