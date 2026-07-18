@@ -36,7 +36,9 @@ The monitor writes `openmemory.scheduled_health` Analytics Engine datapoints on
 every run. When a check fails, it logs
 `openmemory.scheduled_health_failed` and sends a JSON alert if either
 `OPENMEMORY_ALERT_WEBHOOK_URL` or `OPENMEMORY_ALERT_EMAIL_ENDPOINT` is
-configured.
+configured. Set `OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY` to send failed cron
+checks to PagerDuty Events API v2 with a stable dedup key per monitored base
+URL.
 
 For Cloudflare-side alerting, create dashboard or notification policies from the
 saved queries:
@@ -49,9 +51,9 @@ saved queries:
 - alert on any sustained source ingestion or memory extraction worker failure
 
 GitHub scheduled smoke plus the Worker Cron monitor are the default alpha alert
-path. Add Cloudflare Notifications, Grafana, PagerDuty, or another destination
-for escalation and multi-recipient routing before a higher-volume public
-launch.
+path. Add Cloudflare Notifications, Grafana, or another Analytics
+Engine-backed policy path for the sustained threshold alerts before a
+higher-volume public launch.
 
 ## Query Notes
 
