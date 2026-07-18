@@ -69,7 +69,8 @@
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
 - `bun run test:mcp:sdk` dogfoods the MCP endpoint through the official
   TypeScript SDK `StreamableHTTPClientTransport` across named request profiles
-  for the official SDK, MCP Inspector, Cursor, and Claude-style clients.
+  for the official SDK, MCP Inspector, Cursor, Claude-style clients, and
+  ChatGPT-style connector clients.
 - Workers Analytics Engine captures `openmemory.request`,
   `openmemory.request_error`, rate-limit, 5xx, and async worker failure events,
   with saved SQL in `docs/observability-queries.sql`.

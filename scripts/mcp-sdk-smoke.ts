@@ -36,51 +36,21 @@ const CLIENT_PROFILES = [
       "user-agent": "Claude-MCP/OpenMemory-Smoke",
     },
   },
-] as const;
-
-const port = await getAvailablePort();
-const persistTo = join(testTmpRoot, crypto.randomUUID());
-await mkdir(persistTo, { recursive: true });
-
-const worker = spawn(
-  "bun",
-  [
-    "run",
-    "--cwd",
-    "apps/api",
-    "wrangler",
-    "dev",
-    "--local",
-    "--port",
-    String(port),
-    "--persist-to",
-    persistTo,
-  ],
   {
-    cwd: repoRoot,
-    env: {
-      ...process.env,
-      NO_COLOR: "1",
-      OPENMEMORY_RATE_LIMIT_PER_MINUTE: "2000",
-      WRANGLER_SEND_METRICS: "false",
+    name: "chatgpt-connector-mcp-config-shape",
+    headers: {
+      "user-agent": "ChatGPT-Connector/OpenMemory-Smoke",
     },
   },
-);
+] as const;
 
-const output: string[] = [];
-collectOutput(worker.stdout, output);
-collectOutput(worker.stderr, output);
-
+const worker = await startWorker();
 try {
-  const baseUrl = `http://127.0.0.1:${port}`;
-  await waitForHealth(baseUrl, worker, output);
   for (const profile of CLIENT_PROFILES) {
-    await runSdkSmoke(baseUrl, profile);
+    await runSdkSmoke(worker.baseUrl, profile);
   }
 } finally {
-  worker.kill();
-  await waitForExit(worker);
-  await rm(persistTo, { force: true, recursive: true });
+  await worker.stop();
 }
 
 async function runSdkSmoke(
@@ -142,6 +112,89 @@ function assertIncludes(values: string[], expected: string) {
   if (!values.includes(expected)) {
     throw new Error(`Expected ${expected}; got ${values.join(", ")}`);
   }
+}
+
+async function startWorker() {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await startWorkerOnce();
+    } catch (error) {
+      lastError = error;
+      if (!isWranglerAddressInUse(error) || attempt === 3) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+async function startWorkerOnce() {
+  const port = await getAvailablePort();
+  const persistTo = join(testTmpRoot, crypto.randomUUID());
+  await mkdir(persistTo, { recursive: true });
+
+  const proc = spawn(
+    "bun",
+    [
+      "run",
+      "--cwd",
+      "apps/api",
+      "wrangler",
+      "dev",
+      "--local",
+      "--port",
+      String(port),
+      "--persist-to",
+      persistTo,
+    ],
+    {
+      cwd: repoRoot,
+      env: {
+        ...process.env,
+        NO_COLOR: "1",
+        OPENMEMORY_RATE_LIMIT_PER_MINUTE: "2000",
+        WRANGLER_SEND_METRICS: "false",
+      },
+    },
+  );
+
+  const output: string[] = [];
+  collectOutput(proc.stdout, output);
+  collectOutput(proc.stderr, output);
+
+  const baseUrl = `http://127.0.0.1:${port}`;
+  try {
+    await waitForHealth(baseUrl, proc, output);
+  } catch (error) {
+    await stopWorker(proc, persistTo);
+    throw error;
+  }
+
+  return {
+    baseUrl,
+    stop: () => stopWorker(proc, persistTo),
+  };
+}
+
+async function stopWorker(
+  proc: ChildProcessWithoutNullStreams,
+  persistTo: string,
+) {
+  proc.kill("SIGTERM");
+  await Promise.race([waitForExit(proc), sleep(3_000)]);
+  if (proc.exitCode === null) {
+    proc.kill("SIGKILL");
+    await waitForExit(proc);
+  }
+  await rm(persistTo, { force: true, recursive: true });
+}
+
+function isWranglerAddressInUse(error: unknown) {
+  return (
+    error instanceof Error && error.message.includes("Address already in use")
+  );
 }
 
 async function waitForHealth(
