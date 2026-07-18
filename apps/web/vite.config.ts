@@ -18,12 +18,33 @@ export default defineConfig({
             return undefined;
           }
 
-          if (id.includes("react-force-graph-2d")) {
-            return "graph";
+          if (
+            id.includes("/react/") ||
+            id.includes("/react-dom/") ||
+            id.includes("/scheduler/")
+          ) {
+            return "react-vendor";
           }
 
-          if (id.includes("recharts") || id.includes("d3-")) {
-            return "charts";
+          if (id.includes("/@tanstack/")) {
+            return "tanstack-vendor";
+          }
+
+          if (id.includes("/recharts/")) {
+            return "charts-vendor";
+          }
+
+          if (id.includes("/d3-")) {
+            return "d3-vendor";
+          }
+
+          if (
+            id.includes("/react-force-graph-2d/") ||
+            id.includes("/force-graph/") ||
+            id.includes("/kapsule/") ||
+            id.includes("/lodash-es/")
+          ) {
+            return "graph-vendor";
           }
 
           return undefined;
