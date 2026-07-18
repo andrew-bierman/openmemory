@@ -42,7 +42,7 @@ export function getRecentActivity(
     return {
       key: date.toISOString().slice(0, 10),
       label: date
-        .toLocaleDateString(undefined, { weekday: "short" })
+        .toLocaleDateString(undefined, { timeZone: "UTC", weekday: "short" })
         .slice(0, 3),
       count: 0,
       percent: 0,

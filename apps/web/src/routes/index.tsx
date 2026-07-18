@@ -94,6 +94,8 @@ import {
 } from "../dashboard-model";
 import { Route as rootRoute } from "./__root";
 
+const INITIAL_ACTIVITY_NOW = new Date("2026-01-07T00:00:00.000Z");
+
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
@@ -168,6 +170,7 @@ function Home() {
   const [profileName, setProfileName] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<"admin" | "member">("member");
+  const [activityNow, setActivityNow] = useState(INITIAL_ACTIVITY_NOW);
   const [tags, setTags] = useState("");
   const [type, setType] = useState("fact");
   const [recallDraft, setRecallDraft] = useState(
@@ -292,7 +295,10 @@ function Home() {
     () => getDashboardMetrics(memories, graphStats, oauthConnections),
     [memories, graphStats, oauthConnections],
   );
-  const recentActivity = useMemo(() => getRecentActivity(memories), [memories]);
+  const recentActivity = useMemo(
+    () => getRecentActivity(memories, activityNow),
+    [activityNow, memories],
+  );
   const typeDistribution = useMemo(
     () => getTypeDistribution(memories),
     [memories],
@@ -314,6 +320,10 @@ function Home() {
       setProfileName(nextName);
     }
   }, [account?.user.name, profileName, sessionUser?.name]);
+
+  useEffect(() => {
+    setActivityNow(new Date());
+  }, []);
 
   const invalidateDashboard = useCallback(async () => {
     await Promise.all([
