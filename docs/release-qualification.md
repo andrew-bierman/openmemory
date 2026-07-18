@@ -15,6 +15,14 @@ The release validation command runs formatting, secret scanning, type checks,
 unit/integration tests, the production build, MCP SDK smoke tests, local
 Playwright E2E, recall benchmarks, and the heavier opt-in scale gate.
 
+The local browser E2E suite also captures launch-review screenshots under
+`.tmp/screenshots/launch-readiness/`. Those artifacts are intentionally ignored
+by git and can be regenerated with:
+
+```sh
+bun run test:e2e:local
+```
+
 For a faster pull-request loop, run the same checks individually:
 
 ```sh
@@ -65,6 +73,7 @@ For each release, record:
 - live gate result, if run
 - Cloudflare Workers Build result
 - known skipped checks or production limitations
+- screenshot capture path for the current launch-review pass, when relevant
 
 Do not publish a release as broadly production-ready while launch readiness
 still has unchecked operational controls, async ingestion, extraction workers,

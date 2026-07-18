@@ -49,6 +49,11 @@
 - `/v1/graph/stats` exposes graph size counters, relationship distribution, and
   graph density; `/v1/graph/relationships` exposes the relationship catalog to
   clients.
+- `/v1/readiness` exposes a tenant-scoped operational snapshot for graph,
+  relationship, auth, MCP, binding, export, and rate-limit readiness without
+  leaking secrets or memory contents.
+- `docs/data-model.md` records the current D1, Durable Object, Vectorize, R2,
+  Queue/Workflow, OAuth, MCP, and readiness data shape.
 - Local Wrangler integration includes a moderate graph-scale recall smoke, and
   `bun run test:scale:local` runs a heavier bounded 360-memory graph check.
 - Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.

@@ -150,6 +150,7 @@ Useful endpoints:
 - `POST /v1/sources/async`
 - `GET /v1/sources/:sourceId`
 - `GET /v1/profile`
+- `GET /v1/readiness`
 - `GET /v1/graph/stats`
 - `GET /v1/graph/relationships`
 - `GET /v1/graph/:id/neighbors`
@@ -290,6 +291,7 @@ remaining implementation tracks.
 - [Deployment](docs/deployment.md)
 - [Operations runbook](docs/operations.md)
 - [Observability](docs/observability.md)
+- [Data model](docs/data-model.md)
 - [Launch announcement](docs/launch-announcement.md)
 - [MCP setup](docs/mcp.md)
 - [MCP compatibility](docs/mcp-compatibility.md)

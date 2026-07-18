@@ -1,4 +1,9 @@
-import type { GraphEdge, GraphStats, Memory } from "@openmemory/client";
+import type {
+  GraphEdge,
+  GraphStats,
+  Memory,
+  ReadinessSnapshot,
+} from "@openmemory/client";
 import { describe, expect, test } from "vitest";
 import {
   getActivitySummary,
@@ -10,6 +15,7 @@ import {
   getLifecycleDistribution,
   getMemoryLabel,
   getMemoryNeighborDetails,
+  getReadinessSummary,
   getRecentActivity,
   getRelationshipDistribution,
   getRelationshipReadinessSummary,
@@ -222,6 +228,33 @@ describe("dashboard model", () => {
     });
   });
 
+  test("summarizes operations readiness from binding and warning state", () => {
+    expect(getReadinessSummary(readiness)).toEqual({
+      configuredBindings: 10,
+      graphStatus: "Typed graph",
+      mcpStatus: "Discoverable",
+      productionReady: true,
+      totalBindings: 10,
+      warningCount: 0,
+    });
+
+    expect(
+      getReadinessSummary({
+        ...readiness,
+        graph: {
+          ...readiness.graph,
+          relationshipTypes: 0,
+          totalEdges: 0,
+        },
+        warnings: ["semantic_index_not_fully_configured"],
+      }),
+    ).toMatchObject({
+      graphStatus: "Needs edges",
+      productionReady: false,
+      warningCount: 1,
+    });
+  });
+
   test("filters knowledge map by content, tags, entities, and memory type", () => {
     const graph = getKnowledgeMap(memories, edges, null, {
       search: "cloudflare",
@@ -415,6 +448,65 @@ const oauthConnection = {
   scopes: ["memory:read"],
   redirectUris: ["http://localhost/callback"],
   disabled: false,
+};
+
+const readiness: ReadinessSnapshot = {
+  service: "openmemory-api",
+  generatedAt: "2026-07-17T12:00:00.000Z",
+  tenant: {
+    id: "local-user",
+    source: "local-header",
+    localDevelopment: true,
+  },
+  graph: {
+    activeMemories: 240,
+    totalMemories: 260,
+    totalEdges: 720,
+    relationshipTypes: 6,
+    graphDensity: 0.03,
+    entityCount: 220,
+    tagCount: 30,
+  },
+  relationships: {
+    catalogSize: 12,
+    top: [],
+  },
+  bindings: {
+    analytics: true,
+    authDb: true,
+    durableObjects: true,
+    memoryExtractionQueue: true,
+    memoryExtractionWorkflow: true,
+    r2Exports: true,
+    sourceIngestionQueue: true,
+    sourceIngestionWorkflow: true,
+    vectorize: true,
+    workersAi: true,
+  },
+  auth: {
+    mode: "local-development-header",
+    betterAuthUrl: "http://127.0.0.1:8787",
+    socialProviders: {
+      github: false,
+      google: false,
+    },
+  },
+  mcp: {
+    endpoint: "http://127.0.0.1:8787/mcp",
+    authorizationServer:
+      "http://127.0.0.1:8787/.well-known/oauth-authorization-server/api/auth",
+    protectedResource:
+      "http://127.0.0.1:8787/.well-known/oauth-protected-resource/mcp",
+    tools: ["remember", "recall", "profile", "forget"],
+  },
+  rateLimit: {
+    enabled: true,
+    limitPerMinute: 600,
+  },
+  exports: {
+    r2Configured: true,
+  },
+  warnings: [],
 };
 
 function memory(

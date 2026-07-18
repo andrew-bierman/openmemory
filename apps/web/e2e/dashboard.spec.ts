@@ -1,3 +1,4 @@
+import { mkdir } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 
 const API_URL = "http://127.0.0.1:54150";
@@ -10,7 +11,9 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   page,
 }) => {
   const tenant = `ui-e2e-${crypto.randomUUID()}`;
+  const screenshotDir = ".tmp/screenshots/launch-readiness";
   const errors: string[] = [];
+  await mkdir(screenshotDir, { recursive: true });
 
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("console", (message) => {
@@ -71,6 +74,10 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.getByText("Page 1 of 1")).toBeVisible();
   await page.getByLabel("Rows per page").selectOption("10");
   await expect(page.getByLabel("Rows per page")).toHaveValue("10");
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/01-recall-dashboard.png`,
+  });
 
   await page.getByLabel("Recall query").fill("cloudflare graph");
   await page
@@ -173,6 +180,10 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.locator(".graph-node-card")).toHaveCount(1);
 
   await page.getByRole("button", { name: "Fit graph" }).click();
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/02-knowledge-map-filtered.png`,
+  });
 
   await page
     .locator(".tabs")
@@ -197,6 +208,10 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.getByLabel("Member email")).toBeDisabled();
   await expect(page.getByLabel("Role")).toBeDisabled();
   await expect(page.getByText("No hosted workspace loaded")).toBeVisible();
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/03-admin-local-mode.png`,
+  });
 
   await page
     .locator(".tabs")
@@ -218,6 +233,30 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     PROTECTED_RESOURCE_METADATA_URL,
   );
   await expect(page.getByText("No authorized clients")).toBeVisible();
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/04-mcp-setup.png`,
+  });
+
+  await page
+    .locator(".tabs")
+    .getByRole("button", { name: "Operations", exact: true })
+    .click();
+  await expect(page).toHaveURL(/view=operations/);
+  await expect(page.getByLabel("Operations readiness")).toContainText(
+    "Launch readiness",
+  );
+  await expect(page.getByText("Cloudflare bindings")).toBeVisible();
+  await expect(page.getByText("MCP discovery")).toBeVisible();
+  await expect(page.getByText("Tenant and auth")).toBeVisible();
+  await expect(page.locator(".binding-grid")).toContainText("Durable Objects");
+  await expect(page.locator(".binding-grid")).toContainText(
+    "Source Ingestion Queue",
+  );
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/05-operations-readiness.png`,
+  });
 
   await page.goto("/?view=admin");
   await expect(page.locator(".admin-grid")).toBeVisible();
@@ -256,6 +295,10 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await page.reload({ waitUntil: "networkidle" });
   await expect(page.getByText("Start your memory graph")).toBeVisible();
   await expect(page.getByText("Connect MCP after OAuth sign-in")).toBeVisible();
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/06-empty-state.png`,
+  });
 
   await page.getByLabel("Tenant").fill(tenant);
   await page.getByRole("button", { name: /refresh/i }).click();
@@ -309,6 +352,10 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.getByLabel("Graph neighbor relationships")).toContainText(
     "Recall combines graph traversal",
   );
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/07-selected-memory-graph.png`,
+  });
   const neighborInspectButtons = page
     .getByLabel("Graph neighbor relationships")
     .getByRole("button", { name: "Inspect" });
@@ -353,9 +400,21 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     "Chunks",
   );
   await expect(page.getByLabel("Source ingest summary")).toContainText("Edges");
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/08-ingest-source.png`,
+  });
   await page.getByRole("button", { name: "Inspect first chunk" }).click();
   await expect(page).toHaveURL(/view=graph/);
   await expect(page).toHaveURL(/memoryId=/);
+
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/?view=operations", { waitUntil: "networkidle" });
+  await expect(page.getByLabel("Operations readiness")).toBeVisible();
+  await page.screenshot({
+    fullPage: true,
+    path: `${screenshotDir}/09-mobile-operations.png`,
+  });
 
   expect(errors).toEqual([]);
 });

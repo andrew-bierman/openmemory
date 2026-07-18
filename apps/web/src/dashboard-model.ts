@@ -3,6 +3,7 @@ import type {
   GraphStats,
   Memory,
   OAuthConnection,
+  ReadinessSnapshot,
   SourceIngestResult,
 } from "@openmemory/client";
 
@@ -266,6 +267,49 @@ export function getSourceIngestSummary(
     memoryCount: result.memories.length,
     sourceId: result.sourceId,
     typeCount: memoryTypes.length,
+  };
+}
+
+export function getReadinessSummary(
+  readiness: ReadinessSnapshot | null,
+): ReadinessSummary {
+  if (!readiness) {
+    return {
+      configuredBindings: 0,
+      graphStatus: "Unknown",
+      mcpStatus: "Unknown",
+      productionReady: false,
+      totalBindings: 0,
+      warningCount: 0,
+    };
+  }
+
+  const bindings = Object.values(readiness.bindings);
+  const configuredBindings = bindings.filter(Boolean).length;
+  const graphStatus =
+    readiness.graph.activeMemories === 0
+      ? "Empty"
+      : readiness.graph.totalEdges === 0
+        ? "Needs edges"
+        : readiness.graph.relationshipTypes >= 3
+          ? "Typed graph"
+          : "Basic graph";
+  const mcpStatus =
+    readiness.mcp.tools.length >= 4 && readiness.auth.betterAuthUrl
+      ? "Discoverable"
+      : "Incomplete";
+
+  return {
+    configuredBindings,
+    graphStatus,
+    mcpStatus,
+    productionReady:
+      readiness.warnings.length === 0 &&
+      readiness.bindings.authDb &&
+      readiness.bindings.durableObjects &&
+      readiness.rateLimit.enabled,
+    totalBindings: bindings.length,
+    warningCount: readiness.warnings.length,
   };
 }
 
@@ -571,6 +615,20 @@ export type SourceIngestSummary = {
   memoryCount: number;
   sourceId: string;
   typeCount: number;
+};
+
+export type ReadinessSummary = {
+  configuredBindings: number;
+  graphStatus:
+    | "Basic graph"
+    | "Empty"
+    | "Needs edges"
+    | "Typed graph"
+    | "Unknown";
+  mcpStatus: "Discoverable" | "Incomplete" | "Unknown";
+  productionReady: boolean;
+  totalBindings: number;
+  warningCount: number;
 };
 
 export type KnowledgeNode = {
