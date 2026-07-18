@@ -205,12 +205,26 @@ bun run test:e2e:ui
 
 It accepts an optional `base_url` input and defaults to the current production Worker URL.
 
-For optional live-smoke cleanup and the fallback manual deploy workflow, configure:
+For optional live-smoke cleanup, the fallback manual deploy workflow, and the
+scheduled CI analytics threshold job, configure:
 
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
 
-The API token needs permission to operate D1 migrations and, for the fallback deploy workflow, deploy Workers for the target Cloudflare account. The live-smoke cleanup step runs `scripts/cleanup-live-smoke-auth.sql` against D1 after every smoke attempt when those secrets are present.
+The API token needs permission to operate D1 migrations and, for the fallback
+deploy workflow, deploy Workers for the target Cloudflare account. It also needs
+`Account | Account Analytics | Read` for the scheduled CI analytics threshold job,
+which runs:
+
+```sh
+bun run observability:alerts
+```
+
+That script queries the `openmemory_events` Workers Analytics Engine dataset
+through Cloudflare's SQL API and exits nonzero when request-error, 5xx,
+rate-limit, graph/RAG latency, or async worker failure thresholds breach. The
+live-smoke cleanup step runs `scripts/cleanup-live-smoke-auth.sql` against D1
+after every smoke attempt when those secrets are present.
 
 ## Docker Test Runner
 

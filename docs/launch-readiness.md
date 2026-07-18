@@ -46,9 +46,9 @@ larger hosted push.
 - Operational headers and request IDs are live on `/health`.
 - Workers Analytics Engine receives request, error, rate-limit, and async
   worker telemetry when deployed with the `OPENMEMORY_ANALYTICS` binding.
-- Saved Workers Analytics Engine SQL queries, graph/RAG performance queries,
-  hourly live-smoke alerting, and a 15-minute Worker Cron health monitor cover
-  the alpha operations baseline.
+- Saved Workers Analytics Engine SQL queries, executable threshold checks,
+  graph/RAG performance queries, hourly live-smoke alerting, and a 15-minute
+  Worker Cron health monitor cover the alpha operations baseline.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
 - `docs/data-model.md` documents the current D1, Durable Object, Vectorize, R2,
@@ -130,8 +130,9 @@ larger hosted push.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
   `openmemory.request_error`, 429s, and 5xxs.
 - [x] Alerting exists for sustained errors, missing bindings, or auth failures
-  through saved queries, hourly live smoke, and the Worker Cron health monitor;
-  PagerDuty Events API v2 can receive direct cron-failure escalation.
+  through saved queries, the scheduled CI analytics threshold job, hourly
+  live smoke, and the Worker Cron health monitor; PagerDuty Events API v2 can
+  receive direct cron-failure escalation.
 - [x] GitHub secret scanning or an equivalent secret-detection control is
   enabled for public contributions.
 - [x] Documented rollback procedure includes Worker version rollback and D1

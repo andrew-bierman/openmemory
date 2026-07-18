@@ -40,20 +40,28 @@ configured. Set `OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY` to send failed cron
 checks to PagerDuty Events API v2 with a stable dedup key per monitored base
 URL.
 
-For Cloudflare-side alerting, create dashboard or notification policies from the
-saved queries:
+The scheduled CI `Analytics Engine threshold check` job runs every 15 minutes when
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repository secrets are
+configured. It executes `bun run observability:alerts`, queries Workers
+Analytics Engine through Cloudflare's SQL API, and fails the workflow when any
+threshold below breaches. The token needs `Account | Account Analytics | Read`
+permission, matching Cloudflare's SQL API requirements.
 
-- alert on any sustained `openmemory.request_error`
-- alert when 5xx responses exceed 2% for 5 minutes
+The workflow thresholds are:
+
+- alert on any `openmemory.request_error` in 5 minutes
+- alert when 5xx responses exceed 2% for 5 minutes after minimum request volume
 - alert when `/v1/search`, `/v1/context`, `/v1/graph/stats`, `/v1/sources`,
   or `/mcp` p95 latency exceeds 2s for 10 minutes
-- alert when 429 responses exceed 5% for 10 minutes
-- alert on any sustained source ingestion or memory extraction worker failure
+- alert when rate-limited responses exceed 5% for 10 minutes after minimum
+  request volume
+- alert on any source ingestion or memory extraction worker failure in 5 minutes
 
 GitHub scheduled smoke plus the Worker Cron monitor are the default alpha alert
-path. Add Cloudflare Notifications, Grafana, or another Analytics
-Engine-backed policy path for the sustained threshold alerts before a
-higher-volume public launch.
+path. The scheduled CI `Analytics Engine threshold check` job is the first
+Analytics Engine-backed threshold path. Cloudflare Notifications, Grafana, or
+another dedicated policy destination can mirror those thresholds when broader
+operator routing is needed.
 
 ## Query Notes
 
@@ -61,3 +69,6 @@ Workers Analytics Engine exposes the dataset through Cloudflare's SQL API. The
 saved queries intentionally use basic aggregates (`count`, `avg`, `max`, and
 `sum`) so they remain portable across dashboard widgets, API calls, and copied
 ad hoc queries.
+The executable alert checker uses the same API endpoint,
+`https://api.cloudflare.com/client/v4/accounts/<account_id>/analytics_engine/sql`,
+and appends `FORMAT JSON` to parse results in Bun.

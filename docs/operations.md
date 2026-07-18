@@ -176,15 +176,21 @@ metadata, writes `openmemory.scheduled_health`, and dispatches
 `OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY` to route those failures directly to a
 PagerDuty Events API v2 service integration.
 
-Add Cloudflare Notifications or equivalent Analytics Engine policy alerts for
-the sustained query thresholds below before a higher-volume launch; the Worker
-Cron path now covers direct health-check escalation.
+The scheduled CI `Analytics Engine threshold check` job runs
+`bun run observability:alerts` every 15 minutes when
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` are configured. It queries
+Workers Analytics Engine through Cloudflare's SQL API and fails when the
+sustained thresholds below breach. Add Cloudflare Notifications, Grafana, or
+another dedicated policy destination later if the team needs routing outside
+GitHub Actions and PagerDuty cron-failure escalation.
 
 Suggested first thresholds:
 
 - 5xx: alert when 5xx rate is greater than 2% for 5 minutes
 - request errors: alert on any sustained nonzero `openmemory.request_error`
 - 429: alert when 429s are greater than 5% of requests for 10 minutes
+- graph/RAG latency: alert when p95 exceeds 2 seconds for 10 minutes
+- async workers: alert on any source ingestion or memory extraction failure
 - auth/MCP: alert on sudden changes rather than absolute volume until normal
   traffic patterns are known
 
