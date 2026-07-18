@@ -1369,6 +1369,22 @@ test("auth helpers keep tenant headers local-only", () => {
 });
 
 async function startWorker(env: Record<string, string> = {}) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await startWorkerOnce(env);
+    } catch (error) {
+      lastError = error;
+      if (!isWranglerAddressInUse(error) || attempt === 3) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+async function startWorkerOnce(env: Record<string, string>) {
   const port = await getAvailablePort();
   const inspectorPort = await getAvailablePort();
   await mkdir(testTmpRoot, { recursive: true });
@@ -1421,7 +1437,18 @@ async function startWorker(env: Record<string, string> = {}) {
   collectOutput(proc.stderr, output);
 
   const baseUrl = `http://127.0.0.1:${port}`;
-  await waitForHealth(baseUrl, proc, output);
+  try {
+    await waitForHealth(baseUrl, proc, output);
+  } catch (error) {
+    proc.kill("SIGTERM");
+    await Promise.race([waitForExit(proc), sleep(3_000)]);
+    if (proc.exitCode === null) {
+      proc.kill("SIGKILL");
+      await waitForExit(proc);
+    }
+    await rm(persistTo, { force: true, recursive: true });
+    throw error;
+  }
 
   return {
     baseUrl,
@@ -1447,6 +1474,12 @@ async function startWorker(env: Record<string, string> = {}) {
       await rm(persistTo, { force: true, recursive: true });
     },
   };
+}
+
+function isWranglerAddressInUse(error: unknown) {
+  return (
+    error instanceof Error && error.message.includes("Address already in use")
+  );
 }
 
 type WorkerProcess = Awaited<ReturnType<typeof startWorker>>;
