@@ -112,7 +112,7 @@ larger hosted push.
 - [x] Live smoke workflow exists.
 - [x] Cloudflare Cron health monitor exists for `/health` and MCP OAuth
   protected-resource metadata, with Analytics Engine telemetry and optional
-  webhook/email alert dispatch.
+  webhook/email/PagerDuty alert dispatch.
 - [x] Latest live smoke proves remote Workers AI and Vectorize semantic recall
   on the current launch candidate. Evidence:
   `https://github.com/andrew-bierman/openmemory/actions/runs/29661917115`
@@ -130,7 +130,8 @@ larger hosted push.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
   `openmemory.request_error`, 429s, and 5xxs.
 - [x] Alerting exists for sustained errors, missing bindings, or auth failures
-  through saved queries, hourly live smoke, and the Worker Cron health monitor.
+  through saved queries, hourly live smoke, and the Worker Cron health monitor;
+  PagerDuty Events API v2 can receive direct cron-failure escalation.
 - [x] GitHub secret scanning or an equivalent secret-detection control is
   enabled for public contributions.
 - [x] Documented rollback procedure includes Worker version rollback and D1

@@ -28,6 +28,7 @@ type MonitorDeps = {
 };
 
 const DEFAULT_BASE_URL = "https://openmemory-api.abbierman101.workers.dev";
+const PAGERDUTY_EVENTS_URL = "https://events.pagerduty.com/v2/enqueue";
 
 export async function runScheduledHealthMonitor(
   env: Env,
@@ -175,6 +176,7 @@ async function notifyScheduledHealthFailure(
   const destinations = [
     env.OPENMEMORY_ALERT_WEBHOOK_URL ? "webhook" : undefined,
     env.OPENMEMORY_ALERT_EMAIL_ENDPOINT ? "email_endpoint" : undefined,
+    env.OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY ? "pagerduty" : undefined,
   ].filter(Boolean) as string[];
   if (destinations.length === 0) {
     return {
@@ -206,6 +208,23 @@ async function notifyScheduledHealthFailure(
       ? postJson(input.fetcher, env.OPENMEMORY_ALERT_EMAIL_ENDPOINT, {
           ...payload,
           subject: "[OpenMemory] scheduled health check failed",
+        })
+      : Promise.resolve(undefined),
+    env.OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY
+      ? postJson(input.fetcher, PAGERDUTY_EVENTS_URL, {
+          routing_key: env.OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY,
+          event_action: "trigger",
+          dedup_key: `openmemory.scheduled_health_failed:${input.baseUrl}`,
+          payload: {
+            summary: `OpenMemory scheduled health failed for ${input.baseUrl}`,
+            source: input.baseUrl,
+            severity: "critical",
+            component: "openmemory-api",
+            group: "production",
+            class: "scheduled-health",
+            timestamp: input.checkedAt,
+            custom_details: payload,
+          },
         })
       : Promise.resolve(undefined),
   ]);

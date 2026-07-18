@@ -129,20 +129,25 @@ monitor:
 ```sh
 bun --cwd apps/api wrangler secret put OPENMEMORY_ALERT_WEBHOOK_URL
 bun --cwd apps/api wrangler secret put OPENMEMORY_ALERT_WEBHOOK_TOKEN
+bun --cwd apps/api wrangler secret put OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY
 ```
 
 `OPENMEMORY_ALERT_WEBHOOK_TOKEN` is optional. If present, the monitor sends it
 as a bearer token to the webhook destination. For email-style routing through a
 separate internal Worker or provider endpoint, set
-`OPENMEMORY_ALERT_EMAIL_ENDPOINT`. `OPENMEMORY_BASE_URL` can override the
-monitored base URL; otherwise the monitor uses `BETTER_AUTH_URL` and then the
-current production Worker URL as fallback.
+`OPENMEMORY_ALERT_EMAIL_ENDPOINT`. For PagerDuty, create an Events API v2
+integration on the target service and store its routing key in
+`OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY`; the monitor sends a `trigger` event
+with a stable dedup key per monitored base URL. `OPENMEMORY_BASE_URL` can
+override the monitored base URL; otherwise the monitor uses `BETTER_AUTH_URL`
+and then the current production Worker URL as fallback.
 
 The Worker Cron Trigger runs every 15 minutes from Wrangler config and checks
 `/health` plus MCP OAuth protected-resource metadata. It writes
 `openmemory.scheduled_health` Analytics Engine datapoints every run and sends
 `openmemory.scheduled_health_failed` JSON alerts on failures when a destination
-is configured.
+is configured. PagerDuty Events API v2 is documented at
+<https://developer.pagerduty.com/docs/events-api-v2-overview>.
 
 ## Cloudflare Git Deploys
 

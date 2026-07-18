@@ -172,10 +172,13 @@ one default alpha alert path. The deployed Worker also has a Cloudflare Cron
 Trigger every 15 minutes that checks `/health` and MCP OAuth protected-resource
 metadata, writes `openmemory.scheduled_health`, and dispatches
 `openmemory.scheduled_health_failed` to `OPENMEMORY_ALERT_WEBHOOK_URL` or
-`OPENMEMORY_ALERT_EMAIL_ENDPOINT` when configured.
+`OPENMEMORY_ALERT_EMAIL_ENDPOINT` when configured. Set
+`OPENMEMORY_ALERT_PAGERDUTY_ROUTING_KEY` to route those failures directly to a
+PagerDuty Events API v2 service integration.
 
-Add Cloudflare Notifications, PagerDuty, or another external paging workflow
-for escalation and multi-recipient routing before a higher-volume launch.
+Add Cloudflare Notifications or equivalent Analytics Engine policy alerts for
+the sustained query thresholds below before a higher-volume launch; the Worker
+Cron path now covers direct health-check escalation.
 
 Suggested first thresholds:
 
