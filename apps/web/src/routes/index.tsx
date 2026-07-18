@@ -40,6 +40,7 @@ import {
   Send,
   ServerCog,
   ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import {
   type FormEvent,
@@ -1326,6 +1327,7 @@ function OperationsReadiness({
 }>) {
   const summary = getReadinessSummary(readiness);
   const semanticIndex = readiness?.semanticIndex ?? null;
+  const rerank = readiness?.rerank ?? null;
   const bindingRows = readiness
     ? Object.entries(readiness.bindings).map(([key, configured]) => ({
         configured,
@@ -1389,6 +1391,13 @@ function OperationsReadiness({
               : "warn"
           }
           value={`${semanticIndex?.expectedVectors ?? 0} current · ${semanticIndex?.staleVectorCandidates ?? 0} stale`}
+        />
+        <ReadinessCard
+          icon={<Sparkles aria-hidden="true" />}
+          label="Rerank"
+          status={summary.rerankStatus}
+          tone={summary.rerankStatus === "Needs AI" ? "warn" : "good"}
+          value={formatRerankCardValue(rerank)}
         />
         <ReadinessCard
           icon={
@@ -1498,6 +1507,40 @@ function OperationsReadiness({
           <div>
             <dt>Stale sample</dt>
             <dd>{semanticIndex?.staleVectorSample.join(", ") || "None"}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="operations-card">
+        <div className="panel-heading">
+          <span>Recall rerank</span>
+          <Badge
+            className={
+              rerank?.status === "misconfigured"
+                ? "border-amber-200 bg-amber-50 text-amber-800"
+                : undefined
+            }
+            variant="outline"
+          >
+            {summary.rerankStatus}
+          </Badge>
+        </div>
+        <dl className="definition-list">
+          <div>
+            <dt>Status</dt>
+            <dd>{rerank?.status ?? "loading"}</dd>
+          </div>
+          <div>
+            <dt>Model</dt>
+            <dd>{rerank?.model ?? "Not configured"}</dd>
+          </div>
+          <div>
+            <dt>Workers AI</dt>
+            <dd>{rerank?.workersAiConfigured ? "configured" : "missing"}</dd>
+          </div>
+          <div>
+            <dt>Timeout budget</dt>
+            <dd>{rerank ? `${rerank.timeoutMs}ms` : "Loading"}</dd>
           </div>
         </dl>
       </section>
@@ -2219,6 +2262,10 @@ function formatBindingLabel(value: string) {
 }
 
 function formatWarningLabel(value: string) {
+  if (value === "rerank_model_requires_workers_ai") {
+    return "Rerank model requires Workers AI";
+  }
+
   return value
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -2237,6 +2284,19 @@ function formatSemanticIndexStatus(
       return "Needs check";
     case "unconfigured":
       return "Unconfigured";
+    default:
+      return "Loading";
+  }
+}
+
+function formatRerankCardValue(rerank: ReadinessSnapshot["rerank"] | null) {
+  switch (rerank?.status) {
+    case "enabled":
+      return `${rerank.timeoutMs}ms budget`;
+    case "misconfigured":
+      return "Workers AI missing";
+    case "disabled":
+      return "Deterministic fallback";
     default:
       return "Loading";
   }

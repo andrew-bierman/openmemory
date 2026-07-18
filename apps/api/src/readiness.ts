@@ -94,7 +94,16 @@ export type ReadinessSnapshot = {
     r2Configured: boolean;
   };
   semanticIndex: SemanticIndexDiagnostic;
+  rerank: RerankReadiness;
   warnings: string[];
+};
+
+type RerankReadiness = {
+  configured: boolean;
+  workersAiConfigured: boolean;
+  model?: string;
+  timeoutMs: number;
+  status: "enabled" | "disabled" | "misconfigured";
 };
 
 export async function getReadinessSnapshot({
@@ -125,6 +134,7 @@ export async function getReadinessSnapshot({
   const rateLimit = getRateLimitSettings(request, env);
   const localDevelopment = isLocalDevelopmentRequest(request);
   const source = sessionTenant ? "session" : "local-header";
+  const rerank = getRerankReadiness(env);
 
   return {
     service: "openmemory-api",
@@ -181,9 +191,11 @@ export async function getReadinessSnapshot({
       r2Configured: Boolean(env.MEMORY_EXPORTS),
     },
     semanticIndex,
+    rerank,
     warnings: getReadinessWarnings({
       env,
       localDevelopment,
+      rerank,
       semanticIndex,
       source,
       stats,
@@ -194,12 +206,14 @@ export async function getReadinessSnapshot({
 function getReadinessWarnings({
   env,
   localDevelopment,
+  rerank,
   semanticIndex,
   source,
   stats,
 }: {
   env: Env;
   localDevelopment: boolean;
+  rerank: RerankReadiness;
   semanticIndex: SemanticIndexDiagnostic;
   source: "session" | "local-header";
   stats: GraphStats;
@@ -214,6 +228,9 @@ function getReadinessWarnings({
   }
   if (!env.MEMORY_VECTORS || !env.AI) {
     warnings.push("semantic_index_not_fully_configured");
+  }
+  if (rerank.status === "misconfigured") {
+    warnings.push("rerank_model_requires_workers_ai");
   }
   if (semanticIndex.status === "needs_repair") {
     warnings.push("semantic_index_needs_repair");
@@ -235,6 +252,35 @@ function getReadinessWarnings({
   }
 
   return warnings;
+}
+
+function getRerankReadiness(env: Env): RerankReadiness {
+  const model = normalizeOptionalEnv(env.OPENMEMORY_RERANK_MODEL);
+  const configured = Boolean(model);
+  const workersAiConfigured = Boolean(env.AI);
+  const timeoutMs = parsePositiveInteger(env.OPENMEMORY_RERANK_TIMEOUT_MS, 900);
+
+  return {
+    configured,
+    workersAiConfigured,
+    ...(model ? { model } : {}),
+    timeoutMs,
+    status: configured
+      ? workersAiConfigured
+        ? "enabled"
+        : "misconfigured"
+      : "disabled",
+  };
+}
+
+function normalizeOptionalEnv(value: string | undefined) {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function parsePositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : fallback;
 }
 
 function resolveResourceBaseUrl(authBaseURL: string) {

@@ -214,6 +214,14 @@ export type SemanticIndexDiagnostic = {
   status: "current" | "needs_repair" | "unchecked" | "unconfigured";
 };
 
+export type RerankReadiness = {
+  configured: boolean;
+  workersAiConfigured: boolean;
+  model?: string;
+  timeoutMs: number;
+  status: "enabled" | "disabled" | "misconfigured";
+};
+
 export type TenantExportCleanupResult = {
   r2Configured: boolean;
   prefix: string;
@@ -327,6 +335,7 @@ export type ReadinessSnapshot = {
     r2Configured: boolean;
   };
   semanticIndex: SemanticIndexDiagnostic;
+  rerank: RerankReadiness;
   warnings: string[];
 };
 

@@ -897,6 +897,13 @@ type ReadinessResponse = {
     repairRecommended: boolean;
     status: "current" | "needs_repair" | "unchecked" | "unconfigured";
   };
+  rerank: {
+    configured: boolean;
+    workersAiConfigured: boolean;
+    model?: string;
+    timeoutMs: number;
+    status: "enabled" | "disabled" | "misconfigured";
+  };
   warnings: string[];
 };
 
