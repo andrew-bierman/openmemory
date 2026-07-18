@@ -49,6 +49,8 @@ to provide the infrastructure layer behind a more portable experience:
   confidence, importance, recency, and currentness.
 - Optional semantic candidate retrieval through Workers AI embeddings and
   Cloudflare Vectorize.
+- Optional Workers AI reranking for API and MCP recall when
+  `OPENMEMORY_RERANK_MODEL` is configured.
 - Semantic index diagnostics that report expected current vectors, stale vector
   candidates, sampled missing vectors, sampled stale vectors, and repair
   recommendations.
@@ -196,6 +198,8 @@ Every response includes `x-openmemory-request-id` and rate-limit headers for
 supportability. Configure the per-isolate safety valve with
 `OPENMEMORY_RATE_LIMIT_PER_MINUTE` or disable it with
 `OPENMEMORY_RATE_LIMIT_ENABLED=false` for controlled environments.
+Set `OPENMEMORY_RERANK_MODEL` to opt into a bounded Workers AI rerank pass over
+recall candidates; leave it unset for deterministic-only recall.
 
 ## MCP
 

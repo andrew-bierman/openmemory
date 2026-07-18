@@ -21,6 +21,8 @@ export type Env = {
   SOURCE_INGESTION_QUEUE?: Queue<SourceIngestionMessage>;
   SOURCE_INGESTION_WORKFLOW?: WorkflowBinding<SourceIngestionMessage>;
   EMBEDDING_MODEL: string;
+  OPENMEMORY_RERANK_MODEL?: string;
+  OPENMEMORY_RERANK_TIMEOUT_MS?: string;
   OPENMEMORY_API_TOKEN?: string;
   OPENMEMORY_RATE_LIMIT_ENABLED?: string;
   OPENMEMORY_RATE_LIMIT_PER_MINUTE?: string;

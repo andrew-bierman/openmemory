@@ -69,7 +69,7 @@
 - Local benchmark and release-qualification runs emit JSONL benchmark evidence
   under `.tmp/benchmark-reports/`; the manual GitHub release workflow uploads
   those files as a `benchmark-reports` artifact.
-- Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness.
+- Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness. When `OPENMEMORY_RERANK_MODEL` is configured with the Workers AI binding, API and MCP recall can also apply a bounded Workers AI rerank pass over the top candidates with deterministic fallback.
 - Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
 - `bun run test:mcp:sdk` dogfoods the MCP endpoint through the official
@@ -129,8 +129,10 @@
     management, shadcn-style dashboard surfaces, charts, a wide graph explorer,
     and hosted browser smoke coverage for profile/team/OAuth admin flows, but
     still needs broader hosted user feedback on navigation
-- RAG quality is still basic:
-  - no LLM/ML reranker
+- RAG quality is still alpha-grade:
+  - optional Workers AI reranking exists behind explicit configuration, but
+    model choice, thresholds, and latency/cost budgets still need production
+    trace review before broad hosted launch.
 - Graph performance has larger local smoke coverage, release benchmark
   artifacts, graph-specific product signals, relationship diagnostics,
   production request telemetry, a recurring hosted synthetic benchmark, and
@@ -167,7 +169,8 @@
      has enough production traces to evaluate.
    - Store embeddings in Vectorize for every chunk and tune stale-index
      thresholds from production diagnostics.
-   - Tune deterministic reranking and evaluate an optional LLM/ML reranker.
+   - Tune deterministic reranking and the optional Workers AI reranker from
+     benchmark artifacts and production traces.
    - Use `bun run benchmark:import` when evaluating external MemoryBench-style
      corpora.
    - Review hosted benchmark trend summaries across production deploys and tune
