@@ -390,7 +390,10 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(repair).toMatchObject({
     attempted: 2,
     expectedVectors: 2,
+    failed: 2,
+    indexed: 0,
     purgeableMemories: 1,
+    skipped: 0,
     semanticIndex: {
       expectedVectors: 2,
       staleVectorCandidates: 1,
@@ -2925,6 +2928,13 @@ type GraphImportPreviewResponse = {
 type IndexRepairResponse = {
   attempted: number;
   expectedVectors: number;
+  failed: number;
+  indexed: number;
+  skipped: number;
+  errorSample: Array<{
+    vectorId?: string;
+    error: string;
+  }>;
   purgeableMemories: number;
   semanticIndex: SemanticIndexResponse;
   staleVectors: {

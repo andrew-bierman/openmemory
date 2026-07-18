@@ -79,6 +79,11 @@ environment without recreating other Cloudflare resources:
 bun run setup:vectorize-metadata
 ```
 
+Only scalar Vectorize metadata is used for hosted recall routing:
+`tenantId`, `memoryId`, `source`, `status`, and `isLatest`. Do not add graph
+tags or entities to Vectorize metadata; those are canonical Durable Object data
+and are hydrated after vector candidate lookup.
+
 ## Required Secrets
 
 Set these before production deploy:

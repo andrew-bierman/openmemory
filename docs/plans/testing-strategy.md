@@ -67,7 +67,8 @@ bun test apps/api/test
 Scope:
 
 - Workers AI embedding response shape.
-- Vectorize upsert/query metadata shape.
+- Vectorize upsert/query metadata shape, including scalar-only routing metadata
+  for hosted compatibility.
 - Cloudflare AI Search candidate response shape when configured.
 - OAuth/MCP protected-resource metadata.
 - Connector webhook payloads.
@@ -118,7 +119,8 @@ This uses `OPENMEMORY_LIVE_BASE_URL` when provided and otherwise targets the dep
 - Worker integration test in `apps/api/test/http.integration.test.ts`.
 - Client request contract tests in `packages/client/src/index.test.ts`.
 - Opt-in production E2E smoke in `apps/api/test/live.e2e.test.ts`, including
-  remote Workers AI and Vectorize semantic indexing/recall checks.
+  remote Workers AI and Vectorize semantic indexing/recall checks after
+  `/v1/index/repair` reports the sampled semantic index is current.
 - Opt-in hosted UI browser E2E in `apps/api/e2e/live-ui.spec.ts`.
 - Local browser E2E in `apps/web/e2e/dashboard.spec.ts` covers dashboard,
   graph inspection, graph import preview, source ingest, MCP setup, operations,

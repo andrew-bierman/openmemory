@@ -7,6 +7,13 @@ type IndexInventory = {
   purgeableMemoryIds: string[];
 };
 
+export type SemanticIndexResult = {
+  attempted: boolean;
+  indexed: boolean;
+  vectorId?: string;
+  error?: string;
+};
+
 export type SemanticIndexDiagnostic = {
   configured: boolean;
   workersAiConfigured: boolean;
@@ -22,35 +29,59 @@ export type SemanticIndexDiagnostic = {
 
 export async function indexMemory(env: Env, tenantId: string, memory: unknown) {
   if (!isMemoryForIndex(memory)) {
-    return;
+    return {
+      attempted: false,
+      indexed: false,
+      error: "invalid_memory_shape",
+    } satisfies SemanticIndexResult;
   }
 
+  const vectorId = semanticVectorId(tenantId, memory.id);
   try {
     if (!env.AI || !env.MEMORY_VECTORS) {
-      return;
+      return {
+        attempted: false,
+        indexed: false,
+        vectorId,
+        error: "semantic_bindings_unavailable",
+      } satisfies SemanticIndexResult;
     }
 
     const embedding = await embed(env, memory.content);
     if (!embedding) {
-      return;
+      return {
+        attempted: true,
+        indexed: false,
+        vectorId,
+        error: "embedding_unavailable",
+      } satisfies SemanticIndexResult;
     }
 
     await env.MEMORY_VECTORS.upsert([
       {
-        id: semanticVectorId(tenantId, memory.id),
+        id: vectorId,
         values: embedding,
         metadata: {
           tenantId,
           memoryId: memory.id,
           source: memory.source,
-          tags: memory.tags,
           status: memory.status,
           isLatest: memory.isLatest,
         },
       },
     ]);
+    return {
+      attempted: true,
+      indexed: true,
+      vectorId,
+    } satisfies SemanticIndexResult;
   } catch {
-    // Local Wrangler cannot emulate AI/Vectorize bindings. The graph write is canonical.
+    return {
+      attempted: true,
+      indexed: false,
+      vectorId,
+      error: "semantic_index_failed",
+    } satisfies SemanticIndexResult;
   }
 }
 
@@ -104,7 +135,7 @@ export async function deleteTenantVectors(
       .map((memoryId) => semanticVectorId(tenantId, memoryId));
     try {
       const result = await env.MEMORY_VECTORS.deleteByIds(ids);
-      deleted += result.count;
+      deleted += deleteCount(result, ids.length);
     } catch {
       // Vectorize is an eventually consistent index. Canonical graph deletion already succeeded.
     }
@@ -115,6 +146,15 @@ export async function deleteTenantVectors(
     deleted,
     vectorizeConfigured: true,
   };
+}
+
+function deleteCount(result: unknown, fallback: number) {
+  return typeof result === "object" &&
+    result !== null &&
+    "count" in result &&
+    typeof result.count === "number"
+    ? result.count
+    : fallback;
 }
 
 export async function getSemanticIndexDiagnostic(

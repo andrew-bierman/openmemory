@@ -152,6 +152,10 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       });
       expect(indexRepair.semanticIndex.status).not.toBe("unconfigured");
 
+      const currentIndex = await waitForSemanticIndex(cookie);
+      expect(currentIndex.semanticIndex.status).toBe("current");
+      expect(currentIndex.failed).toBe(0);
+
       const semanticSearch = await waitForSemanticSearch(
         cookie,
         "Vectorize semantic candidates source chunks document order",
@@ -707,6 +711,27 @@ async function waitForSemanticSearch(cookie: string, query: string) {
   return latest;
 }
 
+async function waitForSemanticIndex(cookie: string) {
+  let latest: IndexRepairResponse | undefined;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    latest = await authedJson<IndexRepairResponse>(cookie, "/v1/index/repair", {
+      method: "POST",
+    });
+    if (
+      latest.semanticIndex.status === "current" &&
+      latest.failed === 0 &&
+      latest.errorSample.length === 0
+    ) {
+      return latest;
+    }
+    await sleep(5_000);
+  }
+
+  throw new Error(
+    `Semantic index did not become current: ${JSON.stringify(latest)}`,
+  );
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -881,7 +906,15 @@ type GraphExportResponse = {
 };
 
 type IndexRepairResponse = {
+  attempted: number;
   expectedVectors: number;
+  failed: number;
+  indexed: number;
+  skipped: number;
+  errorSample: Array<{
+    vectorId?: string;
+    error: string;
+  }>;
   vectorizeConfigured: boolean;
   semanticIndex: {
     configured: boolean;

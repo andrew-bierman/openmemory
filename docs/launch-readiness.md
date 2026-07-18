@@ -6,14 +6,14 @@ the current repo, CI, deployment, or runtime behavior proves them.
 
 ## Current Launch Posture
 
-OpenMemory is ready for an alpha open-source release aimed at technical early
+OpenMemory is close to an alpha open-source release aimed at technical early
 adopters who are comfortable with Cloudflare Workers, Durable Objects, D1,
 Vectorize, Workers AI, R2, OAuth, and MCP.
 
 It is not yet a broad self-serve SaaS launch. The backend, companion UI, larger
 benchmarks, and alpha telemetry are covered; higher-volume production
-operations and full external OAuth callback dogfooding still need work before a
-larger hosted push.
+operations, hosted semantic-provider proof, and full external OAuth callback
+dogfooding still need work before a larger hosted push.
 
 ## Proven Today
 
@@ -22,10 +22,11 @@ larger hosted push.
   `wrangler.jsonc`.
 - Local CI covers formatting, types, unit tests, Worker integration tests, and
   browser E2E.
-- Live production smoke has passed against the deployed Worker, including
-  remote Workers AI and Vectorize semantic indexing/recall checks.
+- Live production smoke exists for the deployed Worker. The latest qualifying
+  run must pass remote Workers AI and Vectorize semantic indexing/recall checks
+  before alpha launch readiness is claimed.
 - Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, semantic
-  provider recall, source ingestion, R2 export, tenant readiness snapshots,
+  provider diagnostics, source ingestion, R2 export, tenant readiness snapshots,
   browser-session readiness, and hosted UI smoke are covered by tests.
 - API and MCP recall use the shared graph recall path; semantic candidates are
   included when Vectorize is configured, with an optional Workers AI rerank pass
@@ -103,6 +104,8 @@ larger hosted push.
 - [x] Request IDs and structured request logs exist.
 - [x] Cloudflare-native global rate limiter exists through a Durable Object.
 - [x] Live smoke workflow exists.
+- [ ] Latest live smoke proves remote Workers AI and Vectorize semantic recall
+  after the deployed semantic-index metadata fix.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
@@ -117,7 +120,7 @@ larger hosted push.
 
 ## Recommended Launch Sequence
 
-1. Keep CI and live smoke green after each deploy.
+1. Keep CI green and require live smoke to pass after each deploy.
 2. Publish the launch note from `docs/launch-announcement.md`.
 3. Use the first public feedback cycle to prioritize MCP compatibility,
    Cloudflare setup friction, recall quality, security, and dashboard UX.
