@@ -75,10 +75,7 @@ export type ReadinessSnapshot = {
   auth: {
     mode: "session" | "local-development-header";
     betterAuthUrl: string;
-    socialProviders: {
-      github: boolean;
-      google: boolean;
-    };
+    socialProviders: SocialProviderReadiness;
   };
   mcp: {
     endpoint: string;
@@ -105,6 +102,16 @@ type RerankReadiness = {
   timeoutMs: number;
   status: "enabled" | "disabled" | "misconfigured";
 };
+
+type SocialProviderReadiness = Record<
+  "github" | "google",
+  {
+    configured: boolean;
+    hasClientId: boolean;
+    hasClientSecret: boolean;
+    status: "ready" | "missing" | "partial";
+  }
+>;
 
 export async function getReadinessSnapshot({
   env,
@@ -135,6 +142,7 @@ export async function getReadinessSnapshot({
   const localDevelopment = isLocalDevelopmentRequest(request);
   const source = sessionTenant ? "session" : "local-header";
   const rerank = getRerankReadiness(env);
+  const socialProviders = getSocialProviderReadiness(env);
 
   return {
     service: "openmemory-api",
@@ -172,10 +180,7 @@ export async function getReadinessSnapshot({
     auth: {
       mode: source === "session" ? "session" : "local-development-header",
       betterAuthUrl: authBaseUrl,
-      socialProviders: {
-        github: Boolean(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET),
-        google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
-      },
+      socialProviders,
     },
     mcp: {
       endpoint: `${resourceBaseUrl}/mcp`,
@@ -197,6 +202,7 @@ export async function getReadinessSnapshot({
       localDevelopment,
       rerank,
       semanticIndex,
+      socialProviders,
       source,
       stats,
     }),
@@ -208,6 +214,7 @@ function getReadinessWarnings({
   localDevelopment,
   rerank,
   semanticIndex,
+  socialProviders,
   source,
   stats,
 }: {
@@ -215,6 +222,7 @@ function getReadinessWarnings({
   localDevelopment: boolean;
   rerank: RerankReadiness;
   semanticIndex: SemanticIndexDiagnostic;
+  socialProviders: SocialProviderReadiness;
   source: "session" | "local-header";
   stats: GraphStats;
 }) {
@@ -231,6 +239,11 @@ function getReadinessWarnings({
   }
   if (rerank.status === "misconfigured") {
     warnings.push("rerank_model_requires_workers_ai");
+  }
+  for (const [provider, readiness] of Object.entries(socialProviders)) {
+    if (readiness.status === "partial") {
+      warnings.push(`${provider}_oauth_provider_partial`);
+    }
   }
   if (semanticIndex.status === "needs_repair") {
     warnings.push("semantic_index_needs_repair");
@@ -252,6 +265,32 @@ function getReadinessWarnings({
   }
 
   return warnings;
+}
+
+function getSocialProviderReadiness(env: Env): SocialProviderReadiness {
+  return {
+    github: providerReadiness(env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET),
+    google: providerReadiness(env.GOOGLE_CLIENT_ID, env.GOOGLE_CLIENT_SECRET),
+  };
+}
+
+function providerReadiness(
+  clientId: string | undefined,
+  clientSecret: string | undefined,
+) {
+  const hasClientId = Boolean(normalizeOptionalEnv(clientId));
+  const hasClientSecret = Boolean(normalizeOptionalEnv(clientSecret));
+  const configured = hasClientId && hasClientSecret;
+  return {
+    configured,
+    hasClientId,
+    hasClientSecret,
+    status: configured
+      ? "ready"
+      : hasClientId || hasClientSecret
+        ? "partial"
+        : "missing",
+  } as const;
 }
 
 function getRerankReadiness(env: Env): RerankReadiness {

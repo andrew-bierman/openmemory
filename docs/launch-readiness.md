@@ -32,7 +32,8 @@ larger hosted push.
   an 80-memory throwaway graph, including account cleanup.
 - Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, semantic
   provider diagnostics, source ingestion, R2 export, tenant readiness snapshots,
-  browser-session readiness, and hosted UI smoke are covered by tests.
+  OAuth provider readiness diagnostics, browser-session readiness, and hosted UI
+  smoke are covered by tests.
 - API and MCP recall use the shared graph recall path; semantic candidates are
   included when Vectorize is configured, with an optional Workers AI rerank pass
   behind `OPENMEMORY_RERANK_MODEL` and deterministic fallback.

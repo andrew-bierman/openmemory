@@ -232,7 +232,7 @@ MCP tools at launch are `remember`, `recall`, `profile`, and `forget`.
   missing vectors, sampled stale vectors, and repair recommendation
 - relationship catalog size and top relationship distribution
 - binding availability booleans
-- auth mode and provider availability booleans
+- auth mode plus GitHub/Google provider readiness without secret values
 - MCP endpoint and metadata URLs
 - rate-limit status
 - warning codes for incomplete optional production bindings

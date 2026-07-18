@@ -319,10 +319,15 @@ export type ReadinessSnapshot = {
   auth: {
     mode: "session" | "local-development-header";
     betterAuthUrl: string;
-    socialProviders: {
-      github: boolean;
-      google: boolean;
-    };
+    socialProviders: Record<
+      "github" | "google",
+      {
+        configured: boolean;
+        hasClientId: boolean;
+        hasClientSecret: boolean;
+        status: "ready" | "missing" | "partial";
+      }
+    >;
   };
   mcp: {
     endpoint: string;

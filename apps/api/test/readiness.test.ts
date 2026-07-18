@@ -79,6 +79,63 @@ describe("readiness rerank diagnostics", () => {
   });
 });
 
+describe("readiness OAuth provider diagnostics", () => {
+  test("reports missing social login providers without warnings", async () => {
+    const readiness = await snapshot({});
+
+    expect(readiness.auth.socialProviders.github).toEqual({
+      configured: false,
+      hasClientId: false,
+      hasClientSecret: false,
+      status: "missing",
+    });
+    expect(readiness.auth.socialProviders.google.status).toBe("missing");
+    expect(readiness.warnings).not.toContain("github_oauth_provider_partial");
+    expect(readiness.warnings).not.toContain("google_oauth_provider_partial");
+  });
+
+  test("warns when a social login provider has only one credential half", async () => {
+    const readiness = await snapshot({
+      GITHUB_CLIENT_ID: "github-client-id",
+      GOOGLE_CLIENT_SECRET: "google-client-secret",
+    });
+
+    expect(readiness.auth.socialProviders.github).toEqual({
+      configured: false,
+      hasClientId: true,
+      hasClientSecret: false,
+      status: "partial",
+    });
+    expect(readiness.auth.socialProviders.google).toEqual({
+      configured: false,
+      hasClientId: false,
+      hasClientSecret: true,
+      status: "partial",
+    });
+    expect(readiness.warnings).toContain("github_oauth_provider_partial");
+    expect(readiness.warnings).toContain("google_oauth_provider_partial");
+  });
+
+  test("reports ready social login providers without exposing credential values", async () => {
+    const readiness = await snapshot({
+      GITHUB_CLIENT_ID: "github-client-id",
+      GITHUB_CLIENT_SECRET: "github-client-secret",
+      GOOGLE_CLIENT_ID: "google-client-id",
+      GOOGLE_CLIENT_SECRET: "google-client-secret",
+    });
+
+    expect(readiness.auth.socialProviders.github).toEqual({
+      configured: true,
+      hasClientId: true,
+      hasClientSecret: true,
+      status: "ready",
+    });
+    expect(readiness.auth.socialProviders.google.status).toBe("ready");
+    expect(JSON.stringify(readiness)).not.toContain("github-client-secret");
+    expect(JSON.stringify(readiness)).not.toContain("google-client-secret");
+  });
+});
+
 async function snapshot(env: Partial<Env>) {
   return getReadinessSnapshot({
     env: {

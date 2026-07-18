@@ -153,7 +153,9 @@
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the
   preferred deploy path; the manual GitHub deploy workflow remains a fallback
   and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
-- Optional GitHub and Google login providers still need OAuth app client IDs and secrets.
+- Optional GitHub and Google login provider readiness is visible in
+  `/v1/readiness`; hosted social login still requires installing real OAuth app
+  client IDs and secrets.
 - Repository public-launch operations are complete: Discussions, topics/about
   metadata, public visibility, and the first tagged alpha release are live.
 - Launch copy and first-feedback triage guidance live in
