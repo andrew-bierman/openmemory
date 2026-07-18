@@ -285,6 +285,13 @@ bun run test:scale:local
 OPENMEMORY_SCALE_GRAPH_SIZE=1000 bun run test:scale:local
 ```
 
+Convert external MemoryBench-style JSON or JSONL fixtures into an OpenMemory
+graph export for local restore/import evaluation:
+
+```sh
+bun run benchmark:import -- fixtures/memorybench.example.jsonl --out .tmp/memorybench-export.json
+```
+
 Optional live checks:
 
 ```sh

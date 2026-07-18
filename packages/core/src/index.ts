@@ -226,6 +226,48 @@ export const GraphExportPayloadSchema = z.object({
   edges: z.array(GraphEdgeRecordSchema).max(50_000),
 });
 
+export const BenchmarkMemoryFixtureSchema = z.object({
+  key: z.string().min(1).max(160),
+  content: z.string().min(1).max(200_000),
+  query: z.string().min(1).max(4_000).optional(),
+  tags: z.array(z.string().min(1).max(80)).max(50).default([]),
+  type: MemoryTypeSchema.default("fact"),
+  confidence: z.number().min(0).max(1).default(0.8),
+  importance: z.number().min(0).max(1).default(0.5),
+  metadata: MemoryMetadataSchema,
+});
+
+export const BenchmarkDistractorFixtureSchema = z.union([
+  z.string().min(1).max(200_000),
+  BenchmarkMemoryFixtureSchema.omit({ query: true }),
+]);
+
+export const BenchmarkCaseFixtureSchema = z.object({
+  query: z.string().min(1).max(4_000),
+  targetKey: z.string().min(1).max(160),
+});
+
+export const BenchmarkEdgeFixtureSchema = z.object({
+  sourceKey: z.string().min(1).max(160),
+  targetKey: z.string().min(1).max(160),
+  relationship: GraphRelationshipSchema.default("supports"),
+  weight: z.number().min(0).max(1).optional(),
+  metadata: MemoryMetadataSchema,
+});
+
+export const BenchmarkFixtureSchema = z.object({
+  version: z.literal(1).default(1),
+  name: z.string().min(1).max(200).default("memorybench-fixture"),
+  importedAt: z.string().datetime().optional(),
+  memories: z.array(BenchmarkMemoryFixtureSchema).min(1).max(10_000),
+  distractors: z
+    .array(BenchmarkDistractorFixtureSchema)
+    .max(10_000)
+    .default([]),
+  cases: z.array(BenchmarkCaseFixtureSchema).max(10_000).default([]),
+  edges: z.array(BenchmarkEdgeFixtureSchema).max(50_000).default([]),
+});
+
 export const UpdateMemorySchema = z.object({
   content: z.string().min(1).max(200_000),
   relationship: z.enum(["updates", "extends", "derives"]).default("updates"),
@@ -290,6 +332,180 @@ export type MemoryRecord = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type BenchmarkFixture = z.infer<typeof BenchmarkFixtureSchema>;
+
+export type BenchmarkImportResult = {
+  graphExport: z.infer<typeof GraphExportPayloadSchema>;
+  cases: Array<{
+    query: string;
+    targetKey: string;
+    targetId: string;
+  }>;
+};
+
+export function importBenchmarkFixture(
+  input: unknown,
+  options: { importedAt?: string } = {},
+): BenchmarkImportResult {
+  const fixture = BenchmarkFixtureSchema.parse(input);
+  const importedAt =
+    options.importedAt ?? fixture.importedAt ?? new Date().toISOString();
+  const memoryKeyToId = new Map<string, string>();
+  const memoryIds = new Set<string>();
+  const memories = fixture.memories.map((memory) => {
+    const id = benchmarkMemoryId(memory.key);
+    registerBenchmarkMemoryKey(memoryKeyToId, memoryIds, memory.key, id);
+    return benchmarkMemoryRecord(memory, id, importedAt, {
+      benchmarkName: fixture.name,
+      benchmarkKey: memory.key,
+      benchmarkRole: "target",
+      benchmarkQuery: memory.query,
+    });
+  });
+
+  for (let index = 0; index < fixture.distractors.length; index += 1) {
+    const distractor = normalizeBenchmarkDistractor(
+      fixture.distractors[index],
+      index,
+    );
+    const id = benchmarkMemoryId(distractor.key);
+    registerBenchmarkMemoryKey(memoryKeyToId, memoryIds, distractor.key, id);
+    memories.push(
+      benchmarkMemoryRecord(distractor, id, importedAt, {
+        benchmarkName: fixture.name,
+        benchmarkKey: distractor.key,
+        benchmarkRole: "distractor",
+      }),
+    );
+  }
+
+  const cases = fixture.cases.map((benchmarkCase) => {
+    const targetId = memoryKeyToId.get(benchmarkCase.targetKey);
+    if (!targetId) {
+      throw new Error(
+        `Benchmark case references unknown targetKey: ${benchmarkCase.targetKey}`,
+      );
+    }
+    return {
+      query: benchmarkCase.query,
+      targetKey: benchmarkCase.targetKey,
+      targetId,
+    };
+  });
+
+  const edges = fixture.edges.map((edge) => {
+    const sourceId = memoryKeyToId.get(edge.sourceKey);
+    const targetId = memoryKeyToId.get(edge.targetKey);
+    if (!sourceId || !targetId) {
+      throw new Error(
+        `Benchmark edge references unknown keys: ${edge.sourceKey} -> ${edge.targetKey}`,
+      );
+    }
+    const definition = getGraphRelationshipDefinition(edge.relationship);
+    return {
+      sourceId,
+      targetId,
+      relationship: edge.relationship,
+      weight: edge.weight ?? definition.defaultWeight,
+      metadata: edge.metadata,
+      createdAt: importedAt,
+      updatedAt: importedAt,
+    };
+  });
+
+  const graphExport = GraphExportPayloadSchema.parse({
+    version: 1,
+    exportedAt: importedAt,
+    stats: {
+      source: "benchmark-fixture",
+      name: fixture.name,
+      targetCount: fixture.memories.length,
+      distractorCount: fixture.distractors.length,
+      caseCount: cases.length,
+      edgeCount: edges.length,
+      cases,
+    },
+    memories,
+    edges,
+  });
+
+  return { graphExport, cases };
+}
+
+function benchmarkMemoryRecord(
+  memory: z.infer<typeof BenchmarkMemoryFixtureSchema>,
+  id: string,
+  importedAt: string,
+  metadata: Record<string, unknown>,
+) {
+  return {
+    id,
+    content: memory.content,
+    source: "memorybench",
+    tags: memory.tags,
+    metadata: {
+      ...memory.metadata,
+      ...metadata,
+    },
+    type: memory.type,
+    status: "active" as const,
+    isLatest: true,
+    confidence: memory.confidence,
+    importance: memory.importance,
+    entityIds: [],
+    createdAt: importedAt,
+    updatedAt: importedAt,
+  };
+}
+
+function normalizeBenchmarkDistractor(
+  distractor: z.infer<typeof BenchmarkDistractorFixtureSchema>,
+  index: number,
+): z.infer<typeof BenchmarkMemoryFixtureSchema> {
+  if (typeof distractor === "string") {
+    return BenchmarkMemoryFixtureSchema.parse({
+      key: `distractor-${index + 1}`,
+      content: distractor,
+      tags: ["distractor"],
+      type: "fact",
+      metadata: {},
+    });
+  }
+  return BenchmarkMemoryFixtureSchema.parse({
+    ...distractor,
+    query: undefined,
+  });
+}
+
+function benchmarkMemoryId(key: string) {
+  return `mem_benchmark_${slugifyBenchmarkKey(key)}`;
+}
+
+function registerBenchmarkMemoryKey(
+  keyToId: Map<string, string>,
+  ids: Set<string>,
+  key: string,
+  id: string,
+) {
+  if (keyToId.has(key)) {
+    throw new Error(`Duplicate benchmark memory key: ${key}`);
+  }
+  if (ids.has(id)) {
+    throw new Error(`Benchmark memory keys produce duplicate ids: ${key}`);
+  }
+  keyToId.set(key, id);
+  ids.add(id);
+}
+
+function slugifyBenchmarkKey(key: string) {
+  return key
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 160);
+}
 
 export type GraphExportPayload = z.infer<typeof GraphExportPayloadSchema>;
 
