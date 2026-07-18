@@ -1,6 +1,6 @@
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, rm } from "node:fs/promises";
+import { appendFile, mkdir, mkdtemp, rm } from "node:fs/promises";
 import net from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -1793,6 +1793,16 @@ test("recall benchmark preserves ranking quality across MemoryBench-style fixtur
   const hitAt3Rate =
     hitAt3.reduce<number>((total, hit) => total + hit, 0) / hitAt3.length;
 
+  await appendBenchmarkReport({
+    type: "recall-quality",
+    tenant,
+    cases: cases.length,
+    meanReciprocalRank,
+    meanReciprocalRankThreshold: 0.84,
+    hitAt3Rate,
+    hitAt3Threshold: 0.9,
+  });
+
   expect(meanReciprocalRank).toBeGreaterThanOrEqual(0.84);
   expect(hitAt3Rate).toBeGreaterThanOrEqual(0.9);
 }, 45_000);
@@ -1864,6 +1874,20 @@ test("graph stats and recall stay bounded on a larger local graph", async () => 
     limit: 10,
   });
   const elapsedMs = performance.now() - startedAt;
+
+  await appendBenchmarkReport({
+    type: "graph-scale",
+    tenant,
+    graphSize,
+    activeMemories: stats.activeMemories,
+    totalEdges: stats.totalEdges,
+    relationshipCount: stats.relationshipCount,
+    graphDensity: stats.graphDensity,
+    recallLimit: 10,
+    recallResultCount: results.length,
+    recallElapsedMs: Number(elapsedMs.toFixed(2)),
+    recallElapsedThresholdMs: 7_500,
+  });
 
   expect(results).toHaveLength(10);
   expect(results[0]?.content).toContain("Atlas");
@@ -2262,6 +2286,26 @@ function splitSetCookieHeader(value: string) {
 function reciprocalRank(results: SearchResponse[], targetId: string) {
   const index = results.findIndex((result) => result.id === targetId);
   return index === -1 ? 0 : 1 / (index + 1);
+}
+
+async function appendBenchmarkReport(entry: Record<string, unknown>) {
+  const reportPath = process.env.OPENMEMORY_BENCHMARK_REPORT;
+  if (!reportPath) {
+    return;
+  }
+  const resolvedReportPath = reportPath.startsWith("/")
+    ? reportPath
+    : join(repoRoot, reportPath);
+
+  await mkdir(dirname(resolvedReportPath), { recursive: true });
+  await appendFile(
+    resolvedReportPath,
+    `${JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      commit: process.env.GITHUB_SHA ?? process.env.CI_COMMIT_SHA,
+      ...entry,
+    })}\n`,
+  );
 }
 
 async function pkceChallenge(verifier: string) {

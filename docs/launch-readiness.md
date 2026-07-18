@@ -87,7 +87,7 @@ larger hosted push.
 - [x] Async source ingestion uses Queues and Workflows.
 - [x] Entity and relationship extraction workers are implemented.
 - [x] Larger recall and graph performance benchmarks run in CI or release
-  qualification.
+  qualification, with JSONL benchmark artifacts for release review.
 
 ## Operational Readiness Checklist
 
