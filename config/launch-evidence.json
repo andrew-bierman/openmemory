@@ -1,9 +1,9 @@
 {
   "latestRepositoryGate": {
-    "commit": "132a0dc175751f1bb2f90a1f4b9a0d4eb3f4bd73",
-    "mainCiRun": "29664341903",
-    "mainCiUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29664341903",
-    "workersBuildUrl": "https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/461e0692-86af-4cf6-bab2-e5645567e00a"
+    "commit": "ae433710f37b7d784833c47d37b1d8da5dd8276e",
+    "mainCiRun": "29664533575",
+    "mainCiUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29664533575",
+    "workersBuildUrl": "https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/b08e35a6-9d52-4c33-a584-29680090eb95"
   },
   "latestVerifiedRuntimeCandidate": {
     "commit": "3f1603557c3e82351ea78734889aa8a61062e7c0",
@@ -16,15 +16,17 @@
     }
   },
   "benchmarkEvidence": {
-    "releaseValidationCommit": "f7914b8ce9b78dc8e320c89c5a228593accb92e1",
+    "releaseValidationCommit": "ae433710f37b7d784833c47d37b1d8da5dd8276e",
+    "releaseValidationRun": "29664622501",
     "releaseValidationLocalRecallMrr": 1,
     "releaseValidationHitAt3": 1,
-    "releaseValidationGraphRecallMs": 5.95,
-    "releaseValidationScaleRecallMs": 10.85,
-    "liveBenchmarkRun": "29662033364",
+    "releaseValidationGraphRecallMs": 19.92,
+    "releaseValidationScaleRecallMs": 20.51,
+    "releaseValidationScale1000RecallMs": 65.73,
+    "liveBenchmarkRun": "29664622502",
     "liveBenchmarkActiveMemories": 80,
     "liveBenchmarkEdges": 79,
-    "liveBenchmarkRecallMs": 1055.43,
+    "liveBenchmarkRecallMs": 1071.36,
     "liveBenchmarkThresholdMs": 12000
   },
   "screenshotDirectory": ".tmp/screenshots/launch-readiness"
