@@ -194,7 +194,9 @@ Alpha retention policy:
 
 Current limitations:
 
-- R2 export lifecycle expiration is not configured in code.
+- R2 export lifecycle expiration is not configured in code, though
+  tenant/account deletion now best-effort removes the deleted tenant's export
+  objects when the R2 binding is available.
 - Durable Object graph restore is not implemented.
 
 Recommended operator controls before broader public launch:
@@ -203,13 +205,14 @@ Recommended operator controls before broader public launch:
   exports after 30 to 90 days unless a longer retention window is required.
 - For user-initiated account deletion, call `DELETE /v1/account` from an
   authenticated session with `confirmEmail` and `confirmTenantId`. It purges
-  the tenant graph, best-effort deletes Vectorize ids, and removes user-owned
-  D1 auth/workspace/OAuth rows.
+  the tenant graph, best-effort deletes Vectorize ids and R2 export objects,
+  and removes user-owned D1 auth/workspace/OAuth rows.
 - For operator-only graph deletion, use `DELETE /v1/tenant` with
   `confirmTenantId` set to the tenant id shown in `/v1/account` or
-  `/v1/readiness`.
+  `/v1/readiness`. It also best-effort removes export objects under that tenant
+  prefix when `MEMORY_EXPORTS` is bound.
 - Treat both deletion paths as destructive. Export any required tenant data
-  first through `/v1/exports`, and handle R2 export retention separately.
+  first through `/v1/exports`.
 - Do not use production tenant data for demos, tests, screenshots, or issue
   reproduction.
 

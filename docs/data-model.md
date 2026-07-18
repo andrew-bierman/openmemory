@@ -124,17 +124,19 @@ and `edges`.
 after the caller supplies a matching `confirmTenantId`. The operation removes
 memories, edges, memory tags, memory entities, and ingestion jobs from the
 tenant Durable Object. It also best-effort deletes matching Vectorize ids using
-the `<tenant-id>:<memory-id>` vector id convention.
+the `<tenant-id>:<memory-id>` vector id convention and best-effort deletes R2
+export objects under `<tenant-id>/exports/`.
 
 `DELETE /v1/account` is the session-backed account deletion path. It requires
 matching `confirmEmail` and `confirmTenantId`, purges the tenant graph first,
-best-effort deletes Vectorize ids, then deletes user-owned D1 control-plane
-rows for OAuth grants, sessions, auth accounts, owned workspaces, workspace
-memberships, and the user record.
+best-effort deletes Vectorize ids and R2 export objects under the tenant export
+prefix, then deletes user-owned D1 control-plane rows for OAuth grants,
+sessions, auth accounts, owned workspaces, workspace memberships, and the user
+record.
 
-R2 export objects are not deleted by either purge path. Operators should apply
-the configured R2 lifecycle policy or manually remove export objects when a
-stricter deletion request requires it.
+Both destructive routes report R2 cleanup counts without returning object
+contents or unrelated tenant keys. Operators should still apply an R2 lifecycle
+policy for abandoned exports and defense-in-depth retention control.
 
 ## Queues and Workflows
 

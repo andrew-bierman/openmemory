@@ -1,5 +1,6 @@
 import type {
   Account,
+  AccountDeletionResult,
   OAuthConnection,
   WorkspaceMember,
 } from "@openmemory/client";
@@ -60,11 +61,15 @@ export function AdminWorkspace({
   account,
   apiUrl,
   connections,
+  deleteConfirmEmail,
+  deleteConfirmTenantId,
   email,
   isLoading,
+  lastAccountDeletion,
   memberEmail,
   memberRole,
   name,
+  onDeleteAccount,
   onInviteMember,
   onRevoke,
   onRemoveMember,
@@ -77,6 +82,8 @@ export function AdminWorkspace({
   profileName,
   sessionUser,
   setApiUrl,
+  setDeleteConfirmEmail,
+  setDeleteConfirmTenantId,
   setEmail,
   setMemberEmail,
   setMemberRole,
@@ -94,11 +101,15 @@ export function AdminWorkspace({
   account: Account | null;
   apiUrl: string;
   connections: OAuthConnection[];
+  deleteConfirmEmail: string;
+  deleteConfirmTenantId: string;
   email: string;
   isLoading: boolean;
+  lastAccountDeletion: AccountDeletionResult | null;
   memberEmail: string;
   memberRole: "admin" | "member";
   name: string;
+  onDeleteAccount: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onInviteMember: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onRevoke: (clientId: string) => Promise<void>;
   onRemoveMember: (memberId: string) => Promise<void>;
@@ -111,6 +122,8 @@ export function AdminWorkspace({
   profileName: string;
   sessionUser: AuthUser | null;
   setApiUrl: (value: string) => void;
+  setDeleteConfirmEmail: (value: string) => void;
+  setDeleteConfirmTenantId: (value: string) => void;
   setEmail: (value: string) => void;
   setMemberEmail: (value: string) => void;
   setMemberRole: (value: "admin" | "member") => void;
@@ -129,6 +142,12 @@ export function AdminWorkspace({
   const ownerMember = account?.members.find(
     (member) => member.role === "owner",
   );
+  const canDeleteAccount =
+    Boolean(account && sessionUser) &&
+    deleteConfirmEmail.trim().toLowerCase() ===
+      account?.user.email.trim().toLowerCase() &&
+    deleteConfirmTenantId.trim().toLowerCase() ===
+      account?.workspace.tenantId.trim().toLowerCase();
   return (
     <div className="admin-grid">
       <section className="admin-card identity-card">
@@ -445,6 +464,73 @@ export function AdminWorkspace({
             ))}
           </div>
         )}
+      </section>
+
+      <section className="admin-card admin-card-wide danger-zone">
+        <div className="panel-title">
+          <div>
+            <p className="eyebrow">Danger zone</p>
+            <h2>Delete account</h2>
+          </div>
+          <Trash2 aria-hidden="true" />
+        </div>
+        <div className="status-strip danger-strip">
+          <ShieldCheck aria-hidden="true" />
+          <span>
+            <strong>
+              {account
+                ? `Deletes tenant ${account.workspace.tenantId}`
+                : "Hosted session required"}
+            </strong>
+            <small>
+              Removes graph data, Vectorize entries, R2 exports, sessions, OAuth
+              grants, workspace rows, and the user record.
+            </small>
+          </span>
+        </div>
+        <form className="stack" onSubmit={onDeleteAccount}>
+          <div className="settings-grid">
+            <div className="field">
+              <Label htmlFor="delete-email">Confirm email</Label>
+              <Input
+                disabled={!account || isLoading}
+                id="delete-email"
+                onChange={(event) => setDeleteConfirmEmail(event.target.value)}
+                placeholder={account?.user.email ?? "you@example.com"}
+                type="email"
+                value={deleteConfirmEmail}
+              />
+            </div>
+            <div className="field">
+              <Label htmlFor="delete-tenant">Confirm tenant id</Label>
+              <Input
+                disabled={!account || isLoading}
+                id="delete-tenant"
+                onChange={(event) =>
+                  setDeleteConfirmTenantId(event.target.value)
+                }
+                placeholder={account?.workspace.tenantId ?? "tenant id"}
+                value={deleteConfirmTenantId}
+              />
+            </div>
+          </div>
+          <div className="row">
+            <Button
+              disabled={isLoading || !canDeleteAccount}
+              type="submit"
+              variant="destructive"
+            >
+              <Trash2 aria-hidden="true" />
+              Delete account
+            </Button>
+            {lastAccountDeletion ? (
+              <span className="muted">
+                Deleted {lastAccountDeletion.graph.memoriesDeleted} memories and{" "}
+                {lastAccountDeletion.graph.exports.deleted} R2 exports
+              </span>
+            ) : null}
+          </div>
+        </form>
       </section>
     </div>
   );

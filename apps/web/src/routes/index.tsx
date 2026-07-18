@@ -1,5 +1,6 @@
 import {
   type Account,
+  type AccountDeletionResult,
   createOpenMemoryClient,
   type GraphEdge,
   type GraphExportResult,
@@ -168,6 +169,8 @@ function Home() {
   const [ingestSource, setIngestSource] = useState("conversation");
   const [workspaceName, setWorkspaceName] = useState("");
   const [profileName, setProfileName] = useState("");
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
+  const [deleteConfirmTenantId, setDeleteConfirmTenantId] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<"admin" | "member">("member");
   const [activityNow, setActivityNow] = useState(INITIAL_ACTIVITY_NOW);
@@ -181,6 +184,8 @@ function Home() {
     useState<IndexRepairResult | null>(null);
   const [lastSourceIngest, setLastSourceIngest] =
     useState<SourceIngestResult | null>(null);
+  const [lastAccountDeletion, setLastAccountDeletion] =
+    useState<AccountDeletionResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const usesLocalTenant = isLocalApiUrl(apiUrl);
   const productionDefaultApiUrl = getBrowserProductionDefaultApiUrl();
@@ -555,6 +560,34 @@ function Home() {
     onMutate: () => setError(null),
     onSuccess: invalidateDashboard,
   });
+  const deleteAccountMutation = useMutation({
+    mutationFn: api.deleteAccount,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: async (result) => {
+      setLastAccountDeletion(result);
+      setDeleteConfirmEmail("");
+      setDeleteConfirmTenantId("");
+      queryClient.setQueryData(["openmemory", "session", apiBaseUrl], null);
+      queryClient.setQueryData(["openmemory", "memories", ...queryScope], []);
+      queryClient.setQueryData(["openmemory", "profile", ...queryScope], {
+        summary: "",
+      });
+      queryClient.setQueryData(
+        ["openmemory", "oauth-connections", ...queryScope],
+        [],
+      );
+      queryClient.setQueryData(["openmemory", "account", ...queryScope], null);
+      queryClient.setQueryData(
+        ["openmemory", "readiness", ...queryScope],
+        null,
+      );
+      queryClient.removeQueries({ queryKey: ["openmemory", "context"] });
+      await queryClient.invalidateQueries({
+        queryKey: ["openmemory", "session"],
+      });
+    },
+  });
   const exportGraphMutation = useMutation({
     mutationFn: api.exportGraph,
     onError: (caught) => setError(formatError(caught)),
@@ -588,6 +621,7 @@ function Home() {
     updateProfileMutation.isPending ||
     inviteMemberMutation.isPending ||
     removeMemberMutation.isPending ||
+    deleteAccountMutation.isPending ||
     exportGraphMutation.isPending ||
     repairIndexMutation.isPending;
 
@@ -708,6 +742,18 @@ function Home() {
 
   async function removeCurrentMember(memberId: string) {
     await removeMemberMutation.mutateAsync(memberId);
+  }
+
+  async function deleteCurrentAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!account) {
+      return;
+    }
+
+    await deleteAccountMutation.mutateAsync({
+      confirmEmail: deleteConfirmEmail,
+      confirmTenantId: deleteConfirmTenantId,
+    });
   }
 
   async function exportGraph() {
@@ -1012,11 +1058,15 @@ function Home() {
                 account={account}
                 apiUrl={apiUrl}
                 connections={oauthConnections}
+                deleteConfirmEmail={deleteConfirmEmail}
+                deleteConfirmTenantId={deleteConfirmTenantId}
                 email={email}
                 isLoading={isLoading}
+                lastAccountDeletion={lastAccountDeletion}
                 memberEmail={memberEmail}
                 memberRole={memberRole}
                 name={name}
+                onDeleteAccount={deleteCurrentAccount}
                 onInviteMember={inviteCurrentMember}
                 onRevoke={revokeOAuthConnection}
                 onRemoveMember={removeCurrentMember}
@@ -1029,6 +1079,8 @@ function Home() {
                 profileName={profileName || account?.user.name || name}
                 sessionUser={sessionUser}
                 setApiUrl={setApiUrl}
+                setDeleteConfirmEmail={setDeleteConfirmEmail}
+                setDeleteConfirmTenantId={setDeleteConfirmTenantId}
                 setEmail={setEmail}
                 setMemberEmail={setMemberEmail}
                 setMemberRole={setMemberRole}

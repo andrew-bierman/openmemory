@@ -74,12 +74,13 @@ larger hosted push.
 - [x] Tenant graph purge supports account-deletion workflows with explicit
   confirmation and tenant isolation coverage.
 - [x] Session-backed account deletion removes graph data and user-owned
-  auth/workspace/OAuth control-plane rows after explicit confirmation.
+  auth/workspace/OAuth control-plane rows plus tenant-scoped R2 exports after
+  explicit confirmation.
 - [x] Hosted dashboard has capture, recall, table, charts, graph explorer, graph
   operations signals, MCP setup, onboarding, profile editing, and admin
   settings.
 - [x] First-party hosted web app has fully polished authenticated navigation,
-  account settings, and team/tenant management.
+  account settings, team/tenant management, and confirmed account deletion.
 - [x] MCP protocol compatibility matrix is tested and documented.
 - [x] Named external MCP clients are dogfooded and documented.
 - [x] Async source ingestion uses Queues and Workflows.

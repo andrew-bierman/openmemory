@@ -39,6 +39,7 @@ import {
   resolveOpenMemorySession,
 } from "./better-auth";
 import type { Env } from "./env";
+import { deleteTenantExports, tenantExportPrefix } from "./export-storage";
 import {
   enqueueMemoryExtraction,
   MEMORY_EXTRACTION_QUEUE_NAME,
@@ -334,6 +335,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         tenantId,
         purged.deletedMemoryIds,
       );
+      const exports = await deleteTenantExports(env, tenantId);
       const deleted = await deleteAccountControlPlane(env, request, {
         confirmEmail: body.confirmEmail,
         confirmTenantId: body.confirmTenantId,
@@ -349,6 +351,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           entitiesDeleted: purged.entitiesDeleted,
           ingestionJobsDeleted: purged.ingestionJobsDeleted,
           vectorIndex,
+          exports,
           purgedAt: purged.purgedAt,
         },
       });
@@ -409,6 +412,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         tenantId,
         purged.deletedMemoryIds,
       );
+      const exports = await deleteTenantExports(env, tenantId);
 
       return {
         tenantId,
@@ -418,6 +422,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         entitiesDeleted: purged.entitiesDeleted,
         ingestionJobsDeleted: purged.ingestionJobsDeleted,
         vectorIndex,
+        exports,
         purgedAt: purged.purgedAt,
       };
     },
@@ -722,7 +727,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     const tenantId = "tenantId" in tenant ? tenant.tenantId : "unknown";
     const graphExport = await graph.exportGraph();
     const body = JSON.stringify(graphExport);
-    const key = `${tenantId}/exports/${graphExport.exportedAt.replace(/[:.]/g, "-")}.json`;
+    const key = `${tenantExportPrefix(tenantId)}${graphExport.exportedAt.replace(/[:.]/g, "-")}.json`;
 
     if (env.MEMORY_EXPORTS) {
       await env.MEMORY_EXPORTS.put(key, body, {

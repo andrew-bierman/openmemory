@@ -114,6 +114,15 @@ export type IndexRepairResult = {
   vectorizeConfigured: boolean;
 };
 
+export type TenantExportCleanupResult = {
+  r2Configured: boolean;
+  prefix: string;
+  attempted: number;
+  deleted: number;
+  failed: number;
+  error?: string;
+};
+
 export type TenantPurgeResult = {
   tenantId: string;
   memoriesDeleted: number;
@@ -126,6 +135,7 @@ export type TenantPurgeResult = {
     deleted: number;
     vectorizeConfigured: boolean;
   };
+  exports: TenantExportCleanupResult;
   purgedAt: string;
 };
 
@@ -155,6 +165,7 @@ export type AccountDeletionResult = {
       deleted: number;
       vectorizeConfigured: boolean;
     };
+    exports: TenantExportCleanupResult;
     purgedAt: string;
   };
   deletedAt: string;

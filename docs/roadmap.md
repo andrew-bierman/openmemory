@@ -80,12 +80,14 @@
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
 - `DELETE /v1/tenant` hard-deletes the resolved tenant's Durable Object graph
   data after explicit tenant confirmation and best-effort deletes matching
-  Vectorize ids.
+  Vectorize ids and tenant-scoped R2 exports.
 - `DELETE /v1/account` lets authenticated users delete their account after
-  confirming email and tenant id; it purges graph data and user-owned
-  auth/workspace/OAuth rows.
+  confirming email and tenant id; it purges graph data, Vectorize ids,
+  tenant-scoped R2 exports, and user-owned auth/workspace/OAuth rows.
 - `/v1/account` exposes session-backed account, workspace, and team member
   management backed by Drizzle/D1.
+- The TanStack admin panel exposes a confirmed account deletion danger zone for
+  hosted sessions.
 - The TanStack admin panel can sign in, rename a hosted workspace, invite or
   remove workspace members, manage runtime settings, and revoke MCP OAuth
   grants.
