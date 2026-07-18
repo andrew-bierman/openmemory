@@ -240,6 +240,39 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(stats.graphDensity).toBeGreaterThan(0);
 
+  const readiness = await getJson<ReadinessResponse>(
+    await worker.fetch("/v1/readiness", {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(readiness).toMatchObject({
+    service: "openmemory-api",
+    tenant: {
+      id: tenantA,
+      source: "local-header",
+      localDevelopment: true,
+    },
+    graph: {
+      activeMemories: 2,
+      totalEdges: 1,
+    },
+    relationships: {
+      catalogSize: expect.any(Number),
+    },
+    bindings: {
+      durableObjects: true,
+    },
+    auth: {
+      mode: "local-development-header",
+    },
+    mcp: {
+      endpoint: `${worker.baseUrl}/mcp`,
+    },
+  });
+  expect(readiness.relationships.catalogSize).toBeGreaterThan(8);
+  expect(readiness.rateLimit.limitPerMinute).toBeGreaterThan(0);
+  expect(JSON.stringify(readiness)).not.toContain("test-secret");
+
   const exported = await getJson<GraphExportResponse>(
     await worker.fetch("/v1/exports", {
       method: "POST",
@@ -696,6 +729,36 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     }),
   );
   expect(memories.map((item) => item.id)).toContain(memory.id);
+
+  const readiness = await getJson<ReadinessResponse>(
+    await worker.fetch("/v1/readiness", {
+      headers: { cookie },
+    }),
+  );
+  expect(readiness).toMatchObject({
+    service: "openmemory-api",
+    tenant: {
+      id: session.user.id.toLowerCase(),
+      source: "session",
+    },
+    auth: {
+      mode: "session",
+    },
+    graph: {
+      totalMemories: 1,
+    },
+    mcp: {
+      authorizationServer: `${worker.baseUrl}/.well-known/oauth-authorization-server/api/auth`,
+      protectedResource: `${worker.baseUrl}/.well-known/oauth-protected-resource/mcp`,
+      tools: expect.arrayContaining([
+        "remember",
+        "recall",
+        "profile",
+        "forget",
+      ]),
+    },
+  });
+  expect(readiness.bindings.authDb).toBe(true);
 }, 45_000);
 
 test("worker API manages account workspace and team members", async () => {
@@ -1786,6 +1849,51 @@ type SessionResponse = {
   user: {
     id: string;
     email: string;
+  };
+};
+
+type ReadinessResponse = {
+  service: "openmemory-api";
+  tenant: {
+    id: string;
+    source: "session" | "local-header";
+    localDevelopment: boolean;
+  };
+  graph: {
+    activeMemories: number;
+    totalMemories: number;
+    totalEdges: number;
+    relationshipTypes: number;
+    graphDensity: number;
+  };
+  relationships: {
+    catalogSize: number;
+    top: Array<{
+      relationship: string;
+      label: string;
+      category: string;
+      count: number;
+    }>;
+  };
+  bindings: {
+    authDb: boolean;
+    durableObjects: boolean;
+    vectorize: boolean;
+    workersAi: boolean;
+    r2Exports: boolean;
+  };
+  auth: {
+    mode: "session" | "local-development-header";
+  };
+  mcp: {
+    endpoint: string;
+    authorizationServer: string;
+    protectedResource: string;
+    tools: string[];
+  };
+  rateLimit: {
+    enabled: boolean;
+    limitPerMinute: number;
   };
 };
 

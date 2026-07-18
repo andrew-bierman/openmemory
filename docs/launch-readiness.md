@@ -39,6 +39,8 @@ larger hosted push.
   and hourly live-smoke alerting cover the alpha operations baseline.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
+- `docs/data-model.md` documents the current D1, Durable Object, Vectorize, R2,
+  Queue/Workflow, OAuth, MCP, and readiness data shape.
 - Public launch copy and first-feedback triage guidance are written in
   `docs/launch-announcement.md`.
 

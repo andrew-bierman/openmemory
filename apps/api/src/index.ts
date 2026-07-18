@@ -54,6 +54,7 @@ import {
   logRequest,
   type RateLimitResult,
 } from "./operational-controls";
+import { getReadinessSnapshot } from "./readiness";
 import { indexMemory, semanticSearch } from "./semantic-index";
 import {
   getGraphForTenant,
@@ -213,6 +214,7 @@ async function withTenant(request: Request, headers: HeaderSource) {
     return {
       tenant: auth,
       graph: undefined,
+      sessionTenant: undefined,
     };
   }
 
@@ -221,6 +223,7 @@ async function withTenant(request: Request, headers: HeaderSource) {
     return {
       tenant: sessionTenant,
       graph: getGraph(env, sessionTenant.tenantId),
+      sessionTenant,
     };
   }
 
@@ -231,12 +234,14 @@ async function withTenant(request: Request, headers: HeaderSource) {
     return {
       tenant,
       graph: undefined,
+      sessionTenant: undefined,
     };
   }
 
   return {
     tenant,
     graph: getGraph(env, tenant.tenantId),
+    sessionTenant: undefined,
   };
 }
 
@@ -579,6 +584,21 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     }
 
     return graph.getProfile();
+  })
+  .get("/v1/readiness", async ({ headers, request, status }) => {
+    const { tenant, graph, sessionTenant } = await withTenant(request, headers);
+    if (!graph) {
+      return status(errorStatus(tenantError(tenant)), tenant);
+    }
+
+    const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+    return getReadinessSnapshot({
+      env,
+      graph,
+      request,
+      sessionTenant,
+      tenantId,
+    });
   })
   .get("/v1/oauth/connections", async ({ request, status }) => {
     const result = await listOAuthConnections(env, request);

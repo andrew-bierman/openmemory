@@ -32,6 +32,18 @@ export type RequestLogFields = {
   response: Response;
 };
 
+export type RateLimitSettings = {
+  enabled: boolean;
+  limit: number;
+};
+
+export function getRateLimitSettings(
+  request: Request,
+  env: Env,
+): RateLimitSettings {
+  return rateLimitOptions(request, env);
+}
+
 export function checkRateLimit(
   request: Request,
   env: Env,

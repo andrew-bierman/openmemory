@@ -8,9 +8,11 @@ import {
   type Memory,
   type OAuthConnection,
   OpenMemoryApiError,
+  type ReadinessSnapshot,
   type SourceIngestResult,
 } from "@openmemory/client";
 import {
+  Badge,
   Button,
   Card,
   Input,
@@ -25,7 +27,9 @@ import { createRoute } from "@tanstack/react-router";
 import type { Updater } from "@tanstack/react-table";
 import {
   Activity,
+  AlertTriangle,
   Brain,
+  CheckCircle2,
   Database,
   FileText,
   GitBranch,
@@ -34,6 +38,7 @@ import {
   Plug,
   RefreshCw,
   Send,
+  ServerCog,
   ShieldCheck,
 } from "lucide-react";
 import {
@@ -75,6 +80,7 @@ import {
   getIndexReadinessSummary,
   getLifecycleDistribution,
   getMemoryNeighborDetails,
+  getReadinessSummary,
   getRecentActivity,
   getRelationshipReadinessSummary,
   getSourceIngestSummary,
@@ -107,6 +113,7 @@ const VIEW_LABELS = {
   ingest: "Ingest",
   graph: "Knowledge Map",
   mcp: "MCP",
+  operations: "Operations",
   admin: "Admin",
 } as const;
 
@@ -228,6 +235,11 @@ function Home() {
     queryKey: ["openmemory", "oauth-connections", ...queryScope],
     queryFn: () => api.listOAuthConnections().catch(() => []),
   });
+  const readinessQuery = useQuery({
+    enabled: hasLoadedConnection,
+    queryKey: ["openmemory", "readiness", ...queryScope],
+    queryFn: () => api.getReadiness().catch(() => null),
+  });
   const accountQuery = useQuery<Account | null>({
     enabled: hasLoadedConnection && !usesLocalTenant,
     queryKey: ["openmemory", "account", ...queryScope],
@@ -244,6 +256,7 @@ function Home() {
   const graphStats = graphStatsQuery.data ?? null;
   const graphRelationships = graphRelationshipsQuery.data ?? [];
   const oauthConnections = oauthConnectionsQuery.data ?? [];
+  const readiness = readinessQuery.data ?? null;
   const account = accountQuery.data ?? null;
   const context = contextQuery.data ?? null;
   const profile = profileQuery.data?.summary ?? "";
@@ -285,6 +298,7 @@ function Home() {
       queryClient.invalidateQueries({
         queryKey: ["openmemory", "oauth-connections"],
       }),
+      queryClient.invalidateQueries({ queryKey: ["openmemory", "readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["openmemory", "account"] }),
       queryClient.invalidateQueries({ queryKey: ["openmemory", "session"] }),
       queryClient.invalidateQueries({ queryKey: ["openmemory", "context"] }),
@@ -526,6 +540,7 @@ function Home() {
     neighborsQuery.isFetching ||
     accountQuery.isFetching ||
     oauthConnectionsQuery.isFetching ||
+    readinessQuery.isFetching ||
     contextQuery.isFetching ||
     createMemoryMutation.isPending ||
     ingestSourceMutation.isPending ||
@@ -804,19 +819,19 @@ function Home() {
         />
 
         <TabsList aria-label="Workspace views" className="tabs">
-          {(["recall", "ingest", "graph", "mcp", "admin"] as const).map(
-            (item) => (
-              <TabsTrigger
-                active={view === item}
-                aria-selected={view === item}
-                key={item}
-                onClick={() => selectView(item)}
-                type="button"
-              >
-                {VIEW_LABELS[item]}
-              </TabsTrigger>
-            ),
-          )}
+          {(
+            ["recall", "ingest", "graph", "mcp", "operations", "admin"] as const
+          ).map((item) => (
+            <TabsTrigger
+              active={view === item}
+              aria-selected={view === item}
+              key={item}
+              onClick={() => selectView(item)}
+              type="button"
+            >
+              {VIEW_LABELS[item]}
+            </TabsTrigger>
+          ))}
         </TabsList>
 
         <form className="toolbar" onSubmit={recall}>
@@ -946,6 +961,14 @@ function Home() {
                 apiUrl={apiUrl}
                 connections={oauthConnections}
                 onRevoke={revokeOAuthConnection}
+              />
+            ) : view === "operations" ? (
+              <OperationsReadiness
+                apiUrl={apiUrl}
+                graphStats={graphStats}
+                isLoading={isLoading}
+                onRefresh={refresh}
+                readiness={readiness}
               />
             ) : view === "admin" ? (
               <AdminWorkspace
@@ -1078,6 +1101,229 @@ function OnboardingEmptyState({
   );
 }
 
+function OperationsReadiness({
+  apiUrl,
+  graphStats,
+  isLoading,
+  onRefresh,
+  readiness,
+}: Readonly<{
+  apiUrl: string;
+  graphStats: GraphStats | null;
+  isLoading: boolean;
+  onRefresh: () => Promise<void>;
+  readiness: ReadinessSnapshot | null;
+}>) {
+  const summary = getReadinessSummary(readiness);
+  const bindingRows = readiness
+    ? Object.entries(readiness.bindings).map(([key, configured]) => ({
+        configured,
+        key,
+        label: formatBindingLabel(key),
+      }))
+    : [];
+  const warningRows = readiness?.warnings ?? [];
+
+  return (
+    <section className="operations-stack" aria-label="Operations readiness">
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">Launch readiness</p>
+          <h2>Operations</h2>
+        </div>
+        <Button
+          disabled={isLoading}
+          onClick={() => void onRefresh()}
+          type="button"
+        >
+          <RefreshCw aria-hidden="true" />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="readiness-grid">
+        <ReadinessCard
+          icon={<ServerCog aria-hidden="true" />}
+          label="Bindings"
+          status={`${summary.configuredBindings}/${summary.totalBindings}`}
+          tone={
+            summary.configuredBindings === summary.totalBindings
+              ? "good"
+              : "warn"
+          }
+          value="Cloudflare services"
+        />
+        <ReadinessCard
+          icon={<GitBranch aria-hidden="true" />}
+          label="Graph"
+          status={summary.graphStatus}
+          tone={summary.graphStatus === "Typed graph" ? "good" : "warn"}
+          value={`${readiness?.graph.totalEdges ?? graphStats?.totalEdges ?? 0} edges`}
+        />
+        <ReadinessCard
+          icon={<Plug aria-hidden="true" />}
+          label="MCP"
+          status={summary.mcpStatus}
+          tone={summary.mcpStatus === "Discoverable" ? "good" : "warn"}
+          value={`${readiness?.mcp.tools.length ?? 0} tools`}
+        />
+        <ReadinessCard
+          icon={
+            summary.warningCount === 0 ? (
+              <CheckCircle2 aria-hidden="true" />
+            ) : (
+              <AlertTriangle aria-hidden="true" />
+            )
+          }
+          label="Warnings"
+          status={String(summary.warningCount)}
+          tone={summary.warningCount === 0 ? "good" : "warn"}
+          value={summary.productionReady ? "Ready signal" : "Needs review"}
+        />
+      </div>
+
+      <div className="operations-grid">
+        <section className="operations-card">
+          <div className="panel-heading">
+            <span>Tenant and auth</span>
+            <Badge variant="outline">
+              {readiness?.tenant.source ?? "loading"}
+            </Badge>
+          </div>
+          <dl className="definition-list">
+            <div>
+              <dt>Tenant</dt>
+              <dd>{readiness?.tenant.id ?? "Loading"}</dd>
+            </div>
+            <div>
+              <dt>Mode</dt>
+              <dd>{readiness?.auth.mode ?? "Unknown"}</dd>
+            </div>
+            <div>
+              <dt>Better Auth URL</dt>
+              <dd>{readiness?.auth.betterAuthUrl ?? cleanBaseUrl(apiUrl)}</dd>
+            </div>
+            <div>
+              <dt>Providers</dt>
+              <dd>
+                GitHub {readiness?.auth.socialProviders.github ? "on" : "off"} ·
+                Google {readiness?.auth.socialProviders.google ? "on" : "off"}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section className="operations-card">
+          <div className="panel-heading">
+            <span>MCP discovery</span>
+            <Badge>{summary.mcpStatus}</Badge>
+          </div>
+          <dl className="definition-list">
+            <div>
+              <dt>Endpoint</dt>
+              <dd>
+                {readiness?.mcp.endpoint ?? `${cleanBaseUrl(apiUrl)}/mcp`}
+              </dd>
+            </div>
+            <div>
+              <dt>Authorization</dt>
+              <dd>{readiness?.mcp.authorizationServer ?? "Loading"}</dd>
+            </div>
+            <div>
+              <dt>Protected resource</dt>
+              <dd>{readiness?.mcp.protectedResource ?? "Loading"}</dd>
+            </div>
+            <div>
+              <dt>Tools</dt>
+              <dd>{readiness?.mcp.tools.join(", ") ?? "Loading"}</dd>
+            </div>
+          </dl>
+        </section>
+      </div>
+
+      <section className="operations-card">
+        <div className="panel-heading">
+          <span>Cloudflare bindings</span>
+          <strong>{summary.configuredBindings} configured</strong>
+        </div>
+        <div className="binding-grid">
+          {bindingRows.map((binding) => (
+            <div
+              className={
+                binding.configured ? "binding-pill configured" : "binding-pill"
+              }
+              key={binding.key}
+            >
+              {binding.configured ? (
+                <CheckCircle2 aria-hidden="true" />
+              ) : (
+                <AlertTriangle aria-hidden="true" />
+              )}
+              <span>{binding.label}</span>
+            </div>
+          ))}
+          {bindingRows.length === 0 ? (
+            <div className="empty-state compact">
+              <h3>Readiness loading</h3>
+              <p>Refresh once the API connection is available.</p>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="operations-card">
+        <div className="panel-heading">
+          <span>Warnings</span>
+          <strong>{warningRows.length}</strong>
+        </div>
+        {warningRows.length === 0 ? (
+          <div className="status-strip success">
+            <CheckCircle2 aria-hidden="true" />
+            <span>
+              <strong>No readiness warnings</strong>
+              <small>
+                Current tenant and configured bindings look consistent.
+              </small>
+            </span>
+          </div>
+        ) : (
+          <ul className="warning-list">
+            {warningRows.map((warning) => (
+              <li key={warning}>
+                <AlertTriangle aria-hidden="true" />
+                <span>{formatWarningLabel(warning)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </section>
+  );
+}
+
+function ReadinessCard({
+  icon,
+  label,
+  status,
+  tone,
+  value,
+}: Readonly<{
+  icon: ReactNode;
+  label: string;
+  status: string;
+  tone: "good" | "warn";
+  value: string;
+}>) {
+  return (
+    <div className={`readiness-card ${tone}`}>
+      {icon}
+      <span>{label}</span>
+      <strong>{status}</strong>
+      <small>{value}</small>
+    </div>
+  );
+}
+
 function SidebarNav({
   activeView,
   onSelect,
@@ -1108,6 +1354,12 @@ function SidebarNav({
       label: "Knowledge Map",
       description: "Graph inspection and repair",
       icon: <Network aria-hidden="true" />,
+    },
+    {
+      view: "operations",
+      label: "Operations",
+      description: "Readiness and launch evidence",
+      icon: <ServerCog aria-hidden="true" />,
     },
     {
       view: "admin",
@@ -1764,6 +2016,19 @@ function McpSetup({
       )}
     </div>
   );
+}
+
+function formatBindingLabel(value: string) {
+  return value
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function formatWarningLabel(value: string) {
+  return value
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function parseTags(value: string) {

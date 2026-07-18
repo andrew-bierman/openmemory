@@ -114,6 +114,64 @@ export type IndexRepairResult = {
   vectorizeConfigured: boolean;
 };
 
+export type ReadinessSnapshot = {
+  service: "openmemory-api";
+  generatedAt: string;
+  tenant: {
+    id: string;
+    source: "session" | "local-header";
+    localDevelopment: boolean;
+  };
+  graph: {
+    activeMemories: number;
+    totalMemories: number;
+    totalEdges: number;
+    relationshipTypes: number;
+    graphDensity: number;
+    entityCount: number;
+    tagCount: number;
+  };
+  relationships: {
+    catalogSize: number;
+    top: GraphStats["relationshipDistribution"];
+  };
+  bindings: Record<
+    | "authDb"
+    | "durableObjects"
+    | "vectorize"
+    | "workersAi"
+    | "r2Exports"
+    | "analytics"
+    | "memoryExtractionQueue"
+    | "memoryExtractionWorkflow"
+    | "sourceIngestionQueue"
+    | "sourceIngestionWorkflow",
+    boolean
+  >;
+  auth: {
+    mode: "session" | "local-development-header";
+    betterAuthUrl: string;
+    socialProviders: {
+      github: boolean;
+      google: boolean;
+    };
+  };
+  mcp: {
+    endpoint: string;
+    authorizationServer: string;
+    protectedResource: string;
+    tools: Array<"remember" | "recall" | "profile" | "forget">;
+  };
+  rateLimit: {
+    enabled: boolean;
+    limitPerMinute: number;
+  };
+  exports: {
+    r2Configured: boolean;
+  };
+  warnings: string[];
+};
+
 export type CreateMemoryInput = {
   content: string;
   tags?: string[];
@@ -197,6 +255,7 @@ export function createOpenMemoryClient(
         client.v1.graph.relationships.get(),
       ),
     getAccount: () => unwrap<Account>(client.v1.account.get()),
+    getReadiness: () => unwrap<ReadinessSnapshot>(client.v1.readiness.get()),
     updateAccountProfile: (name: string) =>
       unwrap<Account>(client.v1.account.profile.patch({ name })),
     renameWorkspace: (name: string) =>
@@ -278,6 +337,9 @@ type EdenClient = {
       } & ((params: { memberId: string }) => {
         delete(): EdenResult;
       });
+    };
+    readiness: {
+      get(): EdenResult;
     };
     oauth: {
       connections: {
