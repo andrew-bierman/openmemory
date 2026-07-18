@@ -228,6 +228,10 @@ browser/API smoke for the deployed product.
 bun run release:validate
 ```
 
+Maintainers can also run the manual `Release Qualification` GitHub Actions
+workflow before publishing a tag. It records the full local release gate and a
+configurable high-volume graph scale run.
+
 For the faster pull-request loop:
 
 ```sh
@@ -263,6 +267,7 @@ Optional heavier local scale check:
 
 ```sh
 bun run test:scale:local
+OPENMEMORY_SCALE_GRAPH_SIZE=1000 bun run test:scale:local
 ```
 
 Optional live checks:
