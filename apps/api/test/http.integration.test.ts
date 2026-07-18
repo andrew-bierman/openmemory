@@ -1303,15 +1303,17 @@ test("deterministic reranker prefers important and confident current memories", 
 }, 45_000);
 
 test("graph stats and recall stay bounded on a larger local graph", async () => {
-  const worker = await startWorker();
-  workers.push(worker);
-
-  const tenant = `tenant-scale-${crypto.randomUUID()}`;
-  const topics = ["Atlas", "Borealis", "Cosmos", "Delta"];
   const requestedGraphSize = Number(process.env.OPENMEMORY_SCALE_GRAPH_SIZE);
   const graphSize = Number.isFinite(requestedGraphSize)
     ? Math.max(220, Math.min(1_000, requestedGraphSize))
     : 220;
+  const worker = await startWorker({
+    OPENMEMORY_RATE_LIMIT_PER_MINUTE: String(graphSize + 50),
+  });
+  workers.push(worker);
+
+  const tenant = `tenant-scale-${crypto.randomUUID()}`;
+  const topics = ["Atlas", "Borealis", "Cosmos", "Delta"];
   for (let index = 0; index < graphSize; index += 1) {
     const topic = topics[index % topics.length];
     await createMemory(worker, tenant, {
