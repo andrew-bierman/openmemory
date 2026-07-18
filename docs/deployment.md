@@ -10,6 +10,7 @@ The API is deployed to Cloudflare Workers:
 - D1 `openmemory-auth` is bound as `AUTH_DB`.
 - Durable Object `MemoryGraph` is bound as `MEMORY_GRAPHS`.
 - Vectorize `openmemory-vectors` is bound as `MEMORY_VECTORS`.
+- Workers AI is bound as `AI` for embeddings and optional recall reranking.
 - R2 `openmemory-exports` is bound as `MEMORY_EXPORTS`.
 - `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` are set as Worker secrets.
 
@@ -103,6 +104,11 @@ instance. Set `OPENMEMORY_RATE_LIMIT_ENABLED=false` only for trusted controlled
 environments.
 Responses include `x-openmemory-request-id`, `x-ratelimit-limit`,
 `x-ratelimit-remaining`, `x-ratelimit-reset`, and `x-ratelimit-scope`.
+
+Optional recall reranking can be enabled by setting `OPENMEMORY_RERANK_MODEL`
+to a Workers AI text-generation model. When unset, recall uses deterministic
+ranking only. `OPENMEMORY_RERANK_TIMEOUT_MS` defaults to `900`; timeout,
+malformed model output, or local binding gaps fall back to deterministic order.
 
 ## Cloudflare Git Deploys
 

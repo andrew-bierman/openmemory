@@ -18,6 +18,7 @@ import { resolveAuthBaseUrl } from "./better-auth";
 import type { Env } from "./env";
 import { getRequiredMcpScopesForRequest } from "./mcp-scopes";
 import type { MemoryGraph } from "./memory-graph";
+import { buildRecallContext } from "./recall";
 
 export function createOpenMemoryMcpHandler(): (
   request: Request,
@@ -81,11 +82,7 @@ async function handleMcpRequest(
 
   const graph = getGraph(env, tenant.tenantId) as unknown as Pick<
     MemoryGraph,
-    | "createMemory"
-    | "forgetMemory"
-    | "getContext"
-    | "getProfile"
-    | "listMemories"
+    "createMemory" | "forgetMemory" | "getProfile" | "listMemories" | "search"
   >;
   const server = new McpServer({
     name: "openmemory",
@@ -134,7 +131,10 @@ async function handleMcpRequest(
       includeHistorical: z.boolean().optional(),
     },
     async ({ query, limit = 8, includeHistorical = false }) => {
-      const context = await graph.getContext(
+      const context = await buildRecallContext(
+        env,
+        tenant.tenantId,
+        graph,
         ContextSchema.parse({
           q: query,
           limit,
@@ -246,7 +246,10 @@ async function handleMcpRequest(
     },
     async ({ query = "current user context", limit }) => {
       const parsedLimit = normalizePromptLimit(limit);
-      const context = await graph.getContext(
+      const context = await buildRecallContext(
+        env,
+        tenant.tenantId,
+        graph,
         ContextSchema.parse({
           q: query,
           limit: parsedLimit,

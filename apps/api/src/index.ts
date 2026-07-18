@@ -13,7 +13,6 @@ import {
   GraphExportPayloadSchema,
   IngestSourceSchema,
   normalizeTenantId,
-  SearchSchema,
   UpdateMemorySchema,
 } from "@openmemory/core";
 import { Elysia, t } from "elysia";
@@ -63,11 +62,11 @@ import {
   type RateLimitResult,
 } from "./operational-controls";
 import { getReadinessSnapshot } from "./readiness";
+import { buildRecallContext, searchMemories } from "./recall";
 import {
   deleteTenantVectors,
   getSemanticIndexDiagnostic,
   indexMemory,
-  semanticSearch,
 } from "./semantic-index";
 import {
   getGraphForTenant,
@@ -668,18 +667,12 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
-      const input = SearchSchema.parse({
-        limit: 10,
-        tags: [],
-        ...body,
-      });
-      const semanticIds = await semanticSearch(
+      return searchMemories(
         env,
         "tenantId" in tenant ? tenant.tenantId : "",
-        input.q,
-        input.limit,
+        graph,
+        body,
       );
-      return graph.search({ ...input, semanticIds });
     },
     { body: searchBody },
   )
@@ -691,7 +684,12 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
-      return graph.getContext(ContextSchema.parse(body));
+      return buildRecallContext(
+        env,
+        "tenantId" in tenant ? tenant.tenantId : "",
+        graph,
+        ContextSchema.parse(body),
+      );
     },
     { body: contextBody },
   )
