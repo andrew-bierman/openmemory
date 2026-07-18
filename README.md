@@ -293,6 +293,19 @@ Benchmark runs write ignored JSONL evidence under
 `.tmp/benchmark-reports/`, including recall-quality scores, graph size, recall
 latency, and asserted thresholds.
 
+Optional hosted graph benchmark:
+
+```sh
+bun run test:benchmark:live
+```
+
+The live benchmark creates and deletes a synthetic hosted account, imports a
+bounded graph, measures hosted recall latency, and writes
+`.tmp/benchmark-reports/live-production.jsonl`. Set
+`OPENMEMORY_LIVE_BASE_URL` for a non-default deployment and
+`OPENMEMORY_LIVE_GRAPH_SIZE` to request a size; the test clamps live graph size
+between 40 and 160 memories.
+
 Convert external MemoryBench-style JSON or JSONL fixtures into an OpenMemory
 graph export for local restore/import evaluation:
 
@@ -321,7 +334,8 @@ Current priorities:
 - Expand charts and the knowledge map for graph health, recall quality, index
   freshness, and MCP usage.
 - Expand recall quality benchmarks with larger MemoryBench-style fixtures.
-- Add larger graph performance benchmarks and production telemetry.
+- Compare recurring hosted graph benchmark artifacts with local benchmark
+  reports before broad hosted usage.
 - Deepen MCP client compatibility testing with real external clients.
 - Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
 

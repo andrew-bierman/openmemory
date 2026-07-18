@@ -75,6 +75,20 @@ To run the largest supported local graph gate explicitly:
 OPENMEMORY_SCALE_GRAPH_SIZE=1000 bun run test:scale:local
 ```
 
+The hosted production graph benchmark is separate from `release:validate`
+because it creates production Durable Object, Vectorize, and auth state for a
+throwaway account:
+
+```sh
+bun run test:benchmark:live
+```
+
+It imports a generated graph export, asserts hosted graph recall latency under
+`12s`, deletes the account through `DELETE /v1/account`, and writes
+`.tmp/benchmark-reports/live-production.jsonl`. Set
+`OPENMEMORY_LIVE_GRAPH_SIZE` to request a size; the live test clamps it between
+40 and 160 memories.
+
 External MemoryBench-style fixtures can be converted into an OpenMemory graph
 export for local restore/import testing:
 
@@ -114,6 +128,12 @@ MCP bearer-token `remember`, `recall`, `profile`, and `forget`. The hosted UI
 smoke also verifies the authenticated browser session can fetch readiness
 content from the deployed Worker.
 
+Use the `Live Production Benchmark` workflow for recurring hosted graph
+performance evidence. It runs the same live benchmark command, defaults to an
+80-memory synthetic graph, runs on a daily schedule, and uploads
+`live-production-benchmark` artifacts for comparison across production
+deployments.
+
 ## Release Evidence
 
 For each release, record:
@@ -121,6 +141,7 @@ For each release, record:
 - commit SHA
 - local gate result
 - live gate result, if run
+- live production benchmark result, if run
 - Cloudflare Workers Build result
 - R2 lifecycle policy verification result
 - known skipped checks or production limitations

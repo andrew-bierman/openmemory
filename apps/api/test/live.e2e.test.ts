@@ -1,10 +1,20 @@
+import { appendFile, mkdir } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { GraphExportPayloadSchema } from "@openmemory/core";
 import { describe, expect, test } from "vitest";
 
 const runLiveE2E = process.env.OPENMEMORY_LIVE_E2E === "true";
+const runLiveBenchmark = process.env.OPENMEMORY_LIVE_BENCHMARK === "true";
 const baseUrl =
   process.env.OPENMEMORY_LIVE_BASE_URL ??
   "https://openmemory-api.abbierman101.workers.dev";
 const origin = baseUrl;
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const liveGraphSize = parseLiveGraphSize(
+  process.env.OPENMEMORY_LIVE_GRAPH_SIZE,
+);
+const liveRecallThresholdMs = 12_000;
 
 describe.runIf(runLiveE2E)("live production e2e", () => {
   test("supports hosted UI, session auth, graph recall, OAuth, and MCP bearer access", async () => {
@@ -382,6 +392,189 @@ describe.skipIf(runLiveE2E)("live production e2e", () => {
   });
 });
 
+describe.runIf(runLiveBenchmark)("live production graph benchmark", () => {
+  test("keeps hosted graph recall bounded on a synthetic tenant", async () => {
+    const email = `live-benchmark-${crypto.randomUUID()}@example.com`;
+    const password = "password1234";
+    let cookie = "";
+    let cleanup: { confirmEmail: string; confirmTenantId: string } | undefined;
+
+    try {
+      const signUp = await fetchLive("/api/auth/sign-up/email", {
+        method: "POST",
+        headers: jsonHeaders(),
+        body: JSON.stringify({
+          name: "Live Benchmark",
+          email,
+          password,
+        }),
+      });
+      cookie = cookieHeader(signUp);
+      await expectOk(signUp);
+
+      const account = await authedJson<AccountResponse>(cookie, "/v1/account");
+      cleanup = {
+        confirmEmail: account.user.email,
+        confirmTenantId: account.workspace.tenantId,
+      };
+
+      const graphExport = createBenchmarkGraphExport(liveGraphSize);
+      const importStartedAt = performance.now();
+      const imported = await authedJson<GraphImportResponse>(
+        cookie,
+        "/v1/imports",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            confirmTenantId: account.workspace.tenantId,
+            mode: "merge",
+            export: graphExport,
+          }),
+        },
+      );
+      const importElapsedMs = performance.now() - importStartedAt;
+      expect(imported.memoriesImported).toBe(liveGraphSize);
+      expect(imported.edgesImported).toBe(graphExport.edges.length);
+
+      const stats = await authedJson<GraphStatsResponse>(
+        cookie,
+        "/v1/graph/stats",
+      );
+      expect(stats.activeMemories).toBeGreaterThanOrEqual(liveGraphSize);
+      expect(stats.totalEdges).toBeGreaterThanOrEqual(graphExport.edges.length);
+
+      const recallStartedAt = performance.now();
+      const results = await authedJson<SearchResponse[]>(cookie, "/v1/search", {
+        method: "POST",
+        body: JSON.stringify({
+          q: "Atlas Graph Indexing retrieval notes",
+          limit: 10,
+        }),
+      });
+      const recallElapsedMs = performance.now() - recallStartedAt;
+
+      await appendBenchmarkReport({
+        type: "live-production-graph-scale",
+        tenant: account.workspace.tenantId,
+        baseUrl,
+        graphSize: liveGraphSize,
+        activeMemories: stats.activeMemories,
+        totalEdges: stats.totalEdges,
+        importedMemories: imported.memoriesImported,
+        importedEdges: imported.edgesImported,
+        importElapsedMs: Number(importElapsedMs.toFixed(2)),
+        recallLimit: 10,
+        recallResultCount: results.length,
+        recallElapsedMs: Number(recallElapsedMs.toFixed(2)),
+        recallElapsedThresholdMs: liveRecallThresholdMs,
+      });
+
+      expect(results).toHaveLength(10);
+      expect(results[0]?.content).toContain("Atlas");
+      expect(recallElapsedMs).toBeLessThan(liveRecallThresholdMs);
+    } finally {
+      if (cookie && cleanup) {
+        await fetchLive("/v1/account", {
+          method: "DELETE",
+          headers: {
+            cookie,
+            origin,
+            "content-type": "application/json",
+            accept: "application/json",
+          },
+          body: JSON.stringify(cleanup),
+        }).catch((error) => {
+          console.warn(
+            `Live benchmark account cleanup failed: ${String(error)}`,
+          );
+        });
+      }
+    }
+  }, 180_000);
+});
+
+describe.skipIf(runLiveBenchmark)("live production graph benchmark", () => {
+  test("set OPENMEMORY_LIVE_BENCHMARK=true to run production graph benchmark", () => {
+    expect(runLiveBenchmark).toBe(false);
+  });
+});
+
+describe("live benchmark helpers", () => {
+  test("clamps requested hosted graph size", () => {
+    expect(parseLiveGraphSize(undefined)).toBe(80);
+    expect(parseLiveGraphSize("12")).toBe(40);
+    expect(parseLiveGraphSize("72.8")).toBe(72);
+    expect(parseLiveGraphSize("10000")).toBe(160);
+  });
+
+  test("generates a graph export accepted by the import schema", () => {
+    const graphExport = GraphExportPayloadSchema.parse(
+      createBenchmarkGraphExport(40),
+    );
+
+    expect(graphExport.memories).toHaveLength(40);
+    expect(graphExport.edges).toHaveLength(39);
+    expect(graphExport.memories[0]).toMatchObject({
+      source: "live-production-benchmark",
+      status: "active",
+      isLatest: true,
+    });
+    expect(graphExport.edges[0]).toMatchObject({
+      sourceId: "mem_live_benchmark_0000",
+      targetId: "mem_live_benchmark_0001",
+      relationship: "supports",
+    });
+  });
+});
+
+function createBenchmarkGraphExport(graphSize: number) {
+  const importedAt = "2026-07-18T00:00:00.000Z";
+  const topics = ["Atlas", "Borealis", "Cosmos", "Delta"];
+  const memories = Array.from({ length: graphSize }, (_, index) => {
+    const topic = topics[index % topics.length];
+    return {
+      id: `mem_live_benchmark_${index.toString().padStart(4, "0")}`,
+      content: `${topic} project memory ${index}: Graph Indexing connects hosted source chunks, decisions, and retrieval notes.`,
+      source: "live-production-benchmark",
+      type: "fact" as const,
+      tags: ["live-benchmark", topic.toLowerCase()],
+      metadata: {
+        benchmark: "live-production-graph-scale",
+        topic,
+        index,
+      },
+      entityIds: [slugifyEntity(topic), "graph-indexing"],
+      confidence: index % 10 === 0 ? 0.95 : 0.7,
+      importance: index % 10 === 0 ? 0.9 : 0.5,
+      status: "active" as const,
+      isLatest: true,
+      version: 1,
+      createdAt: importedAt,
+      updatedAt: importedAt,
+    };
+  });
+  const edges = memories.slice(1).map((memory, index) => ({
+    sourceId: memories[index]?.id ?? memory.id,
+    targetId: memory.id,
+    relationship: index % 3 === 0 ? "supports" : "shares_entity",
+    weight: index % 3 === 0 ? 0.8 : 0.7,
+    metadata: { benchmark: "live-production-graph-scale" },
+    createdAt: importedAt,
+    updatedAt: importedAt,
+  }));
+
+  return {
+    version: 1 as const,
+    exportedAt: importedAt,
+    stats: {
+      benchmark: "live-production-graph-scale",
+      graphSize,
+    },
+    memories,
+    edges,
+  };
+}
+
 function mcpText(response: unknown) {
   const result = (response as { result?: unknown }).result;
   const content = (result as { content?: Array<{ text?: string }> } | undefined)
@@ -478,6 +671,38 @@ function splitSetCookieHeader(value: string) {
   return value ? value.split(/,(?=\s*[^;,]+=)/) : [];
 }
 
+async function appendBenchmarkReport(entry: Record<string, unknown>) {
+  const reportPath = process.env.OPENMEMORY_BENCHMARK_REPORT;
+  if (!reportPath) {
+    return;
+  }
+  const resolvedReportPath = reportPath.startsWith("/")
+    ? reportPath
+    : join(repoRoot, reportPath);
+
+  await mkdir(dirname(resolvedReportPath), { recursive: true });
+  await appendFile(
+    resolvedReportPath,
+    `${JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      commit: process.env.GITHUB_SHA ?? process.env.CI_COMMIT_SHA,
+      ...entry,
+    })}\n`,
+  );
+}
+
+function parseLiveGraphSize(value: string | undefined) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 80;
+  }
+  return Math.max(40, Math.min(160, Math.trunc(parsed)));
+}
+
+function slugifyEntity(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
 async function pkceChallenge(verifier: string) {
   const hash = await crypto.subtle.digest(
     "SHA-256",
@@ -512,6 +737,7 @@ type AccountResponse = {
 
 type MemoryResponse = {
   id: string;
+  content: string;
   entityIds: string[];
   metadata: Record<string, unknown>;
 };
@@ -546,6 +772,11 @@ type GraphExportResponse = {
   key: string;
   memoryCount: number;
   writtenToR2: boolean;
+};
+
+type GraphImportResponse = {
+  memoriesImported: number;
+  edgesImported: number;
 };
 
 type ReadinessResponse = {
