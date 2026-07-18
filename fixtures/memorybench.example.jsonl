@@ -1,0 +1,5 @@
+{"kind":"memory","key":"maya-review","query":"Maya TypeScript review preference","content":"Maya prefers concise TypeScript code reviews.","tags":["people","reviews"],"type":"preference","importance":0.9}
+{"kind":"memory","key":"atlas-launch","query":"Atlas launch date","content":"Atlas launch moved to Tuesday.","tags":["projects"],"type":"decision"}
+{"kind":"distractor","key":"maya-book-club","content":"Maya likes long-form prose in book club notes.","tags":["distractor"]}
+{"kind":"case","query":"Maya TypeScript review preference","targetKey":"maya-review"}
+{"kind":"edge","sourceKey":"maya-review","targetKey":"atlas-launch","relationship":"supports"}

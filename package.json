@@ -38,6 +38,7 @@
     "test": "turbo run test",
     "test:benchmark:local": "bun run --cwd apps/api test:benchmark",
     "test:scale:local": "bun run --cwd apps/api test:scale",
+    "benchmark:import": "bun scripts/import-memorybench-fixture.ts",
     "test:mcp:sdk": "bun run build:web-shell && bun scripts/mcp-sdk-smoke.ts",
     "test:integration:local": "bun run --cwd apps/api test:integration",
     "test:integration:docker": "docker compose -f docker-compose.test.yml run --build --rm local-wrangler-integration",

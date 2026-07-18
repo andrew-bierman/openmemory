@@ -68,6 +68,19 @@ To run the largest supported local graph gate explicitly:
 OPENMEMORY_SCALE_GRAPH_SIZE=1000 bun run test:scale:local
 ```
 
+External MemoryBench-style fixtures can be converted into an OpenMemory graph
+export for local restore/import testing:
+
+```sh
+bun run benchmark:import -- fixtures/memorybench.example.jsonl --out .tmp/memorybench-export.json
+```
+
+The importer accepts JSON fixture objects with `memories`, `distractors`,
+`cases`, and `edges`, or JSONL rows with `kind: "memory"`, `"distractor"`,
+`"case"`, or `"edge"`. It validates references and writes a
+`GraphExportPayloadSchema`-compatible export, with recall cases preserved under
+`stats.cases`.
+
 ## Recorded GitHub Gate
 
 Use the manual `Release Qualification` workflow before publishing a release tag

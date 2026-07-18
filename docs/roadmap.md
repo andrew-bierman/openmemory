@@ -94,6 +94,8 @@
   remove workspace members, manage runtime settings, and revoke MCP OAuth
   grants.
 - Local recall benchmark coverage includes larger MemoryBench-style golden cases across people, decisions, preferences, source chunks, graph expansion, operations, MCP, UI, and distractors.
+- `bun run benchmark:import` converts JSON or JSONL MemoryBench-style fixtures
+  into OpenMemory graph export payloads for local restore/import evaluation.
 - Local graph performance coverage exercises a 220-memory tenant graph, and the
   dashboard exposes graph operations status from active node and edge density
   signals.
@@ -111,8 +113,6 @@
     explorer, but still needs broader hosted user feedback on navigation
 - RAG quality is still basic:
   - no LLM/ML reranker
-- recall benchmark coverage has larger golden fixtures, but still needs an
-  external MemoryBench import path if we adopt a third-party benchmark corpus
 - Graph performance has larger local smoke coverage, graph-specific product
   signals, relationship diagnostics, and production request telemetry, but
   still needs high-volume production benchmarks before a hosted SaaS launch.
@@ -146,8 +146,8 @@
      has enough production traces to evaluate.
    - Store embeddings in Vectorize for every chunk and add deeper stale-index diagnostics.
    - Tune deterministic reranking and evaluate an optional LLM/ML reranker.
-   - Add an external MemoryBench fixture importer if a stable public corpus is
-     selected.
+   - Use `bun run benchmark:import` when evaluating external MemoryBench-style
+     corpora.
    - Add higher-volume graph performance benchmarks and production telemetry.
 
 4. Web app expansion
