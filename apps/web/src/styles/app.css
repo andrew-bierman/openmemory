@@ -18,6 +18,7 @@
   --accent: #2563eb;
   --accent-2: #0f766e;
   --accent-foreground: #ffffff;
+  --destructive: #dc2626;
   --border: #e4e4e7;
   --input: #d4d4d8;
   --ring: rgba(37, 99, 235, 0.26);
@@ -645,6 +646,23 @@ textarea:focus-visible,
 
 .admin-card-wide {
   grid-column: 1 / -1;
+}
+
+.danger-zone {
+  border-color: color-mix(in srgb, var(--destructive) 36%, var(--border));
+}
+
+.danger-zone > .panel-title svg {
+  color: var(--destructive);
+}
+
+.danger-strip {
+  border-color: color-mix(in srgb, var(--destructive) 34%, var(--border));
+  background: color-mix(in srgb, var(--destructive) 7%, var(--card));
+}
+
+.danger-strip > svg {
+  color: var(--destructive);
 }
 
 .identity-card {

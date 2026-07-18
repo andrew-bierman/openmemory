@@ -291,6 +291,14 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(exported.edgeCount).toBeGreaterThanOrEqual(1);
   expect(exported.bytes).toBeGreaterThan(500);
 
+  const tenantBExport = await getJson<GraphExportResponse>(
+    await worker.fetch("/v1/exports", {
+      method: "POST",
+      headers: tenantHeaders(tenantB),
+    }),
+  );
+  expect(tenantBExport.key).toContain(`${tenantB}/exports/`);
+
   const repair = await getJson<IndexRepairResponse>(
     await worker.fetch("/v1/index/repair", {
       method: "POST",
@@ -336,8 +344,15 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     vectorIndex: {
       attempted: 2,
     },
+    exports: {
+      prefix: `${tenantA}/exports/`,
+      attempted: 1,
+      deleted: 1,
+      failed: 0,
+    },
   });
   expect(typeof purge.vectorIndex.vectorizeConfigured).toBe("boolean");
+  expect(typeof purge.exports.r2Configured).toBe("boolean");
 
   const purgedList = await getJson<MemoryResponse[]>(
     await worker.fetch("/v1/memories", {
@@ -961,6 +976,13 @@ test("worker API manages account workspace and team members", async () => {
       }),
     }),
   );
+  const accountExport = await getJson<GraphExportResponse>(
+    await worker.fetch("/v1/exports", {
+      method: "POST",
+      headers: { cookie },
+    }),
+  );
+  expect(accountExport.key).toContain(`${account.workspace.tenantId}/exports/`);
 
   const mismatchedDeletion = await worker.fetch("/v1/account", {
     method: "DELETE",
@@ -997,6 +1019,12 @@ test("worker API manages account workspace and team members", async () => {
       memoriesDeleted: 2,
       vectorIndex: {
         attempted: 2,
+      },
+      exports: {
+        prefix: `${account.workspace.tenantId}/exports/`,
+        attempted: 1,
+        deleted: 1,
+        failed: 0,
       },
     },
   });
@@ -2047,6 +2075,7 @@ type AccountDeletionResponse = {
       deleted: number;
       vectorizeConfigured: boolean;
     };
+    exports: TenantExportCleanupResponse;
     purgedAt: string;
   };
   deletedAt: string;
@@ -2149,6 +2178,7 @@ type TenantPurgeResponse = {
     deleted: number;
     vectorizeConfigured: boolean;
   };
+  exports: TenantExportCleanupResponse;
   purgedAt: string;
 };
 
@@ -2193,4 +2223,13 @@ type IndexRepairResponse = {
   attempted: number;
   tenantId: string;
   vectorizeConfigured: boolean;
+};
+
+type TenantExportCleanupResponse = {
+  r2Configured: boolean;
+  prefix: string;
+  attempted: number;
+  deleted: number;
+  failed: number;
+  error?: string;
 };

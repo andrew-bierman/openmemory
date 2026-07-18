@@ -192,7 +192,9 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page).toHaveURL(/view=admin/);
   const adminGrid = page.locator(".admin-grid");
   await expect(adminGrid).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { exact: true, name: "Account" }),
+  ).toBeVisible();
   await expect(adminGrid.getByLabel("API URL")).toHaveValue(API_URL);
   await expect(adminGrid.getByLabel("Local tenant")).toHaveValue(tenant);
   await expect(
