@@ -352,6 +352,7 @@ export function getReadinessSummary(
       graphStatus: "Unknown",
       mcpStatus: "Unknown",
       productionReady: false,
+      rerankStatus: "Unknown",
       totalBindings: 0,
       warningCount: 0,
     };
@@ -371,6 +372,12 @@ export function getReadinessSummary(
     readiness.mcp.tools.length >= 4 && readiness.auth.betterAuthUrl
       ? "Discoverable"
       : "Incomplete";
+  const rerankStatus =
+    readiness.rerank.status === "enabled"
+      ? "AI rerank"
+      : readiness.rerank.status === "misconfigured"
+        ? "Needs AI"
+        : "Deterministic";
 
   return {
     configuredBindings,
@@ -381,6 +388,7 @@ export function getReadinessSummary(
       readiness.bindings.authDb &&
       readiness.bindings.durableObjects &&
       readiness.rateLimit.enabled,
+    rerankStatus,
     totalBindings: bindings.length,
     warningCount: readiness.warnings.length,
   };
@@ -717,6 +725,7 @@ export type ReadinessSummary = {
     | "Unknown";
   mcpStatus: "Discoverable" | "Incomplete" | "Unknown";
   productionReady: boolean;
+  rerankStatus: "AI rerank" | "Deterministic" | "Needs AI" | "Unknown";
   totalBindings: number;
   warningCount: number;
 };

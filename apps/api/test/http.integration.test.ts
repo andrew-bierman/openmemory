@@ -281,6 +281,12 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     mcp: {
       endpoint: `${worker.baseUrl}/mcp`,
     },
+    rerank: {
+      configured: false,
+      workersAiConfigured: true,
+      timeoutMs: 900,
+      status: "disabled",
+    },
   });
   expect(readiness.relationships.catalogSize).toBeGreaterThan(8);
   expect(readiness.rateLimit.limitPerMinute).toBeGreaterThan(0);
@@ -1401,6 +1407,7 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     },
   });
   expect(readiness.bindings.authDb).toBe(true);
+  expect(readiness.rerank.status).toBe("disabled");
 }, 45_000);
 
 test("worker API manages account workspace and team members", async () => {
@@ -2749,6 +2756,13 @@ type ReadinessResponse = {
     limitPerMinute: number;
   };
   semanticIndex: SemanticIndexResponse;
+  rerank: {
+    configured: boolean;
+    workersAiConfigured: boolean;
+    model?: string;
+    timeoutMs: number;
+    status: "enabled" | "disabled" | "misconfigured";
+  };
 };
 
 type IngestResponse = {

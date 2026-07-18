@@ -416,11 +416,16 @@ describe("dashboard model", () => {
   });
 
   test("summarizes operations readiness from binding and warning state", () => {
+    expect(getReadinessSummary(null)).toMatchObject({
+      rerankStatus: "Unknown",
+    });
+
     expect(getReadinessSummary(readiness)).toEqual({
       configuredBindings: 10,
       graphStatus: "Typed graph",
       mcpStatus: "Discoverable",
       productionReady: true,
+      rerankStatus: "AI rerank",
       totalBindings: 10,
       warningCount: 0,
     });
@@ -439,6 +444,31 @@ describe("dashboard model", () => {
       graphStatus: "Needs edges",
       productionReady: false,
       warningCount: 1,
+    });
+    expect(
+      getReadinessSummary({
+        ...readiness,
+        rerank: {
+          configured: false,
+          workersAiConfigured: false,
+          timeoutMs: 900,
+          status: "disabled",
+        },
+      }),
+    ).toMatchObject({
+      rerankStatus: "Deterministic",
+    });
+    expect(
+      getReadinessSummary({
+        ...readiness,
+        rerank: {
+          ...readiness.rerank,
+          status: "misconfigured",
+          workersAiConfigured: false,
+        },
+      }),
+    ).toMatchObject({
+      rerankStatus: "Needs AI",
     });
   });
 
@@ -704,6 +734,13 @@ const readiness: ReadinessSnapshot = {
     status: "current",
     vectorizeConfigured: true,
     workersAiConfigured: true,
+  },
+  rerank: {
+    configured: true,
+    workersAiConfigured: true,
+    model: "@cf/test/reranker",
+    timeoutMs: 900,
+    status: "enabled",
   },
   warnings: [],
 };
