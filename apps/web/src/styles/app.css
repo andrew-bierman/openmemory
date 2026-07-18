@@ -40,15 +40,30 @@
   box-sizing: border-box;
 }
 
+html,
 body {
+  width: 100%;
+  max-width: 100%;
   margin: 0;
+  overflow-x: hidden;
 }
 
 button,
 input,
 select,
 textarea {
+  min-width: 0;
   font: inherit;
+}
+
+input,
+select {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+textarea {
+  resize: vertical;
 }
 
 button svg {
@@ -66,17 +81,26 @@ textarea:focus-visible,
 }
 
 .app-shell {
+  width: 100%;
+  min-width: 0;
+  max-width: 100vw;
   min-height: 100vh;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+  overflow-x: clip;
   background: var(--background);
 }
 
 .sidebar {
   position: sticky;
   top: 0;
+  width: 100%;
+  min-width: 0;
   height: 100vh;
+  max-height: 100dvh;
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border-right: 1px solid var(--border);
   background: #fbfbfb;
   padding: 18px;
@@ -207,11 +231,20 @@ textarea:focus-visible,
   background: var(--card);
 }
 
+.capture-section textarea {
+  min-height: 112px;
+  max-height: 180px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
   min-width: 0;
+}
+
+.row > .field {
+  flex: 1 1 0;
 }
 
 .field label {
@@ -266,17 +299,21 @@ textarea:focus-visible,
 
 .account-summary strong,
 .status-strip strong {
+  display: block;
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 13px;
+  line-height: 1.35;
 }
 
 .account-summary small,
 .status-strip small {
+  display: block;
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--muted-foreground);
   font-size: 12px;
+  line-height: 1.35;
 }
 
 .row {
@@ -287,13 +324,24 @@ textarea:focus-visible,
 }
 
 .content {
+  width: 100%;
+  min-width: 0;
   padding: 22px;
   display: grid;
+  justify-items: stretch;
   grid-template-rows: auto auto auto auto minmax(0, 1fr);
   gap: 16px;
 }
 
+.content > * {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .page-header {
+  width: 100%;
+  min-width: 0;
   min-height: 96px;
   display: flex;
   align-items: center;
@@ -323,6 +371,7 @@ textarea:focus-visible,
 }
 
 .header-actions {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -330,6 +379,7 @@ textarea:focus-visible,
 }
 
 .runtime-pill {
+  width: min(380px, 38vw);
   min-width: 218px;
   display: flex;
   flex-direction: column;
@@ -347,15 +397,23 @@ textarea:focus-visible,
 }
 
 .runtime-pill strong {
+  display: block;
   min-width: 0;
   overflow-wrap: anywhere;
   font-size: 13px;
+  line-height: 1.35;
 }
 
 .overview-grid {
+  width: 100%;
+  min-width: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
+}
+
+.overview-grid > * {
+  min-width: 0;
 }
 
 .metric-tile,
@@ -631,6 +689,7 @@ textarea:focus-visible,
 
 .admin-card {
   min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--card);
@@ -676,6 +735,7 @@ textarea:focus-visible,
   grid-template-columns: 38px minmax(0, 1fr);
   align-items: center;
   gap: 11px;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--secondary);
@@ -731,7 +791,7 @@ textarea:focus-visible,
 
 .workspace-admin-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
   gap: 14px;
 }
 
@@ -744,7 +804,7 @@ textarea:focus-visible,
 .member-row {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(88px, auto) auto;
   align-items: center;
   gap: 10px;
   border: 1px solid var(--border);
@@ -779,6 +839,7 @@ textarea:focus-visible,
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
+  min-width: 0;
 }
 
 .memory-list {
@@ -1487,7 +1548,10 @@ textarea:focus-visible,
 
 .graph-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px 190px auto;
+  grid-template-columns: minmax(220px, 1fr) minmax(130px, 150px) minmax(
+      150px,
+      190px
+    ) auto;
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -1501,7 +1565,9 @@ textarea:focus-visible,
 
 .force-graph-frame {
   width: 100%;
+  min-width: 0;
   min-height: 420px;
+  aspect-ratio: 16 / 10;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1726,6 +1792,7 @@ textarea:focus-visible,
 }
 
 .graph-node-card {
+  min-width: 0;
   min-height: 74px;
   display: flex;
   flex-direction: column;
@@ -1786,9 +1853,12 @@ textarea:focus-visible,
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-width: 0;
 }
 
 .pill {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--secondary);
@@ -1798,10 +1868,13 @@ textarea:focus-visible,
 }
 
 .context {
+  min-width: 0;
+  max-width: 100%;
   white-space: pre-wrap;
   color: #263244;
   line-height: 1.5;
   margin: 0;
+  overflow: auto;
   overflow-wrap: anywhere;
 }
 
@@ -1894,6 +1967,10 @@ textarea:focus-visible,
     grid-template-columns: 1fr;
   }
 
+  .overview-grid > * {
+    grid-column: 1 / -1;
+  }
+
   .activity-panel,
   .type-panel {
     grid-column: span 1;
@@ -1954,6 +2031,11 @@ textarea:focus-visible,
   .row,
   .header-actions {
     flex-wrap: wrap;
+  }
+
+  .header-actions,
+  .runtime-pill {
+    width: 100%;
   }
 
   .settings-grid,

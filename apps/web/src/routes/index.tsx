@@ -127,6 +127,7 @@ const VIEW_LABELS = {
 } as const;
 
 type View = keyof typeof VIEW_LABELS;
+type DashboardSearch = ReturnType<typeof Route.useSearch>;
 
 const DEFAULT_MEMORY_SORT: MemoryTableSorting = [
   { id: "updatedAt", desc: true },
@@ -138,8 +139,21 @@ const MEMORY_SORT_COLUMNS = new Set([
   "type",
   "updatedAt",
 ]);
+const DEFAULT_DASHBOARD_SEARCH = {
+  graphRelationship: undefined,
+  graphSearch: undefined,
+  graphType: undefined,
+  memoryId: undefined,
+  memorySearch: undefined,
+  memorySort: undefined,
+  memoryType: undefined,
+  recallQuery: undefined,
+  view: "recall",
+} satisfies DashboardSearch;
 
 function Home() {
+  const routeSearch = Route.useSearch();
+  const hasMounted = useHasMounted();
   const {
     graphRelationship,
     graphSearch,
@@ -149,8 +163,9 @@ function Home() {
     memorySort,
     memoryType,
     recallQuery,
-    view,
-  } = Route.useSearch();
+    view: searchView,
+  } = hasMounted ? routeSearch : DEFAULT_DASHBOARD_SEARCH;
+  const view = parseView(searchView);
   const navigate = Route.useNavigate();
   const [apiUrl, setApiUrl, hasLoadedApiUrl] = useLocalStorage(
     "openmemory:apiUrl",
@@ -232,6 +247,7 @@ function Home() {
     queryKey: ["openmemory", "session", apiBaseUrl],
     queryFn: () => getSession(apiBaseUrl),
   });
+  const sessionUser = sessionQuery.data ?? null;
   const memoriesQuery = useQuery({
     enabled: hasLoadedConnection,
     queryKey: ["openmemory", "memories", ...queryScope],
@@ -263,7 +279,7 @@ function Home() {
     queryFn: () => api.getNeighbors(memoryId ?? ""),
   });
   const oauthConnectionsQuery = useQuery({
-    enabled: hasLoadedConnection,
+    enabled: hasLoadedConnection && !usesLocalTenant && Boolean(sessionUser),
     queryKey: ["openmemory", "oauth-connections", ...queryScope],
     queryFn: () => api.listOAuthConnections().catch(() => []),
   });
@@ -292,7 +308,6 @@ function Home() {
   const account = accountQuery.data ?? null;
   const context = contextQuery.data ?? null;
   const profile = profileQuery.data?.summary ?? "";
-  const sessionUser = sessionQuery.data ?? null;
 
   useEffect(() => {
     if (
@@ -2473,6 +2488,16 @@ function useLocalStorage(key: string, initialValue: string) {
   }, [hasLoaded, key, value]);
 
   return [value, setValue, hasLoaded] as const;
+}
+
+function useHasMounted() {
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  return hasMounted;
 }
 
 function formatError(error: unknown) {

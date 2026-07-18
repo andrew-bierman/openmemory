@@ -442,6 +442,17 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     fullPage: true,
     path: `${screenshotDir}/09-mobile-operations.png`,
   });
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            document.documentElement.scrollWidth <=
+            document.documentElement.clientWidth + 2,
+        ),
+      { message: "mobile dashboard should not scroll horizontally" },
+    )
+    .toBe(true);
 
   expect(errors).toEqual([]);
 });
