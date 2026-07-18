@@ -228,6 +228,12 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   );
   expect(matchingEdges).toHaveLength(1);
   expect(matchingEdges[0]?.weight).toBe(0.8);
+  const graphExportPayload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    memories: [memoryA, memoryB],
+    edges: [matchingEdges[0]],
+  };
   expect(matchingEdges[0]?.metadata).toMatchObject({
     relationshipCategory: "causal",
     relationshipDirection: "forward",
@@ -372,6 +378,88 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     entityCount: 0,
     tagCount: 0,
   });
+  const mismatchedImport = await worker.fetch("/v1/imports", {
+    method: "POST",
+    headers: {
+      ...tenantHeaders(tenantA),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      confirmTenantId: tenantB,
+      mode: "replace",
+      export: graphExportPayload,
+    }),
+  });
+  expect(mismatchedImport.status).toBe(409);
+  expect(await mismatchedImport.json()).toMatchObject({
+    error: "tenant_confirmation_mismatch",
+  });
+  const invalidImport = await worker.fetch("/v1/imports", {
+    method: "POST",
+    headers: {
+      ...tenantHeaders(tenantA),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      confirmTenantId: tenantA,
+      mode: "replace",
+      export: { version: 1, exportedAt: new Date().toISOString() },
+    }),
+  });
+  expect(invalidImport.status).toBe(400);
+  expect(await invalidImport.json()).toMatchObject({
+    error: "invalid_graph_export",
+  });
+  const restored = await getJson<GraphImportResponse>(
+    await worker.fetch("/v1/imports", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        confirmTenantId: tenantA,
+        mode: "replace",
+        export: graphExportPayload,
+      }),
+    }),
+  );
+  expect(restored).toMatchObject({
+    tenantId: tenantA,
+    mode: "replace",
+    version: 1,
+    memoriesImported: 2,
+    edgesImported: 1,
+    activeMemoriesIndexed: 2,
+    replaced: {
+      memoriesDeleted: 0,
+      edgesDeleted: 0,
+      vectorIndex: {
+        attempted: 0,
+      },
+    },
+  });
+  const restoredList = await getJson<MemoryResponse[]>(
+    await worker.fetch("/v1/memories", {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(restoredList.map((memory) => memory.id).sort()).toEqual(
+    [memoryA.id, memoryB.id].sort(),
+  );
+  const restoredNeighbors = await getJson<EdgeResponse[]>(
+    await worker.fetch(`/v1/graph/${memoryA.id}/neighbors`, {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(restoredNeighbors).toContainEqual(
+    expect.objectContaining({
+      sourceId: memoryB.id,
+      targetId: memoryA.id,
+      relationship: "supports",
+      weight: 0.8,
+    }),
+  );
   const tenantBListAfterPurge = await getJson<MemoryResponse[]>(
     await worker.fetch("/v1/memories", {
       headers: tenantHeaders(tenantB),
@@ -1966,13 +2054,23 @@ function withTimeout(init: RequestInit = {}, timeoutMs: number): RequestInit {
 type MemoryResponse = {
   id: string;
   content: string;
+  source: string;
+  conversationId?: string;
   tags: string[];
   metadata: Record<string, unknown>;
   type: string;
   status: string;
   isLatest: boolean;
+  confidence: number;
+  importance: number;
+  validFrom?: string;
+  validUntil?: string;
   entityIds: string[];
   supersedesId?: string;
+  forgottenAt?: string;
+  forgetReason?: string;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type SearchResponse = MemoryResponse & {
@@ -1986,6 +2084,8 @@ type EdgeResponse = {
   relationship: string;
   weight: number;
   metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
 };
 
 type ProfileResponse = {
@@ -2217,6 +2317,29 @@ type GraphExportResponse = {
   memoryCount: number;
   edgeCount: number;
   writtenToR2: boolean;
+};
+
+type GraphImportResponse = {
+  tenantId: string;
+  mode: "replace";
+  version: 1;
+  memoriesImported: number;
+  edgesImported: number;
+  activeMemoriesIndexed: number;
+  replaced: {
+    memoriesDeleted: number;
+    edgesDeleted: number;
+    tagsDeleted: number;
+    entitiesDeleted: number;
+    ingestionJobsDeleted: number;
+    vectorIndex: {
+      attempted: number;
+      deleted: number;
+      vectorizeConfigured: boolean;
+    };
+    purgedAt: string;
+  };
+  importedAt: string;
 };
 
 type IndexRepairResponse = {

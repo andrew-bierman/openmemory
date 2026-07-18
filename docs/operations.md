@@ -197,7 +197,9 @@ Current limitations:
 - R2 export lifecycle expiration is not configured in code, though
   tenant/account deletion now best-effort removes the deleted tenant's export
   objects when the R2 binding is available.
-- Durable Object graph restore is not implemented.
+- Durable Object graph restore is implemented as a tenant-scoped destructive
+  replace from an OpenMemory export payload; merge/diff restore is not
+  implemented.
 
 Recommended operator controls before broader public launch:
 
@@ -215,6 +217,40 @@ Recommended operator controls before broader public launch:
   first through `/v1/exports`.
 - Do not use production tenant data for demos, tests, screenshots, or issue
   reproduction.
+
+## Tenant Graph Restore
+
+Restore an exported graph only when the tenant has requested recovery or an
+operator has a written incident plan. The import path replaces the current
+tenant graph.
+
+1. Retrieve the tenant export JSON from R2 or another trusted backup location.
+2. Confirm the target tenant id from `/v1/account` or `/v1/readiness`.
+3. Call:
+
+   ```sh
+   curl -X POST "$OPENMEMORY_API_URL/v1/imports" \
+     -H "content-type: application/json" \
+     -H "authorization: Bearer $OPENMEMORY_API_TOKEN" \
+     -d @restore-payload.json
+   ```
+
+   where `restore-payload.json` contains:
+
+   ```json
+   {
+     "confirmTenantId": "tenant-id",
+     "mode": "replace",
+     "export": {
+       "version": 1,
+       "exportedAt": "2026-07-18T00:00:00.000Z",
+       "memories": [],
+       "edges": []
+     }
+   }
+   ```
+
+4. Verify `/v1/graph/stats`, `/v1/search`, and `/v1/readiness` for the tenant.
 
 ## Incident Notes
 

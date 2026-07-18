@@ -70,7 +70,8 @@ larger hosted push.
 - [x] Production tenant headers rejected; OAuth-backed identity is required.
 - [x] Better Auth session and OAuth flows covered by local and live tests.
 - [x] MCP endpoint exposes `remember`, `recall`, `profile`, and `forget`.
-- [x] Graph memory CRUD, recall, source chunks, exports, and repair paths work.
+- [x] Graph memory CRUD, recall, source chunks, exports, restore, and repair
+  paths work.
 - [x] Tenant graph purge supports account-deletion workflows with explicit
   confirmation and tenant isolation coverage.
 - [x] Session-backed account deletion removes graph data and user-owned

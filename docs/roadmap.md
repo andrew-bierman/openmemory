@@ -77,6 +77,8 @@
 - The `Live Smoke` workflow runs hourly against production as the alpha alert
   path for API, auth, readiness, MCP, and hosted UI regressions.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
+- `/v1/imports` restores a validated OpenMemory graph export into a tenant as
+  an explicit replace operation, then re-indexes active memories.
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
 - `DELETE /v1/tenant` hard-deletes the resolved tenant's Durable Object graph
   data after explicit tenant confirmation and best-effort deletes matching
@@ -112,6 +114,8 @@
 - Graph performance has larger local smoke coverage, graph-specific product
   signals, relationship diagnostics, and production request telemetry, but
   still needs high-volume production benchmarks before a hosted SaaS launch.
+- Graph restore is implemented for whole-tenant replace recovery, but not yet
+  for merge/diff restore workflows.
 - GitHub Actions are configured. Cloudflare Git/Workers Builds should be the
   preferred deploy path; the manual GitHub deploy workflow remains a fallback
   and needs a scoped `CLOUDFLARE_API_TOKEN` repository secret.
