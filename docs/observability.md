@@ -26,6 +26,18 @@ Worker. Treat a failed scheduled run as a production alert because it covers:
 - MCP tools
 - hosted UI browser smoke
 
+The deployed Worker also has a Cloudflare Cron Trigger that runs every 15
+minutes. It checks:
+
+- `/health`
+- `/.well-known/oauth-protected-resource/mcp`
+
+The monitor writes `openmemory.scheduled_health` Analytics Engine datapoints on
+every run. When a check fails, it logs
+`openmemory.scheduled_health_failed` and sends a JSON alert if either
+`OPENMEMORY_ALERT_WEBHOOK_URL` or `OPENMEMORY_ALERT_EMAIL_ENDPOINT` is
+configured.
+
 For Cloudflare-side alerting, create dashboard or notification policies from the
 saved queries:
 
@@ -36,9 +48,10 @@ saved queries:
 - alert when 429 responses exceed 5% for 10 minutes
 - alert on any sustained source ingestion or memory extraction worker failure
 
-GitHub scheduled smoke is the default alpha alert path. Add Cloudflare
-Notifications, Grafana, or another destination before higher-volume public
-launch if the project needs paging, escalation, or multi-recipient routing.
+GitHub scheduled smoke plus the Worker Cron monitor are the default alpha alert
+path. Add Cloudflare Notifications, Grafana, PagerDuty, or another destination
+for escalation and multi-recipient routing before a higher-volume public
+launch.
 
 ## Query Notes
 

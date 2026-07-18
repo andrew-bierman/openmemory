@@ -168,8 +168,14 @@ Create alerts before broader public launch for:
 - missing Cloudflare binding or startup/deploy failures
 
 The `Live Smoke` GitHub Actions workflow runs hourly and should be treated as
-the default alpha alert path. Add Cloudflare Notifications or external paging
-before a higher-volume launch.
+one default alpha alert path. The deployed Worker also has a Cloudflare Cron
+Trigger every 15 minutes that checks `/health` and MCP OAuth protected-resource
+metadata, writes `openmemory.scheduled_health`, and dispatches
+`openmemory.scheduled_health_failed` to `OPENMEMORY_ALERT_WEBHOOK_URL` or
+`OPENMEMORY_ALERT_EMAIL_ENDPOINT` when configured.
+
+Add Cloudflare Notifications, PagerDuty, or another external paging workflow
+for escalation and multi-recipient routing before a higher-volume launch.
 
 Suggested first thresholds:
 

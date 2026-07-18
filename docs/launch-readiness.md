@@ -47,7 +47,8 @@ larger hosted push.
 - Workers Analytics Engine receives request, error, rate-limit, and async
   worker telemetry when deployed with the `OPENMEMORY_ANALYTICS` binding.
 - Saved Workers Analytics Engine SQL queries, graph/RAG performance queries,
-  and hourly live-smoke alerting cover the alpha operations baseline.
+  hourly live-smoke alerting, and a 15-minute Worker Cron health monitor cover
+  the alpha operations baseline.
 - Deployment docs explain Cloudflare resources, secrets, Git deploys, manual
   fallback deploys, and live smoke.
 - `docs/data-model.md` documents the current D1, Durable Object, Vectorize, R2,
@@ -109,6 +110,9 @@ larger hosted push.
 - [x] Request IDs and structured request logs exist.
 - [x] Cloudflare-native global rate limiter exists through a Durable Object.
 - [x] Live smoke workflow exists.
+- [x] Cloudflare Cron health monitor exists for `/health` and MCP OAuth
+  protected-resource metadata, with Analytics Engine telemetry and optional
+  webhook/email alert dispatch.
 - [x] Latest live smoke proves remote Workers AI and Vectorize semantic recall
   after the deployed semantic-index metadata fix. Evidence:
   `https://github.com/andrew-bierman/openmemory/actions/runs/29661280233`
@@ -124,7 +128,8 @@ larger hosted push.
   control.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
   `openmemory.request_error`, 429s, and 5xxs.
-- [x] Alerting exists for sustained errors, missing bindings, or auth failures.
+- [x] Alerting exists for sustained errors, missing bindings, or auth failures
+  through saved queries, hourly live smoke, and the Worker Cron health monitor.
 - [x] GitHub secret scanning or an equivalent secret-detection control is
   enabled for public contributions.
 - [x] Documented rollback procedure includes Worker version rollback and D1

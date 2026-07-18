@@ -6,6 +6,9 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "preview_urls": false,
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
   "assets": {
     "directory": "./apps/web/dist/client",
     "not_found_handling": "single-page-application",

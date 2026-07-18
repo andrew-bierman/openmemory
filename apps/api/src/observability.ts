@@ -46,3 +46,31 @@ export function writeErrorAnalytics(
     indexes: [input.event],
   });
 }
+
+export function writeScheduledHealthAnalytics(
+  env: Env,
+  input: {
+    durationMs: number;
+    failedChecks: number;
+    notificationSent: boolean;
+    status: "healthy" | "unhealthy";
+  },
+) {
+  if (!env.OPENMEMORY_ANALYTICS) {
+    return;
+  }
+
+  env.OPENMEMORY_ANALYTICS.writeDataPoint({
+    blobs: [
+      "openmemory.scheduled_health",
+      input.status,
+      input.notificationSent ? "true" : "false",
+    ],
+    doubles: [
+      input.failedChecks,
+      input.durationMs,
+      input.notificationSent ? 1 : 0,
+    ],
+    indexes: ["openmemory.scheduled_health"],
+  });
+}

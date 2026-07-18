@@ -25,6 +25,7 @@ import {
   renameWorkspace,
   updateAccountProfile,
 } from "./account";
+import { runScheduledHealthMonitor } from "./alerting";
 import {
   getGraph,
   type HeaderSource,
@@ -1020,6 +1021,13 @@ const mcpHandler = createOpenMemoryMcpHandler();
 export default {
   fetch(request: Request, requestEnv: Env, ctx: ExecutionContext) {
     return handleWorkerFetch(request, requestEnv, ctx);
+  },
+  scheduled(
+    _controller: ScheduledController,
+    requestEnv: Env,
+    ctx: ExecutionContext,
+  ) {
+    ctx.waitUntil(runScheduledHealthMonitor(requestEnv));
   },
   queue(batch: MessageBatch<unknown>, requestEnv: Env) {
     if (batch.queue === MEMORY_EXTRACTION_QUEUE_NAME) {
