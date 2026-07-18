@@ -81,6 +81,9 @@
 - `DELETE /v1/tenant` hard-deletes the resolved tenant's Durable Object graph
   data after explicit tenant confirmation and best-effort deletes matching
   Vectorize ids.
+- `DELETE /v1/account` lets authenticated users delete their account after
+  confirming email and tenant id; it purges graph data and user-owned
+  auth/workspace/OAuth rows.
 - `/v1/account` exposes session-backed account, workspace, and team member
   management backed by Drizzle/D1.
 - The TanStack admin panel can sign in, rename a hosted workspace, invite or

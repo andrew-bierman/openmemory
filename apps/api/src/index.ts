@@ -11,12 +11,14 @@ import {
   ForgetMemorySchema,
   GraphEdgeSchema,
   IngestSourceSchema,
+  normalizeTenantId,
   SearchSchema,
   UpdateMemorySchema,
 } from "@openmemory/core";
 import { Elysia, t } from "elysia";
 import { CloudflareAdapter } from "elysia/adapter/cloudflare-worker";
 import {
+  deleteAccountControlPlane,
   getAccount,
   inviteWorkspaceMember,
   removeWorkspaceMember,
@@ -31,7 +33,11 @@ import {
   resolveSessionTenant,
   resolveTenant,
 } from "./auth";
-import { handleOpenMemoryAuthRequest, isAuthRoute } from "./better-auth";
+import {
+  handleOpenMemoryAuthRequest,
+  isAuthRoute,
+  resolveOpenMemorySession,
+} from "./better-auth";
 import type { Env } from "./env";
 import {
   enqueueMemoryExtraction,
@@ -176,6 +182,11 @@ const tenantPurgeBody = t.Object({
   confirmTenantId: t.String({ minLength: 1, maxLength: 200 }),
 });
 
+const accountDeletionBody = t.Object({
+  confirmEmail: t.String({ minLength: 3, maxLength: 320 }),
+  confirmTenantId: t.String({ minLength: 1, maxLength: 200 }),
+});
+
 const edgeBody = t.Object({
   sourceId: t.String({ minLength: 1 }),
   targetId: t.String({ minLength: 1 }),
@@ -291,6 +302,59 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     const result = await getAccount(env, request);
     return status(result.status, result.body);
   })
+  .delete(
+    "/v1/account",
+    async ({ body, request, status }) => {
+      const session = await resolveOpenMemorySession(env, request);
+      if (!session) {
+        return status(401, { error: "unauthorized" as const });
+      }
+      if (!env.AUTH_DB) {
+        return status(503, { error: "auth_db_unavailable" as const });
+      }
+
+      const tenantId = normalizeTenantId(session.user.id);
+      if (
+        !tenantId ||
+        normalizeTenantId(body.confirmTenantId) !== tenantId ||
+        body.confirmEmail.trim().toLowerCase() !==
+          session.user.email.trim().toLowerCase()
+      ) {
+        return status(409, {
+          error: "account_confirmation_mismatch" as const,
+          message:
+            "confirmEmail and confirmTenantId must match the authenticated account before deletion.",
+        });
+      }
+
+      const graph = getGraph(env, tenantId);
+      const purged = await graph.purgeTenantData();
+      const vectorIndex = await deleteTenantVectors(
+        env,
+        tenantId,
+        purged.deletedMemoryIds,
+      );
+      const deleted = await deleteAccountControlPlane(env, request, {
+        confirmEmail: body.confirmEmail,
+        confirmTenantId: body.confirmTenantId,
+        tenantId,
+      });
+
+      return status(deleted.status, {
+        ...deleted.body,
+        graph: {
+          memoriesDeleted: purged.memoriesDeleted,
+          edgesDeleted: purged.edgesDeleted,
+          tagsDeleted: purged.tagsDeleted,
+          entitiesDeleted: purged.entitiesDeleted,
+          ingestionJobsDeleted: purged.ingestionJobsDeleted,
+          vectorIndex,
+          purgedAt: purged.purgedAt,
+        },
+      });
+    },
+    { body: accountDeletionBody },
+  )
   .patch(
     "/v1/account/profile",
     async ({ body, request, status }) => {

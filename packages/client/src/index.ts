@@ -129,6 +129,37 @@ export type TenantPurgeResult = {
   purgedAt: string;
 };
 
+export type AccountDeletionResult = {
+  userId: string;
+  email: string;
+  tenantId: string;
+  controlPlane: {
+    oauthAccessTokensDeleted: number;
+    oauthRefreshTokensDeleted: number;
+    oauthConsentsDeleted: number;
+    oauthClientsDeleted: number;
+    sessionsDeleted: number;
+    authAccountsDeleted: number;
+    ownedWorkspacesDeleted: number;
+    workspaceMembershipsDeleted: number;
+    userDeleted: boolean;
+  };
+  graph: {
+    memoriesDeleted: number;
+    edgesDeleted: number;
+    tagsDeleted: number;
+    entitiesDeleted: number;
+    ingestionJobsDeleted: number;
+    vectorIndex: {
+      attempted: number;
+      deleted: number;
+      vectorizeConfigured: boolean;
+    };
+    purgedAt: string;
+  };
+  deletedAt: string;
+};
+
 export type ReadinessSnapshot = {
   service: "openmemory-api";
   generatedAt: string;
@@ -270,6 +301,8 @@ export function createOpenMemoryClient(
         client.v1.graph.relationships.get(),
       ),
     getAccount: () => unwrap<Account>(client.v1.account.get()),
+    deleteAccount: (input: { confirmEmail: string; confirmTenantId: string }) =>
+      unwrap<AccountDeletionResult>(client.v1.account.delete(input)),
     getReadiness: () => unwrap<ReadinessSnapshot>(client.v1.readiness.get()),
     updateAccountProfile: (name: string) =>
       unwrap<Account>(client.v1.account.profile.patch({ name })),
@@ -343,6 +376,10 @@ type EdenClient = {
     };
     account: {
       get(): EdenResult;
+      delete(input: {
+        confirmEmail: string;
+        confirmTenantId: string;
+      }): EdenResult;
       profile: {
         patch(input: { name: string }): EdenResult;
       };
