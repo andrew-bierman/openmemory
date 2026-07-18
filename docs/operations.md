@@ -198,9 +198,9 @@ Current limitations:
   [r2-lifecycle.json](../infra/cloudflare/r2-lifecycle.json). Tenant/account
   deletion also best-effort removes the deleted tenant's export objects when
   the R2 binding is available.
-- Durable Object graph restore is implemented as a tenant-scoped destructive
-  replace from an OpenMemory export payload; merge/diff restore is not
-  implemented.
+- Durable Object graph import supports tenant-scoped destructive `replace` and
+  additive `merge` from OpenMemory export payloads; field-level diff conflict
+  resolution is not implemented.
 
 Recommended operator controls before broader public launch:
 
@@ -223,8 +223,9 @@ Recommended operator controls before broader public launch:
 ## Tenant Graph Restore
 
 Restore an exported graph only when the tenant has requested recovery or an
-operator has a written incident plan. The import path replaces the current
-tenant graph.
+operator has a written incident plan. Use `mode: "merge"` when preserving
+current tenant memories is required; use `mode: "replace"` only when the
+current tenant graph should be wiped before restoring the export.
 
 1. Retrieve the tenant export JSON from R2 or another trusted backup location.
 2. Confirm the target tenant id from `/v1/account` or `/v1/readiness`.
@@ -251,6 +252,10 @@ tenant graph.
      }
    }
    ```
+
+   Set `"mode": "merge"` to preserve current tenant graph data and import only
+   new memory IDs from the export. Merge validates that every incoming edge
+   points to either an existing memory or an incoming memory.
 
 4. Verify `/v1/graph/stats`, `/v1/search`, and `/v1/readiness` for the tenant.
 

@@ -191,7 +191,7 @@ const accountDeletionBody = t.Object({
 
 const graphImportBody = t.Object({
   confirmTenantId: t.String({ minLength: 1, maxLength: 200 }),
-  mode: t.Literal("replace"),
+  mode: t.Union([t.Literal("replace"), t.Literal("merge")]),
   export: t.Unknown(),
 });
 
@@ -781,6 +781,34 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       }
 
       try {
+        if (body.mode === "merge") {
+          const merged = await graph.mergeGraph(graphExport.data);
+          const importedMemoryIds = new Set(merged.importedMemoryIds);
+          const activeMemories = graphExport.data.memories.filter(
+            (memory) =>
+              importedMemoryIds.has(memory.id) &&
+              memory.status === "active" &&
+              memory.isLatest,
+          );
+          for (const memory of activeMemories) {
+            await indexMemory(env, tenantId, memory);
+          }
+
+          return status(201, {
+            tenantId,
+            mode: body.mode,
+            version: merged.version,
+            memoriesImported: merged.memoriesImported,
+            memoriesSkipped: merged.memoriesSkipped,
+            edgesImported: merged.edgesImported,
+            activeMemoriesIndexed: activeMemories.length,
+            merged: {
+              memoriesSkipped: merged.memoriesSkipped,
+            },
+            importedAt: merged.importedAt,
+          });
+        }
+
         const restored = await graph.restoreGraph(graphExport.data);
         const vectorIndex = await deleteTenantVectors(
           env,
