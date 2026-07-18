@@ -51,6 +51,8 @@ to provide the infrastructure layer behind a more portable experience:
 - Better Auth routes, OAuth 2.1/OIDC discovery, dynamic client registration,
   JWT/JWKS-backed resource tokens, and optional GitHub/Google login providers.
 - Session-backed workspace and team member management backed by Drizzle/D1.
+- Confirmed account and tenant deletion paths for graph purge, Vectorize
+  cleanup, and user-owned auth/workspace/OAuth control-plane rows.
 - Streamable HTTP MCP endpoint with `remember`, `recall`, `profile`, and
   `forget` tools.
 - Authenticated OAuth/MCP connection listing and revocation.
@@ -156,11 +158,14 @@ Useful endpoints:
 - `GET /v1/sources/:sourceId`
 - `GET /v1/profile`
 - `GET /v1/readiness`
+- `GET /v1/account`
+- `DELETE /v1/account`
 - `GET /v1/graph/stats`
 - `GET /v1/graph/relationships`
 - `GET /v1/graph/:id/neighbors`
 - `POST /v1/exports`
 - `POST /v1/index/repair`
+- `DELETE /v1/tenant`
 - `GET /v1/oauth/connections`
 - `DELETE /v1/oauth/connections/:clientId`
 - `POST /mcp`
@@ -321,5 +326,6 @@ remaining implementation tracks.
 ## Contributing
 
 OpenMemory is MIT licensed. See [CONTRIBUTING.md](CONTRIBUTING.md),
-[SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md), and
+[SECURITY.md](SECURITY.md), [PRIVACY.md](PRIVACY.md),
+[SUPPORT.md](SUPPORT.md), and
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening issues or PRs.

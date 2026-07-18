@@ -196,20 +196,20 @@ Current limitations:
 
 - R2 export lifecycle expiration is not configured in code.
 - Durable Object graph restore is not implemented.
-- Formal privacy policy text is not included in this repository.
 
 Recommended operator controls before broader public launch:
 
 - Configure R2 lifecycle rules for export retention, such as deleting alpha
   exports after 30 to 90 days unless a longer retention window is required.
-- For account deletion requests, revoke OAuth clients and sessions in D1, then
-  purge the resolved tenant graph through `DELETE /v1/tenant` with
+- For user-initiated account deletion, call `DELETE /v1/account` from an
+  authenticated session with `confirmEmail` and `confirmTenantId`. It purges
+  the tenant graph, best-effort deletes Vectorize ids, and removes user-owned
+  D1 auth/workspace/OAuth rows.
+- For operator-only graph deletion, use `DELETE /v1/tenant` with
   `confirmTenantId` set to the tenant id shown in `/v1/account` or
   `/v1/readiness`.
-- Treat `DELETE /v1/tenant` as destructive. It removes Durable Object memories,
-  graph edges, tags, entities, and ingestion jobs for the resolved tenant, and
-  best-effort deletes matching Vectorize ids. Export any required tenant data
-  first through `/v1/exports`.
+- Treat both deletion paths as destructive. Export any required tenant data
+  first through `/v1/exports`, and handle R2 export retention separately.
 - Do not use production tenant data for demos, tests, screenshots, or issue
   reproduction.
 

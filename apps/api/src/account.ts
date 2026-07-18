@@ -1,13 +1,26 @@
+import { normalizeTenantId } from "@openmemory/core";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { resolveOpenMemorySession } from "./better-auth";
-import { authUser, workspace, workspaceMember } from "./db/schema";
+import {
+  authAccount,
+  authSession,
+  authUser,
+  oauthAccessToken,
+  oauthClient,
+  oauthConsent,
+  oauthRefreshToken,
+  workspace,
+  workspaceMember,
+} from "./db/schema";
 import type { Env } from "./env";
 
 type AccountResult =
   | { status: 200; body: AccountResponse }
+  | { status: 200; body: AccountDeletionResult }
   | { status: 201; body: WorkspaceMemberResponse }
   | { status: 401; body: { error: "unauthorized" } }
+  | { status: 409; body: { error: "account_confirmation_mismatch" } }
   | { status: 403; body: { error: "owner_member_required" } }
   | { status: 404; body: { error: "not_found" } }
   | { status: 503; body: { error: "auth_db_unavailable" } };
@@ -53,6 +66,24 @@ export type WorkspaceMemberResponse = {
   userId?: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type AccountDeletionResult = {
+  userId: string;
+  email: string;
+  tenantId: string;
+  controlPlane: {
+    oauthAccessTokensDeleted: number;
+    oauthRefreshTokensDeleted: number;
+    oauthConsentsDeleted: number;
+    oauthClientsDeleted: number;
+    sessionsDeleted: number;
+    authAccountsDeleted: number;
+    ownedWorkspacesDeleted: number;
+    workspaceMembershipsDeleted: number;
+    userDeleted: boolean;
+  };
+  deletedAt: string;
 };
 
 export async function getAccount(env: Env, request: Request) {
@@ -233,6 +264,121 @@ export async function removeWorkspaceMember(
   } satisfies AccountResult;
 }
 
+export async function deleteAccountControlPlane(
+  env: Env,
+  request: Request,
+  input: { confirmEmail: string; confirmTenantId: string; tenantId: string },
+) {
+  const context = await getAccountContext(env, request);
+  if (!context.ok) {
+    return context.result;
+  }
+
+  if (
+    normalizeEmail(input.confirmEmail) !== normalizeEmail(context.user.email) ||
+    normalizeTenantId(input.confirmTenantId) !== input.tenantId
+  ) {
+    return {
+      status: 409,
+      body: { error: "account_confirmation_mismatch" as const },
+    } satisfies AccountResult;
+  }
+
+  const deletedAt = new Date().toISOString();
+  const ownedWorkspaceRows = await context.db
+    .select({ id: workspace.id })
+    .from(workspace)
+    .where(eq(workspace.ownerUserId, context.user.id));
+
+  const oauthAccessTokensDeleted = (
+    await context.db
+      .delete(oauthAccessToken)
+      .where(eq(oauthAccessToken.userId, context.user.id))
+      .returning({ id: oauthAccessToken.id })
+  ).length;
+  const oauthRefreshTokensDeleted = (
+    await context.db
+      .delete(oauthRefreshToken)
+      .where(eq(oauthRefreshToken.userId, context.user.id))
+      .returning({ id: oauthRefreshToken.id })
+  ).length;
+  const oauthConsentsDeleted = (
+    await context.db
+      .delete(oauthConsent)
+      .where(eq(oauthConsent.userId, context.user.id))
+      .returning({ id: oauthConsent.id })
+  ).length;
+  const oauthClientsDeleted = (
+    await context.db
+      .delete(oauthClient)
+      .where(eq(oauthClient.userId, context.user.id))
+      .returning({ id: oauthClient.id })
+  ).length;
+  const sessionsDeleted = (
+    await context.db
+      .delete(authSession)
+      .where(eq(authSession.userId, context.user.id))
+      .returning({ id: authSession.id })
+  ).length;
+  const authAccountsDeleted = (
+    await context.db
+      .delete(authAccount)
+      .where(eq(authAccount.userId, context.user.id))
+      .returning({ id: authAccount.id })
+  ).length;
+  let workspaceMembershipsDeleted = (
+    await context.db
+      .delete(workspaceMember)
+      .where(eq(workspaceMember.userId, context.user.id))
+      .returning({ id: workspaceMember.id })
+  ).length;
+  for (const ownedWorkspace of ownedWorkspaceRows) {
+    workspaceMembershipsDeleted += (
+      await context.db
+        .delete(workspaceMember)
+        .where(eq(workspaceMember.workspaceId, ownedWorkspace.id))
+        .returning({ id: workspaceMember.id })
+    ).length;
+  }
+  const ownedWorkspacesDeleted = (
+    await context.db
+      .delete(workspace)
+      .where(eq(workspace.ownerUserId, context.user.id))
+      .returning({ id: workspace.id })
+  ).length;
+  const userDeleted =
+    (
+      await context.db
+        .delete(authUser)
+        .where(eq(authUser.id, context.user.id))
+        .returning({ id: authUser.id })
+    ).length === 1;
+
+  return {
+    status: 200,
+    body: {
+      userId: context.user.id,
+      email: context.user.email,
+      tenantId: input.tenantId,
+      controlPlane: {
+        oauthAccessTokensDeleted,
+        oauthRefreshTokensDeleted,
+        oauthConsentsDeleted,
+        oauthClientsDeleted,
+        sessionsDeleted,
+        authAccountsDeleted,
+        ownedWorkspacesDeleted: Math.max(
+          ownedWorkspacesDeleted,
+          ownedWorkspaceRows.length,
+        ),
+        workspaceMembershipsDeleted,
+        userDeleted,
+      },
+      deletedAt,
+    },
+  } satisfies AccountResult;
+}
+
 async function getAccountContext(
   env: Env,
   request: Request,
@@ -354,7 +500,7 @@ async function readAccount(context: Extract<AccountContext, { ok: true }>) {
     workspace: {
       id: context.workspace.id,
       name: context.workspace.name,
-      tenantId: context.user.id,
+      tenantId: normalizeTenantId(context.user.id) ?? context.user.id,
       ownerUserId: context.workspace.ownerUserId,
       createdAt: toIso(context.workspace.createdAt),
       updatedAt: toIso(context.workspace.updatedAt),

@@ -861,7 +861,7 @@ test("worker API manages account workspace and team members", async () => {
   );
   expect(account.user.email).toBe(email);
   expect(account.user.name).toBe("Workspace Owner");
-  expect(account.workspace.tenantId).toBe(account.user.id);
+  expect(account.workspace.tenantId).toBe(account.user.id.toLowerCase());
   expect(account.members).toContainEqual(
     expect.objectContaining({
       email,
@@ -929,6 +929,89 @@ test("worker API manages account workspace and team members", async () => {
   expect(afterRemove.members.map((member) => member.id)).not.toContain(
     invited.id,
   );
+
+  const firstAccountMemory = await getJson<MemoryResponse>(
+    await worker.fetch("/v1/memories", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "Account deletion must purge session-backed graph data.",
+        tags: ["privacy"],
+      }),
+    }),
+  );
+  const secondAccountMemory = await getJson<MemoryResponse>(
+    await worker.fetch("/v1/memories", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        content: "Account deletion should remove related graph edges too.",
+        tags: ["privacy"],
+      }),
+    }),
+  );
+  await expectOk(
+    await worker.fetch("/v1/graph/edges", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        sourceId: firstAccountMemory.id,
+        targetId: secondAccountMemory.id,
+        relationship: "supports",
+      }),
+    }),
+  );
+
+  const mismatchedDeletion = await worker.fetch("/v1/account", {
+    method: "DELETE",
+    headers: { cookie, "content-type": "application/json" },
+    body: JSON.stringify({
+      confirmEmail: "wrong@example.com",
+      confirmTenantId: account.workspace.tenantId,
+    }),
+  });
+  expect(mismatchedDeletion.status).toBe(409);
+  expect(await mismatchedDeletion.json()).toMatchObject({
+    error: "account_confirmation_mismatch",
+  });
+
+  const accountDeletion = await getJson<AccountDeletionResponse>(
+    await worker.fetch("/v1/account", {
+      method: "DELETE",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({
+        confirmEmail: email,
+        confirmTenantId: account.workspace.tenantId,
+      }),
+    }),
+  );
+  expect(accountDeletion).toMatchObject({
+    email,
+    tenantId: account.workspace.tenantId,
+    controlPlane: {
+      userDeleted: true,
+      sessionsDeleted: 1,
+      ownedWorkspacesDeleted: 1,
+    },
+    graph: {
+      memoriesDeleted: 2,
+      vectorIndex: {
+        attempted: 2,
+      },
+    },
+  });
+  expect(accountDeletion.graph.edgesDeleted).toBeGreaterThanOrEqual(1);
+
+  const accountAfterDeletion = await worker.fetch("/v1/account", {
+    headers: { cookie },
+  });
+  expect(accountAfterDeletion.status).toBe(401);
+  const purgedAccountGraph = await getJson<MemoryResponse[]>(
+    await worker.fetch("/v1/memories", {
+      headers: tenantHeaders(account.workspace.tenantId),
+    }),
+  );
+  expect(purgedAccountGraph).toEqual([]);
 }, 45_000);
 
 test("ingestion extracts entities, links graph neighbors, and improves recall", async () => {
@@ -1936,6 +2019,37 @@ type AccountResponse = {
     tenantId: string;
   };
   members: WorkspaceMemberResponse[];
+};
+
+type AccountDeletionResponse = {
+  userId: string;
+  email: string;
+  tenantId: string;
+  controlPlane: {
+    oauthAccessTokensDeleted: number;
+    oauthRefreshTokensDeleted: number;
+    oauthConsentsDeleted: number;
+    oauthClientsDeleted: number;
+    sessionsDeleted: number;
+    authAccountsDeleted: number;
+    ownedWorkspacesDeleted: number;
+    workspaceMembershipsDeleted: number;
+    userDeleted: boolean;
+  };
+  graph: {
+    memoriesDeleted: number;
+    edgesDeleted: number;
+    tagsDeleted: number;
+    entitiesDeleted: number;
+    ingestionJobsDeleted: number;
+    vectorIndex: {
+      attempted: number;
+      deleted: number;
+      vectorizeConfigured: boolean;
+    };
+    purgedAt: string;
+  };
+  deletedAt: string;
 };
 
 type WorkspaceMemberResponse = {

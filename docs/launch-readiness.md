@@ -52,6 +52,7 @@ larger hosted push.
 - [x] License file exists.
 - [x] Contribution guide exists.
 - [x] Security reporting policy exists.
+- [x] Privacy policy exists.
 - [x] Support policy exists.
 - [x] Code of conduct exists.
 - [x] Changelog exists.
@@ -72,6 +73,8 @@ larger hosted push.
 - [x] Graph memory CRUD, recall, source chunks, exports, and repair paths work.
 - [x] Tenant graph purge supports account-deletion workflows with explicit
   confirmation and tenant isolation coverage.
+- [x] Session-backed account deletion removes graph data and user-owned
+  auth/workspace/OAuth control-plane rows after explicit confirmation.
 - [x] Hosted dashboard has capture, recall, table, charts, graph explorer, graph
   operations signals, MCP setup, onboarding, profile editing, and admin
   settings.

@@ -126,9 +126,15 @@ memories, edges, memory tags, memory entities, and ingestion jobs from the
 tenant Durable Object. It also best-effort deletes matching Vectorize ids using
 the `<tenant-id>:<memory-id>` vector id convention.
 
-D1 auth/control-plane rows and R2 export objects are not deleted by this graph
-purge. Account deletion remains an operator workflow that combines OAuth/session
-revocation, D1 cleanup, optional R2 retention handling, and tenant graph purge.
+`DELETE /v1/account` is the session-backed account deletion path. It requires
+matching `confirmEmail` and `confirmTenantId`, purges the tenant graph first,
+best-effort deletes Vectorize ids, then deletes user-owned D1 control-plane
+rows for OAuth grants, sessions, auth accounts, owned workspaces, workspace
+memberships, and the user record.
+
+R2 export objects are not deleted by either purge path. Operators should apply
+the configured R2 lifecycle policy or manually remove export objects when a
+stricter deletion request requires it.
 
 ## Queues and Workflows
 
