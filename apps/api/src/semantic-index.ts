@@ -64,6 +64,39 @@ export async function semanticSearch(
   }
 }
 
+export async function deleteTenantVectors(
+  env: Env,
+  tenantId: string,
+  memoryIds: string[],
+) {
+  if (!env.MEMORY_VECTORS || memoryIds.length === 0) {
+    return {
+      attempted: memoryIds.length,
+      deleted: 0,
+      vectorizeConfigured: Boolean(env.MEMORY_VECTORS),
+    };
+  }
+
+  let deleted = 0;
+  for (let index = 0; index < memoryIds.length; index += 100) {
+    const ids = memoryIds
+      .slice(index, index + 100)
+      .map((memoryId) => `${tenantId}:${memoryId}`);
+    try {
+      const result = await env.MEMORY_VECTORS.deleteByIds(ids);
+      deleted += result.count;
+    } catch {
+      // Vectorize is an eventually consistent index. Canonical graph deletion already succeeded.
+    }
+  }
+
+  return {
+    attempted: memoryIds.length,
+    deleted,
+    vectorizeConfigured: true,
+  };
+}
+
 export async function embed(env: Env, text: string) {
   const response = await env.AI?.run(env.EMBEDDING_MODEL, { text });
   const data = response as { data?: number[][] };

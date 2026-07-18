@@ -7,7 +7,7 @@ import {
 import { createMcpHandler } from "agents/mcp";
 import { verifyJwsAccessToken } from "better-auth/oauth2";
 import type { JSONWebKeySet } from "jose";
-import { z } from "zod";
+import * as z from "zod/v3";
 import {
   getGraph,
   isLocalDevelopmentRequest,

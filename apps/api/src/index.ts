@@ -55,7 +55,11 @@ import {
   type RateLimitResult,
 } from "./operational-controls";
 import { getReadinessSnapshot } from "./readiness";
-import { indexMemory, semanticSearch } from "./semantic-index";
+import {
+  deleteTenantVectors,
+  indexMemory,
+  semanticSearch,
+} from "./semantic-index";
 import {
   getGraphForTenant,
   ingestSourceDocument,
@@ -166,6 +170,10 @@ const updateBody = t.Object({
 
 const forgetBody = t.Object({
   reason: t.Optional(t.String({ minLength: 1, maxLength: 500 })),
+});
+
+const tenantPurgeBody = t.Object({
+  confirmTenantId: t.String({ minLength: 1, maxLength: 200 }),
 });
 
 const edgeBody = t.Object({
@@ -313,6 +321,43 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       const result = await removeWorkspaceMember(env, request, params.memberId);
       return status(result.status, result.body);
     },
+  )
+  .delete(
+    "/v1/tenant",
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+
+      const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+      if (body.confirmTenantId !== tenantId) {
+        return status(409, {
+          error: "tenant_confirmation_mismatch" as const,
+          message:
+            "confirmTenantId must match the resolved tenant before data is purged.",
+        });
+      }
+
+      const purged = await graph.purgeTenantData();
+      const vectorIndex = await deleteTenantVectors(
+        env,
+        tenantId,
+        purged.deletedMemoryIds,
+      );
+
+      return {
+        tenantId,
+        memoriesDeleted: purged.memoriesDeleted,
+        edgesDeleted: purged.edgesDeleted,
+        tagsDeleted: purged.tagsDeleted,
+        entitiesDeleted: purged.entitiesDeleted,
+        ingestionJobsDeleted: purged.ingestionJobsDeleted,
+        vectorIndex,
+        purgedAt: purged.purgedAt,
+      };
+    },
+    { body: tenantPurgeBody },
   )
   .post(
     "/v1/memories",

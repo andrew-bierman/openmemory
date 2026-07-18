@@ -78,6 +78,9 @@
   path for API, auth, readiness, MCP, and hosted UI regressions.
 - `/v1/exports` serializes a tenant graph and writes JSON backups to R2 when `MEMORY_EXPORTS` is configured.
 - `/v1/index/repair` re-upserts active tenant memories through the embedding and Vectorize indexing path.
+- `DELETE /v1/tenant` hard-deletes the resolved tenant's Durable Object graph
+  data after explicit tenant confirmation and best-effort deletes matching
+  Vectorize ids.
 - `/v1/account` exposes session-backed account, workspace, and team member
   management backed by Drizzle/D1.
 - The TanStack admin panel can sign in, rename a hosted workspace, invite or

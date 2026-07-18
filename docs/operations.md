@@ -194,7 +194,6 @@ Alpha retention policy:
 
 Current limitations:
 
-- A hard-delete tenant purge endpoint is not implemented.
 - R2 export lifecycle expiration is not configured in code.
 - Durable Object graph restore is not implemented.
 - Formal privacy policy text is not included in this repository.
@@ -203,11 +202,14 @@ Recommended operator controls before broader public launch:
 
 - Configure R2 lifecycle rules for export retention, such as deleting alpha
   exports after 30 to 90 days unless a longer retention window is required.
-- Document how users request account deletion while the hard-delete workflow is
-  not yet automated.
-- For account deletion requests, revoke OAuth clients and sessions in D1 and
-  treat Durable Object graph deletion as a manual operator task until a tenant
-  purge endpoint exists.
+- For account deletion requests, revoke OAuth clients and sessions in D1, then
+  purge the resolved tenant graph through `DELETE /v1/tenant` with
+  `confirmTenantId` set to the tenant id shown in `/v1/account` or
+  `/v1/readiness`.
+- Treat `DELETE /v1/tenant` as destructive. It removes Durable Object memories,
+  graph edges, tags, entities, and ingestion jobs for the resolved tenant, and
+  best-effort deletes matching Vectorize ids. Export any required tenant data
+  first through `/v1/exports`.
 - Do not use production tenant data for demos, tests, screenshots, or issue
   reproduction.
 

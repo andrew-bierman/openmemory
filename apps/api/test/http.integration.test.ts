@@ -9,6 +9,13 @@ import { afterAll, expect, test } from "vitest";
 import { isLocalDevelopmentRequest, resolveTenant } from "../src/auth";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
+const apiRoot = join(repoRoot, "apps/api");
+const wranglerBin = join(
+  repoRoot,
+  "node_modules",
+  ".bin",
+  process.platform === "win32" ? "wrangler.cmd" : "wrangler",
+);
 const externalTmpRoot = "/Volumes/CrucialX10/tmp/openmemory-tests";
 const testTmpRoot = existsSync("/Volumes/CrucialX10")
   ? externalTmpRoot
@@ -294,6 +301,70 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     attempted: 2,
     tenantId: tenantA,
   });
+
+  const mismatchPurge = await worker.fetch("/v1/tenant", {
+    method: "DELETE",
+    headers: {
+      ...tenantHeaders(tenantA),
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ confirmTenantId: tenantB }),
+  });
+  expect(mismatchPurge.status).toBe(409);
+  expect(await mismatchPurge.json()).toMatchObject({
+    error: "tenant_confirmation_mismatch",
+  });
+
+  const untouchedTenantMemory = await createMemory(worker, tenantB, {
+    content: "Tenant B memory survives Tenant A purge.",
+    tags: ["isolation"],
+  });
+  const purge = await getJson<TenantPurgeResponse>(
+    await worker.fetch("/v1/tenant", {
+      method: "DELETE",
+      headers: {
+        ...tenantHeaders(tenantA),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ confirmTenantId: tenantA }),
+    }),
+  );
+  expect(purge).toMatchObject({
+    tenantId: tenantA,
+    memoriesDeleted: 2,
+    edgesDeleted: 1,
+    vectorIndex: {
+      attempted: 2,
+    },
+  });
+  expect(typeof purge.vectorIndex.vectorizeConfigured).toBe("boolean");
+
+  const purgedList = await getJson<MemoryResponse[]>(
+    await worker.fetch("/v1/memories", {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(purgedList).toEqual([]);
+  const purgedStats = await getJson<GraphStatsResponse>(
+    await worker.fetch("/v1/graph/stats", {
+      headers: tenantHeaders(tenantA),
+    }),
+  );
+  expect(purgedStats).toMatchObject({
+    activeMemories: 0,
+    totalMemories: 0,
+    totalEdges: 0,
+    entityCount: 0,
+    tagCount: 0,
+  });
+  const tenantBListAfterPurge = await getJson<MemoryResponse[]>(
+    await worker.fetch("/v1/memories", {
+      headers: tenantHeaders(tenantB),
+    }),
+  );
+  expect(tenantBListAfterPurge.map((memory) => memory.id)).toContain(
+    untouchedTenantMemory.id,
+  );
 }, 45_000);
 
 test("worker API supports memory lifecycle, profile context, MCP, and dashboard", async () => {
@@ -1393,12 +1464,8 @@ async function startWorkerOnce(env: Record<string, string>) {
   await applyLocalMigrations(persistTo);
 
   const proc = spawn(
-    "bun",
+    wranglerBin,
     [
-      "run",
-      "--cwd",
-      "apps/api",
-      "wrangler",
       "dev",
       "--local",
       "--ip",
@@ -1418,7 +1485,7 @@ async function startWorkerOnce(env: Record<string, string>) {
       "--show-interactive-dev-session=false",
     ],
     {
-      cwd: repoRoot,
+      cwd: apiRoot,
       env: {
         ...process.env,
         NO_COLOR: "1",
@@ -1685,12 +1752,8 @@ async function collectOutput(
 async function applyLocalMigrations(persistTo: string) {
   const output: string[] = [];
   const proc = spawn(
-    "bun",
+    wranglerBin,
     [
-      "run",
-      "--cwd",
-      "apps/api",
-      "wrangler",
       "d1",
       "migrations",
       "apply",
@@ -1702,7 +1765,7 @@ async function applyLocalMigrations(persistTo: string) {
       "wrangler.jsonc",
     ],
     {
-      cwd: repoRoot,
+      cwd: apiRoot,
       env: {
         ...process.env,
         NO_COLOR: "1",
@@ -1958,6 +2021,21 @@ type SourceIngestJobResponse = {
     edgeCount: number;
   };
   error?: Record<string, unknown>;
+};
+
+type TenantPurgeResponse = {
+  tenantId: string;
+  memoriesDeleted: number;
+  edgesDeleted: number;
+  tagsDeleted: number;
+  entitiesDeleted: number;
+  ingestionJobsDeleted: number;
+  vectorIndex: {
+    attempted: number;
+    deleted: number;
+    vectorizeConfigured: boolean;
+  };
+  purgedAt: string;
 };
 
 type GraphStatsResponse = {
