@@ -101,6 +101,11 @@ creates embeddings with the configured `EMBEDDING_MODEL` and writes vectors to
 Vectorize. Vector ids are tenant-scoped so one tenant cannot retrieve another
 tenant's vectors.
 
+Vectorize metadata is deliberately limited to scalar routing fields:
+`tenantId`, `memoryId`, `source`, `status`, and `isLatest`. Tags, entities,
+relationships, source offsets, and confidence signals remain canonical graph
+data and are hydrated from the Durable Object after candidate retrieval.
+
 The search path uses semantic candidates when available and falls back to
 deterministic keyword/graph ranking when embeddings are not configured.
 
@@ -116,9 +121,11 @@ bound. The diagnostic reports:
 - whether `/v1/index/repair` is recommended
 
 `POST /v1/index/repair` deletes tenant-scoped vectors for stale graph records
-before re-upserting every active latest graph memory. The graph remains the
-source of truth; Vectorize is treated as an eventually consistent secondary
-index.
+before re-upserting every active latest graph memory. Its response includes
+attempted, indexed, failed, skipped, and bounded provider error samples so live
+smoke can distinguish remote-provider failure from local Wrangler's expected
+semantic-provider limitations. The graph remains the source of truth; Vectorize
+is treated as an eventually consistent secondary index.
 
 ## R2 Exports
 

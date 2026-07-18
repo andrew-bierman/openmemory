@@ -918,14 +918,28 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       before.purgeableMemoryIds,
     );
     const memories = await graph.listIndexableMemories();
+    const indexResults = [];
     for (const memory of memories) {
-      await indexMemory(env, tenantId, memory);
+      indexResults.push(await indexMemory(env, tenantId, memory));
     }
     const after = await getSemanticIndexDiagnostic(env, tenantId, before);
+    const indexErrors = indexResults
+      .filter((result) => result.error)
+      .map((result) => ({
+        vectorId: result.vectorId,
+        error: result.error,
+      }))
+      .slice(0, 5);
 
     return status(202, {
       attempted: memories.length,
       expectedVectors: before.indexableMemories,
+      indexed: indexResults.filter((result) => result.indexed).length,
+      failed: indexResults.filter(
+        (result) => result.attempted && !result.indexed,
+      ).length,
+      skipped: indexResults.filter((result) => !result.attempted).length,
+      errorSample: indexErrors,
       purgeableMemories: before.purgeableMemories,
       staleVectors,
       tenantId,

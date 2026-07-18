@@ -1,6 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 import type { Env } from "../src/env";
 import {
+  deleteTenantVectors,
   embed,
   getSemanticIndexDiagnostic,
   indexMemory,
@@ -34,17 +35,23 @@ describe("semantic index provider contracts", () => {
     expect(new TextEncoder().encode(vectorId).length).toBeLessThanOrEqual(64);
   });
 
-  test("upserts Vectorize records with tenant-scoped ids and recall metadata", async () => {
+  test("upserts Vectorize records with tenant-scoped ids and scalar recall metadata", async () => {
     const vectorUpsert = vi.fn(async () => {});
     const env = fakeEnv({ vectorUpsert });
 
-    await indexMemory(env, "tenant-a", {
-      id: "mem_1",
-      content: "Graph memory uses Vectorize.",
-      source: "api",
-      tags: ["graph"],
-      status: "active",
-      isLatest: true,
+    await expect(
+      indexMemory(env, "tenant-a", {
+        id: "mem_1",
+        content: "Graph memory uses Vectorize.",
+        source: "api",
+        tags: ["graph"],
+        status: "active",
+        isLatest: true,
+      }),
+    ).resolves.toMatchObject({
+      attempted: true,
+      indexed: true,
+      vectorId: semanticVectorId("tenant-a", "mem_1"),
     });
 
     expect(vectorUpsert).toHaveBeenCalledWith([
@@ -55,12 +62,83 @@ describe("semantic index provider contracts", () => {
           tenantId: "tenant-a",
           memoryId: "mem_1",
           source: "api",
-          tags: ["graph"],
           status: "active",
           isLatest: true,
         },
       },
     ]);
+  });
+
+  test("returns bounded semantic index errors without throwing graph writes", async () => {
+    const vectorUpsert = vi.fn(async () => {
+      throw new Error("provider included private diagnostics");
+    });
+    const env = fakeEnv({ vectorUpsert });
+
+    await expect(
+      indexMemory(env, "tenant-a", {
+        id: "mem_1",
+        content: "Graph memory uses Vectorize.",
+        source: "api",
+        tags: ["graph"],
+        status: "active",
+        isLatest: true,
+      }),
+    ).resolves.toEqual({
+      attempted: true,
+      indexed: false,
+      vectorId: semanticVectorId("tenant-a", "mem_1"),
+      error: "semantic_index_failed",
+    });
+  });
+
+  test("reports no-op index results when semantic bindings are unavailable", async () => {
+    const env = { EMBEDDING_MODEL: "@cf/test/embedding" } as Env;
+
+    await expect(
+      indexMemory(env, "tenant-a", {
+        id: "mem_1",
+        content: "Graph memory uses Vectorize.",
+        source: "api",
+        tags: ["graph"],
+        status: "active",
+        isLatest: true,
+      }),
+    ).resolves.toEqual({
+      attempted: false,
+      indexed: false,
+      vectorId: semanticVectorId("tenant-a", "mem_1"),
+      error: "semantic_bindings_unavailable",
+    });
+  });
+
+  test("normalizes Vectorize delete result shapes", async () => {
+    const vectorDeleteByIds = vi.fn(async () => undefined);
+    const env = fakeEnv({ vectorDeleteByIds });
+
+    await expect(
+      deleteTenantVectors(env, "tenant-a", ["mem_1", "mem_2"]),
+    ).resolves.toEqual({
+      attempted: 2,
+      deleted: 2,
+      vectorizeConfigured: true,
+    });
+    expect(vectorDeleteByIds).toHaveBeenCalledWith([
+      semanticVectorId("tenant-a", "mem_1"),
+      semanticVectorId("tenant-a", "mem_2"),
+    ]);
+  });
+
+  test("uses Vectorize delete count when provided", async () => {
+    const vectorDeleteByIds = vi.fn(async () => ({ count: 1 }));
+    const env = fakeEnv({ vectorDeleteByIds });
+
+    await expect(
+      deleteTenantVectors(env, "tenant-a", ["mem_1", "mem_2"]),
+    ).resolves.toMatchObject({
+      attempted: 2,
+      deleted: 1,
+    });
   });
 
   test("queries Vectorize with active latest tenant filter and returns memory ids", async () => {
@@ -91,7 +169,11 @@ describe("semantic index provider contracts", () => {
     );
     await expect(
       indexMemory(env, "tenant-a", { id: "mem_1" }),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual({
+      attempted: false,
+      indexed: false,
+      error: "invalid_memory_shape",
+    });
     expect(isMemoryForIndex({ id: "mem_1" })).toBe(false);
   });
 
@@ -134,11 +216,13 @@ describe("semantic index provider contracts", () => {
 
 function fakeEnv({
   aiRun = vi.fn(async () => ({ data: [[0.1, 0.2, 0.3]] })),
+  vectorDeleteByIds = vi.fn(async () => ({ count: 0 })),
   vectorQuery = vi.fn(async () => ({ matches: [] })),
   vectorGetByIds = vi.fn(async () => []),
   vectorUpsert = vi.fn(async () => {}),
 }: {
   aiRun?: ReturnType<typeof vi.fn>;
+  vectorDeleteByIds?: ReturnType<typeof vi.fn>;
   vectorGetByIds?: ReturnType<typeof vi.fn>;
   vectorQuery?: ReturnType<typeof vi.fn>;
   vectorUpsert?: ReturnType<typeof vi.fn>;
@@ -149,6 +233,7 @@ function fakeEnv({
       run: aiRun,
     },
     MEMORY_VECTORS: {
+      deleteByIds: vectorDeleteByIds,
       getByIds: vectorGetByIds,
       query: vectorQuery,
       upsert: vectorUpsert,
