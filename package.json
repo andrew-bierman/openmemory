@@ -24,6 +24,7 @@
     "build:web-shell": "bun run --cwd apps/web build && bun run web:shell",
     "deploy": "bun run --cwd apps/api deploy",
     "setup:cloudflare": "bash scripts/setup-cloudflare.sh",
+    "setup:r2-lifecycle": "bash scripts/apply-r2-lifecycle.sh",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --local --config wrangler.jsonc",
     "db:migrate:remote": "bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --remote --config wrangler.jsonc",

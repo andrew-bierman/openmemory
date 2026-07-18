@@ -98,6 +98,8 @@
   dashboard exposes graph operations status from active node and edge density
   signals.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
+- `infra/cloudflare/r2-lifecycle.json` and `bun run setup:r2-lifecycle`
+  configure the R2 export bucket to expire tenant graph exports after 90 days.
 
 ## Not Fully Solved Yet
 

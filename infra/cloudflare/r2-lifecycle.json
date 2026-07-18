@@ -1,0 +1,26 @@
+{
+  "rules": [
+    {
+      "id": "Expire tenant graph exports after 90 days",
+      "enabled": true,
+      "conditions": {},
+      "deleteObjectsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 7776000
+        }
+      }
+    },
+    {
+      "id": "Abort incomplete multipart uploads after 7 days",
+      "enabled": true,
+      "conditions": {},
+      "abortMultipartUploadsTransition": {
+        "condition": {
+          "type": "Age",
+          "maxAge": 604800
+        }
+      }
+    }
+  ]
+}

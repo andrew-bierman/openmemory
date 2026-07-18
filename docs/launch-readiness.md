@@ -107,6 +107,7 @@ larger hosted push.
 - [x] Documented rollback procedure includes Worker version rollback and D1
   migration precautions.
 - [x] Production data retention and export/delete policy is written.
+- [x] R2 export lifecycle policy is code-backed and applied to production.
 
 ## Recommended Launch Sequence
 

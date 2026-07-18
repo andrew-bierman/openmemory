@@ -35,6 +35,15 @@ bun run test:e2e:local
 bun run test:benchmark:local
 ```
 
+Verify production R2 lifecycle policy before tagging an alpha release:
+
+```sh
+CLOUDFLARE_ACCOUNT_ID=<account-id> bun run setup:r2-lifecycle
+```
+
+The command applies `infra/cloudflare/r2-lifecycle.json` and lists the active
+bucket rules.
+
 The benchmark command runs the focused recall and graph-scale cases from
 `apps/api/test/http.integration.test.ts`:
 
@@ -89,6 +98,7 @@ For each release, record:
 - local gate result
 - live gate result, if run
 - Cloudflare Workers Build result
+- R2 lifecycle policy verification result
 - known skipped checks or production limitations
 - screenshot capture path for the current launch-review pass, when relevant
 
