@@ -6,7 +6,7 @@ OpenMemory exposes a streamable HTTP MCP endpoint at:
 https://openmemory-api.abbierman101.workers.dev/mcp
 ```
 
-The MCP server uses OAuth-backed identity in production. Local development can use the tenant header flow for fast iteration, but deployed clients should use OAuth discovery and dynamic client registration.
+The MCP server uses OAuth-backed identity in production. Local development can use the tenant header flow for fast iteration, but deployed clients should use OAuth discovery plus either dashboard-managed public PKCE client registration or dynamic client registration.
 
 Implementation note: OpenMemory currently serves MCP from the main API Worker using Cloudflare Agents' `createMcpHandler`. That is the Worker-native stateless MCP hosting path. Durable memory state is stored in OpenMemory Durable Objects, not in per-MCP-session Agent state. If we later need session-specific state or independent MCP scaling, move the endpoint to a dedicated Cloudflare Agents `McpAgent` Worker.
 
@@ -86,7 +86,23 @@ Production rejects tenant headers by design. Use OAuth bearer tokens outside loc
 
 ## Connection Management
 
-Authenticated users can inspect and revoke OAuth/MCP connections:
+Authenticated users can create, inspect, and disable first-party public PKCE
+OAuth clients:
+
+```sh
+curl -H "Cookie: better-auth.session_token=..." \
+  https://openmemory-api.abbierman101.workers.dev/v1/oauth/clients
+
+curl -X POST -H "Cookie: better-auth.session_token=..." \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Cursor MCP","redirectUris":["http://127.0.0.1:39123/callback"]}' \
+  https://openmemory-api.abbierman101.workers.dev/v1/oauth/clients
+
+curl -X DELETE -H "Cookie: better-auth.session_token=..." \
+  https://openmemory-api.abbierman101.workers.dev/v1/oauth/clients/<client-id>
+```
+
+Authenticated users can also inspect and revoke OAuth/MCP grants:
 
 ```sh
 curl -H "Cookie: better-auth.session_token=..." \
@@ -97,8 +113,8 @@ curl -X DELETE -H "Cookie: better-auth.session_token=..." \
 ```
 
 The TanStack app MCP panel shows the streamable HTTP URL, OAuth issuer,
-authorization metadata URL, protected resource metadata URL, and the same
-connection list and revoke actions.
+authorization metadata URL, protected resource metadata URL, client
+registration form, registered clients, connection list, and revoke actions.
 
 See [MCP compatibility](mcp-compatibility.md) for the protocol matrix, tools,
 resources, prompts, tested client request shapes, and known external-client

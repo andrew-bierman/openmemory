@@ -134,6 +134,83 @@ describe("OpenMemory client", () => {
       },
     ]);
   });
+
+  test("manages OAuth client registrations through the typed RPC surface", async () => {
+    const requests: Array<{ url: string; method: string; body?: unknown }> = [];
+    const api = createOpenMemoryClient("https://api.openmemory.test", {
+      fetch: fakeFetch(async (input, init) => {
+        const request = new Request(input, init);
+        const body =
+          request.method === "POST" ? await request.json() : undefined;
+        requests.push({
+          url: request.url,
+          method: request.method,
+          body,
+        });
+
+        if (request.method === "GET") {
+          return Response.json([]);
+        }
+        if (request.method === "DELETE") {
+          return Response.json({
+            clientId: "om_mcp_123",
+            disabled: true,
+            revoked: true,
+          });
+        }
+        return Response.json({
+          clientId: "om_mcp_123",
+          name: "Cursor",
+          redirectUris: ["http://127.0.0.1/callback"],
+          tokenEndpointAuthMethod: "none",
+          grantTypes: ["authorization_code", "refresh_token"],
+          responseTypes: ["code"],
+          scopes: ["openid", "profile", "memory:read", "memory:write"],
+          public: true,
+          disabled: false,
+          requirePKCE: true,
+        });
+      }),
+    });
+
+    await expect(api.listOAuthClients()).resolves.toEqual([]);
+    await expect(
+      api.createOAuthClient({
+        name: "Cursor",
+        redirectUris: ["http://127.0.0.1/callback"],
+      }),
+    ).resolves.toMatchObject({
+      clientId: "om_mcp_123",
+      public: true,
+      requirePKCE: true,
+    });
+    await expect(api.deleteOAuthClient("om_mcp_123")).resolves.toEqual({
+      clientId: "om_mcp_123",
+      disabled: true,
+      revoked: true,
+    });
+
+    expect(requests).toEqual([
+      {
+        url: "https://api.openmemory.test/v1/oauth/clients",
+        method: "GET",
+        body: undefined,
+      },
+      {
+        url: "https://api.openmemory.test/v1/oauth/clients",
+        method: "POST",
+        body: {
+          name: "Cursor",
+          redirectUris: ["http://127.0.0.1/callback"],
+        },
+      },
+      {
+        url: "https://api.openmemory.test/v1/oauth/clients/om_mcp_123",
+        method: "DELETE",
+        body: undefined,
+      },
+    ]);
+  });
 });
 
 function fakeFetch(

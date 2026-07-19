@@ -10,6 +10,7 @@ import {
   type GraphStats,
   type IndexRepairResult,
   type Memory,
+  type OAuthClientRegistration,
   type OAuthConnection,
   OpenMemoryApiError,
   type ReadinessSnapshot,
@@ -199,6 +200,12 @@ function Home() {
   const [deleteConfirmTenantId, setDeleteConfirmTenantId] = useState("");
   const [memberEmail, setMemberEmail] = useState("");
   const [memberRole, setMemberRole] = useState<"admin" | "member">("member");
+  const [oauthClientName, setOauthClientName] = useState(
+    "OpenMemory MCP Client",
+  );
+  const [oauthRedirectUris, setOauthRedirectUris] = useState(
+    "http://127.0.0.1:39123/callback",
+  );
   const [activityNow, setActivityNow] = useState(INITIAL_ACTIVITY_NOW);
   const [tags, setTags] = useState("");
   const [type, setType] = useState("fact");
@@ -291,6 +298,11 @@ function Home() {
     queryKey: ["openmemory", "oauth-connections", ...queryScope],
     queryFn: () => api.listOAuthConnections().catch(() => []),
   });
+  const oauthClientsQuery = useQuery({
+    enabled: hasLoadedConnection && !usesLocalTenant && Boolean(sessionUser),
+    queryKey: ["openmemory", "oauth-clients", ...queryScope],
+    queryFn: () => api.listOAuthClients().catch(() => []),
+  });
   const readinessQuery = useQuery({
     enabled: hasLoadedConnection,
     queryKey: ["openmemory", "readiness", ...queryScope],
@@ -312,6 +324,7 @@ function Home() {
   const graphStats = graphStatsQuery.data ?? null;
   const graphRelationships = graphRelationshipsQuery.data ?? [];
   const oauthConnections = oauthConnectionsQuery.data ?? [];
+  const oauthClients = oauthClientsQuery.data ?? [];
   const readiness = readinessQuery.data ?? null;
   const account = accountQuery.data ?? null;
   const context = contextQuery.data ?? null;
@@ -375,6 +388,9 @@ function Home() {
       }),
       queryClient.invalidateQueries({
         queryKey: ["openmemory", "oauth-connections"],
+      }),
+      queryClient.invalidateQueries({
+        queryKey: ["openmemory", "oauth-clients"],
       }),
       queryClient.invalidateQueries({ queryKey: ["openmemory", "readiness"] }),
       queryClient.invalidateQueries({ queryKey: ["openmemory", "account"] }),
@@ -587,6 +603,18 @@ function Home() {
     onMutate: () => setError(null),
     onSuccess: invalidateDashboard,
   });
+  const createOAuthClientMutation = useMutation({
+    mutationFn: api.createOAuthClient,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
+  const deleteOAuthClientMutation = useMutation({
+    mutationFn: api.deleteOAuthClient,
+    onError: (caught) => setError(formatError(caught)),
+    onMutate: () => setError(null),
+    onSuccess: invalidateDashboard,
+  });
   const renameWorkspaceMutation = useMutation({
     mutationFn: api.renameWorkspace,
     onError: (caught) => setError(formatError(caught)),
@@ -629,6 +657,10 @@ function Home() {
       });
       queryClient.setQueryData(
         ["openmemory", "oauth-connections", ...queryScope],
+        [],
+      );
+      queryClient.setQueryData(
+        ["openmemory", "oauth-clients", ...queryScope],
         [],
       );
       queryClient.setQueryData(["openmemory", "account", ...queryScope], null);
@@ -679,6 +711,7 @@ function Home() {
     neighborsQuery.isFetching ||
     accountQuery.isFetching ||
     oauthConnectionsQuery.isFetching ||
+    oauthClientsQuery.isFetching ||
     readinessQuery.isFetching ||
     contextQuery.isFetching ||
     createMemoryMutation.isPending ||
@@ -686,6 +719,8 @@ function Home() {
     forgetMemoryMutation.isPending ||
     authMutation.isPending ||
     revokeOAuthMutation.isPending ||
+    createOAuthClientMutation.isPending ||
+    deleteOAuthClientMutation.isPending ||
     renameWorkspaceMutation.isPending ||
     updateProfileMutation.isPending ||
     inviteMemberMutation.isPending ||
@@ -775,12 +810,28 @@ function Home() {
       ["openmemory", "oauth-connections", ...queryScope],
       [],
     );
+    queryClient.setQueryData(
+      ["openmemory", "oauth-clients", ...queryScope],
+      [],
+    );
     queryClient.setQueryData(["openmemory", "account", ...queryScope], null);
     queryClient.removeQueries({ queryKey: ["openmemory", "context"] });
   }
 
   async function revokeOAuthConnection(clientId: string) {
     await revokeOAuthMutation.mutateAsync(clientId);
+  }
+
+  async function createManagedOAuthClient(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await createOAuthClientMutation.mutateAsync({
+      name: oauthClientName.trim() || "OpenMemory MCP Client",
+      redirectUris: parseRedirectUris(oauthRedirectUris),
+    });
+  }
+
+  async function deleteManagedOAuthClient(clientId: string) {
+    await deleteOAuthClientMutation.mutateAsync(clientId);
   }
 
   async function renameCurrentWorkspace(event: FormEvent<HTMLFormElement>) {
@@ -1236,8 +1287,18 @@ function Home() {
             ) : view === "mcp" ? (
               <McpSetup
                 apiUrl={apiUrl}
+                canManageClients={!usesLocalTenant && Boolean(sessionUser)}
+                clientName={oauthClientName}
+                clients={oauthClients}
                 connections={oauthConnections}
+                isCreatingClient={createOAuthClientMutation.isPending}
+                isDeletingClient={deleteOAuthClientMutation.isPending}
+                onClientNameChange={setOauthClientName}
+                onCreateClient={createManagedOAuthClient}
+                onDeleteClient={deleteManagedOAuthClient}
                 onRevoke={revokeOAuthConnection}
+                onRedirectUrisChange={setOauthRedirectUris}
+                redirectUris={oauthRedirectUris}
               />
             ) : view === "operations" ? (
               <OperationsReadiness
@@ -2242,12 +2303,32 @@ function MemoryMeta({ memory }: Readonly<{ memory: Memory }>) {
 
 function McpSetup({
   apiUrl,
+  canManageClients,
+  clientName,
+  clients,
   connections,
+  isCreatingClient,
+  isDeletingClient,
+  onClientNameChange,
+  onCreateClient,
+  onDeleteClient,
   onRevoke,
+  onRedirectUrisChange,
+  redirectUris,
 }: Readonly<{
   apiUrl: string;
+  canManageClients: boolean;
+  clientName: string;
+  clients: OAuthClientRegistration[];
   connections: OAuthConnection[];
+  isCreatingClient: boolean;
+  isDeletingClient: boolean;
+  onClientNameChange: (value: string) => void;
+  onCreateClient: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onDeleteClient: (clientId: string) => Promise<void>;
   onRevoke: (clientId: string) => Promise<void>;
+  onRedirectUrisChange: (value: string) => void;
+  redirectUris: string;
 }>) {
   const baseUrl = cleanBaseUrl(apiUrl);
   const mcpUrl = `${baseUrl}/mcp`;
@@ -2296,6 +2377,95 @@ function McpSetup({
         </div>
       </div>
       <pre className="context">{JSON.stringify(clientConfig, null, 2)}</pre>
+      <div className="panel-title">
+        <div>
+          <p className="eyebrow">OAuth clients</p>
+          <h2>Registrations</h2>
+        </div>
+      </div>
+      <form className="settings-grid" onSubmit={onCreateClient}>
+        <div className="field">
+          <Label htmlFor="oauthClientName">Client name</Label>
+          <Input
+            disabled={!canManageClients}
+            id="oauthClientName"
+            onChange={(event) => onClientNameChange(event.target.value)}
+            placeholder="Cursor MCP"
+            value={clientName}
+          />
+        </div>
+        <div className="field settings-grid-wide">
+          <Label htmlFor="oauthRedirectUris">Redirect URIs</Label>
+          <Textarea
+            disabled={!canManageClients}
+            id="oauthRedirectUris"
+            onChange={(event) => onRedirectUrisChange(event.target.value)}
+            placeholder="http://127.0.0.1:39123/callback"
+            value={redirectUris}
+          />
+        </div>
+        <div className="field form-action">
+          <Button
+            disabled={!canManageClients || isCreatingClient}
+            type="submit"
+          >
+            {isCreatingClient ? "Creating..." : "Create client"}
+          </Button>
+        </div>
+      </form>
+      {!canManageClients ? (
+        <div className="empty-state compact">
+          <h3>Sign in to register clients</h3>
+          <p>
+            Persistent OAuth clients are owned by hosted Better Auth users, not
+            local development tenant headers.
+          </p>
+        </div>
+      ) : null}
+      {canManageClients && clients.length === 0 ? (
+        <div className="empty-state compact">
+          <h3>No registered clients</h3>
+          <p>
+            Create a public PKCE client for Cursor, Claude, MCP Inspector, or
+            another MCP host.
+          </p>
+        </div>
+      ) : clients.length > 0 ? (
+        <div className="memory-list">
+          {clients.map((client) => (
+            <article className="memory compact" key={client.clientId}>
+              <div className="meta">
+                <span className="pill">{client.name}</span>
+                <span className="pill">
+                  {client.disabled ? "disabled" : "active"}
+                </span>
+                {client.scopes.map((scope) => (
+                  <span className="pill" key={scope}>
+                    {scope}
+                  </span>
+                ))}
+              </div>
+              <pre className="context">{client.clientId}</pre>
+              <div className="meta">
+                {client.redirectUris.map((uri) => (
+                  <span className="pill" key={uri}>
+                    {uri}
+                  </span>
+                ))}
+              </div>
+              <Button
+                disabled={client.disabled || isDeletingClient}
+                onClick={() => void onDeleteClient(client.clientId)}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {client.disabled ? "Disabled" : "Disable"}
+              </Button>
+            </article>
+          ))}
+        </div>
+      ) : null}
       <div className="panel-title">
         <div>
           <p className="eyebrow">OAuth grants</p>
@@ -2411,6 +2581,13 @@ function parseTags(value: string) {
   return value
     .split(",")
     .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function parseRedirectUris(value: string) {
+  return value
+    .split(/[\n,]/)
+    .map((uri) => uri.trim())
     .filter(Boolean);
 }
 
