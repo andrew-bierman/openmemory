@@ -400,8 +400,10 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     .click();
   await expect(page).toHaveURL(/view=ingest/);
   await expect(page.getByLabel("Source ingest summary")).toContainText(
-    "No source ingested yet",
+    "No ingest yet",
   );
+  await expect(page.getByLabel("Mode")).toHaveValue("conversation");
+  await expect(page.getByLabel("Conversation id")).toHaveValue(/conversation-/);
   await page
     .getByRole("textbox", { name: "Source" })
     .fill("architecture-notes");
@@ -422,7 +424,7 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     })
     .click();
   await expect(page.getByLabel("Source ingest summary")).toContainText(
-    "Source indexed",
+    "Ingestion indexed",
   );
   await expect(page.getByLabel("Source ingest summary")).toContainText(
     "Chunks",

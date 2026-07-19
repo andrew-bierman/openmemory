@@ -6,6 +6,7 @@ import {
   GraphExportPayloadSchema,
   GraphRelationshipCatalog,
   getGraphRelationshipDefinition,
+  IngestConversationSchema,
   importBenchmarkFixture,
   normalizeGraphRelationship,
   normalizeTenantId,
@@ -35,6 +36,31 @@ describe("core contracts", () => {
       includeHistorical: false,
       includeForgotten: false,
     });
+  });
+
+  test("validates conversation transcript ingestion contracts", () => {
+    const parsed = IngestConversationSchema.parse({
+      conversationId: "chat-123",
+      messages: [
+        {
+          role: "user",
+          content: "Remember that Atlas launch moved to Tuesday.",
+        },
+        {
+          role: "assistant",
+          content: "Saved the Atlas launch decision.",
+        },
+      ],
+    });
+
+    expect(parsed).toMatchObject({
+      conversationId: "chat-123",
+      source: "conversation",
+      chunkSize: 1600,
+      overlap: 180,
+      tags: [],
+    });
+    expect(parsed.messages).toHaveLength(2);
   });
 
   test("normalizes graph relationships into the canonical taxonomy", () => {

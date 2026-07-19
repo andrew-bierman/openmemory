@@ -48,9 +48,12 @@
   exchange, seeded OAuth/MCP connection revocation, and confirmed account
   deletion.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
-- `/v1/sources/async` creates durable ingestion jobs, buffers requests through
-  Cloudflare Queues, and runs the same graph/indexing pipeline through a
-  Cloudflare Workflow.
+- `/v1/conversations` chunks AI chat transcripts by role-preserving turns,
+  stores `conversationId` on each memory, preserves transcript message ranges in
+  metadata, indexes each chunk, and creates graph edges between adjacent chunks.
+- `/v1/sources/async` and `/v1/conversations/async` create durable ingestion
+  jobs, buffer requests through Cloudflare Queues, and run the same
+  graph/indexing pipeline through a Cloudflare Workflow.
 - Memory create/update/source chunk ingestion enqueues extraction work that
   enriches entity metadata and adds relationship-specific graph edges.
 - `packages/core` owns the canonical graph relationship taxonomy used by edge
@@ -182,8 +185,8 @@
      registration/management if we need first-party clients.
 
 3. RAG pipeline
-   - Extend the Queue/Workflow pipeline from source chunks to conversation
-     transcript extraction and enrichment.
+  - Expand transcript connectors from first-party API/UI ingest into productized
+    imports for specific AI chat surfaces.
    - Improve extraction quality with Workers AI once deterministic extraction
      has enough production traces to evaluate.
    - Store embeddings in Vectorize for every chunk and tune stale-index

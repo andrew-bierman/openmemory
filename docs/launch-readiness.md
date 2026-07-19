@@ -37,8 +37,8 @@ larger hosted push.
 - API and MCP recall use the shared graph recall path; semantic candidates are
   included when Vectorize is configured, with an optional Workers AI rerank pass
   behind `OPENMEMORY_RERANK_MODEL` and deterministic fallback.
-- Async source ingestion is covered by local Wrangler integration with Queues
-  and Workflows.
+- Async source and conversation transcript ingestion are covered by local
+  Wrangler integration with Queues and Workflows.
 - Entity and relationship extraction workers are covered by local Wrangler
   integration with Queues and Workflows.
 - The official MCP TypeScript SDK client is dogfooded in CI, and named
@@ -107,7 +107,11 @@ larger hosted push.
 - [x] Named external MCP request profiles are dogfooded and documented.
 - [x] Generic browser OAuth callback behavior for MCP clients is verified in
   local and live browser E2E.
-- [x] Async source ingestion uses Queues and Workflows.
+- [x] AI chat transcript ingestion stores role-preserving conversation chunks
+  with `conversationId` provenance, message-range metadata, graph links, and
+  recall coverage.
+- [x] Async source and conversation transcript ingestion use Queues and
+  Workflows.
 - [x] Entity and relationship extraction workers are implemented.
 - [x] Larger recall and graph performance benchmarks run in CI or release
   qualification, with JSONL benchmark artifacts for release review.

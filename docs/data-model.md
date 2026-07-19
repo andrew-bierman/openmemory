@@ -109,6 +109,30 @@ data and are hydrated from the Durable Object after candidate retrieval.
 The search path uses semantic candidates when available and falls back to
 deterministic keyword/graph ranking when embeddings are not configured.
 
+## Source and Conversation Ingestion
+
+`POST /v1/sources` ingests long-form documents as ordered chunk memories.
+`POST /v1/conversations` ingests AI chat transcripts as ordered conversation
+chunk memories. Both paths index each chunk, enqueue deterministic entity and
+relationship extraction, link related memories, and write `next_chunk` /
+`previous_chunk` edges between adjacent chunks.
+
+Conversation memories set `conversationId` on the memory row and preserve
+transcript provenance in metadata:
+
+- `sourceId`
+- `title`
+- `conversationId`
+- `messageStartIndex` and `messageEndIndex`
+- `messageCount`
+- `roles`
+- `startedAt` and `endedAt` when message timestamps are present
+- `ingestion.strategy: "conversation-transcript-v1"`
+
+Async transcript ingestion uses `POST /v1/conversations/async`, the same
+`SOURCE_INGESTION_QUEUE`, and the same Durable Object ingestion-job ledger as
+document ingestion.
+
 `GET /v1/readiness` includes a semantic-index diagnostic derived from the
 canonical Durable Object graph plus sampled Vectorize lookups when Vectorize is
 bound. The diagnostic reports:
@@ -193,7 +217,7 @@ policy for abandoned exports and defense-in-depth retention control.
 
 | Binding | Message | Consumer |
 | --- | --- | --- |
-| `SOURCE_INGESTION_QUEUE` | `SourceIngestionMessage` with `sourceId`, `tenantId`, input, and request timestamp. | Starts `SOURCE_INGESTION_WORKFLOW` when configured, otherwise processes inline. |
+| `SOURCE_INGESTION_QUEUE` | `IngestionQueueMessage` with `kind: "source"` or `kind: "conversation"`, `sourceId`, `tenantId`, input, and request timestamp. | Starts `SOURCE_INGESTION_WORKFLOW` when configured, otherwise processes inline. |
 | `MEMORY_EXTRACTION_QUEUE` | `MemoryExtractionMessage` with `memoryId`, `tenantId`, and reason. | Starts `MEMORY_EXTRACTION_WORKFLOW` when configured, otherwise processes inline. |
 
 Both consumers retry failed messages and write structured error telemetry.

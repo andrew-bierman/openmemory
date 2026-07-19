@@ -5,7 +5,7 @@ import net from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, expect, test } from "vitest";
+import { afterEach, expect, test } from "vitest";
 import { isLocalDevelopmentRequest, resolveTenant } from "../src/auth";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -23,8 +23,8 @@ const testTmpRoot = existsSync("/Volumes/CrucialX10")
 
 const workers: WorkerProcess[] = [];
 
-afterAll(async () => {
-  await Promise.all(workers.map((worker) => worker.stop()));
+afterEach(async () => {
+  await Promise.all(workers.splice(0).map((worker) => worker.stop()));
 });
 
 test("worker API isolates tenants and supports memory recall plus graph edges", async () => {
@@ -1874,6 +1874,93 @@ test("source ingestion chunks documents, preserves provenance, and links chunk g
   ).toBe(true);
 }, 45_000);
 
+test("conversation ingestion preserves turns, conversation id, and graph links", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-conversation-${crypto.randomUUID()}`;
+  const conversationId = `chat-${crypto.randomUUID()}`;
+  const anchor = await createMemory(worker, tenant, {
+    content: "Atlas launch decisions should be recoverable across AI chats.",
+    tags: ["atlas", "launch"],
+  });
+
+  const transcript = await getJson<SourceIngestResponse>(
+    await worker.fetch("/v1/conversations", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenant),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        conversationId,
+        title: "Atlas planning chat",
+        tags: ["chat", "atlas"],
+        chunkSize: 450,
+        overlap: 80,
+        messages: [
+          {
+            role: "system",
+            content: "Keep durable project decisions concise.",
+            timestamp: "2026-07-18T20:00:00.000Z",
+          },
+          {
+            role: "user",
+            content:
+              "Atlas launch is moving to Tuesday and the dashboard should show launch evidence.",
+            timestamp: "2026-07-18T20:01:00.000Z",
+          },
+          {
+            role: "assistant",
+            content:
+              "I will remember that Atlas launch moved to Tuesday and link it to evidence dashboard work.",
+            timestamp: "2026-07-18T20:02:00.000Z",
+          },
+          {
+            role: "user",
+            content:
+              "Make sure future recall connects this conversation with launch decisions.",
+            timestamp: "2026-07-18T20:03:00.000Z",
+          },
+        ],
+      }),
+    }),
+  );
+
+  expect(transcript.sourceId).toMatch(/^src_/);
+  expect(transcript.chunkCount).toBeGreaterThan(0);
+  expect(transcript.memories[0]).toMatchObject({
+    conversationId,
+    source: "conversation",
+    type: "episode",
+  });
+  expect(transcript.memories[0]?.tags).toContain("conversation");
+  expect(transcript.memories[0]?.metadata).toMatchObject({
+    sourceId: transcript.sourceId,
+    title: "Atlas planning chat",
+    conversationId,
+    messageStartIndex: 0,
+    ingestion: {
+      strategy: "conversation-transcript-v1",
+    },
+  });
+  expect(transcript.memories[0]?.content).toContain("user @");
+  expect(transcript.edges).toContainEqual(
+    expect.objectContaining({
+      targetId: anchor.id,
+      relationship: "shares_entity",
+    }),
+  );
+
+  const results = await search(worker, tenant, {
+    q: "Atlas launch Tuesday conversation evidence",
+    limit: 5,
+  });
+  expect(
+    results.some((result) => result.conversationId === conversationId),
+  ).toBe(true);
+}, 45_000);
+
 test("async source ingestion queues a durable job and completes the graph pipeline", async () => {
   const worker = await startWorker();
   workers.push(worker);
@@ -1939,6 +2026,64 @@ test("async source ingestion queues a durable job and completes the graph pipeli
   });
   expect(
     results.some((result) => result.metadata.sourceId === queued.sourceId),
+  ).toBe(true);
+}, 60_000);
+
+test("async conversation ingestion queues a durable transcript job", async () => {
+  const worker = await startWorker();
+  workers.push(worker);
+
+  const tenant = `tenant-async-conversation-${crypto.randomUUID()}`;
+  const conversationId = `chat-async-${crypto.randomUUID()}`;
+
+  const queued = await getJson<SourceIngestJobResponse>(
+    await worker.fetch("/v1/conversations/async", {
+      method: "POST",
+      headers: {
+        ...tenantHeaders(tenant),
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        conversationId,
+        title: "Async transcript notes",
+        tags: ["chat", "async"],
+        messages: [
+          {
+            role: "user",
+            content:
+              "OpenMemory should ingest AI chat transcripts through Cloudflare Queues.",
+          },
+          {
+            role: "assistant",
+            content:
+              "The transcript pipeline should preserve role order and conversation ids.",
+          },
+        ],
+      }),
+    }),
+  );
+
+  expect(queued.sourceId).toMatch(/^src_/);
+  expect(queued.status).toBe("queued");
+  expect(queued.metadata).toMatchObject({
+    kind: "conversation",
+    conversationId,
+    strategy: "queue-workflow-conversation-ingestion-v1",
+  });
+
+  const completed = await waitForSourceJob(worker, tenant, queued.sourceId);
+  expect(completed.status).toBe("completed");
+  expect(completed.result).toMatchObject({
+    sourceId: queued.sourceId,
+    chunkCount: 1,
+  });
+
+  const results = await search(worker, tenant, {
+    q: "AI chat transcripts role order conversation ids",
+    limit: 5,
+  });
+  expect(
+    results.some((result) => result.conversationId === conversationId),
   ).toBe(true);
 }, 60_000);
 

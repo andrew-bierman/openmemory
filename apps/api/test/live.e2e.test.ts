@@ -125,6 +125,45 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
         title: "Live E2E source notes",
       });
 
+      const conversationId = `live-chat-${crypto.randomUUID()}`;
+      const conversation = await authedJson<SourceIngestResponse>(
+        cookie,
+        "/v1/conversations",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            conversationId,
+            title: "Live E2E transcript",
+            tags: ["e2e", "chat"],
+            messages: [
+              {
+                role: "user",
+                content:
+                  "Remember that live OpenMemory transcript ingestion should link AI chat decisions.",
+              },
+              {
+                role: "assistant",
+                content:
+                  "Stored the transcript with conversation id provenance for future recall.",
+              },
+            ],
+          }),
+        },
+      );
+      expect(conversation.sourceId).toMatch(/^src_/);
+      expect(conversation.chunkCount).toBeGreaterThan(0);
+      expect(conversation.memories[0]).toMatchObject({
+        conversationId,
+        source: "conversation",
+      });
+      expect(conversation.memories[0]?.metadata).toMatchObject({
+        sourceId: conversation.sourceId,
+        conversationId,
+        ingestion: {
+          strategy: "conversation-transcript-v1",
+        },
+      });
+
       const stats = await authedJson<GraphStatsResponse>(
         cookie,
         "/v1/graph/stats",
@@ -867,8 +906,10 @@ type AccountResponse = {
 type MemoryResponse = {
   id: string;
   content: string;
+  conversationId?: string;
   entityIds: string[];
   metadata: Record<string, unknown>;
+  source: string;
 };
 
 type SearchResponse = MemoryResponse & {
