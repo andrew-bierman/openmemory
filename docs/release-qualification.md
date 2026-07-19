@@ -24,6 +24,16 @@ ChatGPT evidence and run the strict gate:
 bun run mcp:vendor-dogfood:check
 ```
 
+The same posture applies to hosted social login. Install
+`GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, and
+`GOOGLE_CLIENT_SECRET`, verify GitHub and Google report `ready` in
+`/v1/readiness`, complete hosted sign-in through both providers, update
+`config/social-oauth-dogfood.json`, and run:
+
+```sh
+bun run social-oauth:check
+```
+
 The local browser E2E suite also captures launch-review screenshots under
 `.tmp/screenshots/launch-readiness/`. Those artifacts are intentionally ignored
 by git and can be regenerated with:
@@ -129,6 +139,10 @@ Use the manual `MCP Vendor Dogfood` workflow in strict mode after updating
 `config/mcp-vendor-dogfood.json`; it is the durable GitHub Actions record for
 real MCP Inspector, Cursor, Claude, and ChatGPT surface compatibility.
 
+Use the manual `Social OAuth Dogfood` workflow in strict mode after updating
+`config/social-oauth-dogfood.json`; it is the durable GitHub Actions record for
+hosted GitHub and Google sign-in compatibility.
+
 The workflow uploads the generated `.tmp/benchmark-reports/*.jsonl` files as a
 `benchmark-reports` artifact so release reviewers can compare graph latency and
 recall-quality evidence across candidate commits.
@@ -202,4 +216,5 @@ For each release, record:
 
 Do not publish a release as broadly production-ready while launch readiness
 still has unchecked operational controls, async ingestion, extraction workers,
-or real MCP Inspector, Cursor, Claude, and ChatGPT vendor dogfooding.
+real MCP Inspector, Cursor, Claude, and ChatGPT vendor dogfooding, or hosted
+GitHub and Google social OAuth dogfooding.

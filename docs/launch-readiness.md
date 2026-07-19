@@ -34,6 +34,11 @@ larger hosted push.
   provider diagnostics, source ingestion, R2 export, tenant readiness snapshots,
   OAuth provider readiness diagnostics, browser-session readiness, and hosted UI
   smoke are covered by tests.
+- Hosted GitHub and Google social OAuth sign-in evidence is tracked in
+  `config/social-oauth-dogfood.json`; normal CI validates the pending status,
+  and the strict launch gate fails until `GITHUB_CLIENT_ID`,
+  `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET` are
+  installed and both providers pass hosted sign-in dogfooding.
 - API and MCP recall use the shared graph recall path; semantic candidates are
   included when Vectorize is configured, with an optional Workers AI rerank pass
   behind `OPENMEMORY_RERANK_MODEL` and deterministic fallback.
@@ -92,6 +97,8 @@ larger hosted push.
 - [x] Multi-user isolation through Durable Object tenant naming.
 - [x] Production tenant headers rejected; OAuth-backed identity is required.
 - [x] Better Auth session and OAuth flows covered by local and live tests.
+- [ ] Hosted GitHub and Google social OAuth sign-in has passed with evidence in
+  `config/social-oauth-dogfood.json`.
 - [x] MCP endpoint exposes `remember`, `recall`, `profile`, and `forget`.
 - [x] MCP endpoint exposes profile/recent resources and a context prompt.
 - [x] Graph memory CRUD, recall, source chunks, exports, restore, and repair

@@ -169,6 +169,11 @@
 - Optional GitHub and Google login provider readiness is visible in
   `/v1/readiness`; hosted social login still requires installing real OAuth app
   client IDs and secrets.
+- Hosted GitHub and Google sign-in dogfooding is tracked in
+  `config/social-oauth-dogfood.json`; the normal status check is CI-safe, and
+  the strict gate remains pending until `GITHUB_CLIENT_ID`,
+  `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, and `GOOGLE_CLIENT_SECRET` are
+  installed and sign-in evidence is recorded.
 - Real MCP Inspector, Cursor, Claude, and ChatGPT vendor-surface dogfooding is
   tracked in `config/mcp-vendor-dogfood.json`; the normal status check is
   CI-safe, and the strict gate remains pending until evidence is recorded.
@@ -182,6 +187,10 @@
 1. Auth hardening
    - Expand hosted navigation polish from product feedback.
    - Keep `x-openmemory-user-id` only for local development and tests.
+   - Install GitHub and Google OAuth app secrets, update
+     `config/social-oauth-dogfood.json` with hosted sign-in evidence, and run
+     `bun run social-oauth:check` or the strict `Social OAuth Dogfood` workflow
+     before declaring hosted social login complete.
 
 2. MCP production flow
    - Manually test full interactive OAuth callback flows in MCP Inspector,

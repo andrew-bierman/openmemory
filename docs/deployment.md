@@ -109,6 +109,15 @@ without exposing credential values. A `partial` provider means only the client
 id or only the client secret is configured, and the readiness response includes
 `github_oauth_provider_partial` or `google_oauth_provider_partial`.
 
+Hosted social login launch evidence is tracked in
+`config/social-oauth-dogfood.json`. After installing GitHub and Google OAuth app
+secrets, verify `/v1/readiness` reports both providers as `ready`, complete
+hosted sign-in through each provider, update the evidence ledger, and run:
+
+```sh
+bun run social-oauth:check
+```
+
 Optional machine-token fallback:
 
 ```sh
