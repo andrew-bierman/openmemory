@@ -57,14 +57,16 @@ to provide the infrastructure layer behind a more portable experience:
   candidates, sampled missing vectors, sampled stale vectors, and repair
   recommendations.
 - Better Auth routes, OAuth 2.1/OIDC discovery, dynamic client registration,
-  JWT/JWKS-backed resource tokens, and optional GitHub/Google login providers.
+  dashboard-managed public PKCE MCP clients, JWT/JWKS-backed resource tokens,
+  and optional GitHub/Google login providers.
 - Session-backed workspace and team member management backed by Drizzle/D1.
 - Confirmed account and tenant deletion paths for graph purge, Vectorize
   cleanup, R2 export cleanup, and user-owned auth/workspace/OAuth control-plane
   rows.
 - Streamable HTTP MCP endpoint with `remember`, `recall`, `profile`, and
   `forget` tools.
-- Authenticated OAuth/MCP connection listing and revocation.
+- Authenticated OAuth/MCP client registration management, connection listing,
+  and grant revocation.
 - Worker-hosted TanStack dashboard for capture, recall, forgetting, and local
   inspection.
 - TanStack Start web app with a polished hosted-dashboard direction, shared

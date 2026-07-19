@@ -53,6 +53,10 @@ import { createOpenMemoryMcpHandler } from "./mcp";
 import { MemoryGraph } from "./memory-graph";
 import { enrichMemoryInput } from "./memory-signals";
 import {
+  type CreateOAuthClientInput,
+  createOAuthClient,
+  disableOAuthClient,
+  listOAuthClients,
   listOAuthConnections,
   revokeOAuthConnection,
 } from "./oauth-connections";
@@ -834,6 +838,25 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     const result = await listOAuthConnections(env, request);
     return status(result.status, result.body);
   })
+  .get("/v1/oauth/clients", async ({ request, status }) => {
+    const result = await listOAuthClients(env, request);
+    return status(result.status, result.body);
+  })
+  .post("/v1/oauth/clients", async ({ body, request, status }) => {
+    const result = await createOAuthClient(
+      env,
+      request,
+      body as CreateOAuthClientInput,
+    );
+    return status(result.status, result.body);
+  })
+  .delete(
+    "/v1/oauth/clients/:clientId",
+    async ({ params, request, status }) => {
+      const result = await disableOAuthClient(env, request, params.clientId);
+      return status(result.status, result.body);
+    },
+  )
   .delete(
     "/v1/oauth/connections/:clientId",
     async ({ params, request, status }) => {

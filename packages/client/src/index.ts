@@ -73,6 +73,27 @@ export type OAuthConnection = {
   updatedAt?: string;
 };
 
+export type OAuthClientRegistration = {
+  clientId: string;
+  name: string;
+  redirectUris: string[];
+  tokenEndpointAuthMethod: string;
+  grantTypes: string[];
+  responseTypes: string[];
+  scopes: string[];
+  public: boolean;
+  disabled: boolean;
+  requirePKCE: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type CreateOAuthClientInput = {
+  name?: string;
+  redirectUris: string[];
+  scopes?: string[];
+};
+
 export type Account = {
   user: {
     id: string;
@@ -468,6 +489,14 @@ export function createOpenMemoryClient(
       unwrap<{ clientId: string; revoked: boolean }>(
         client.v1.oauth.connections({ clientId }).delete(),
       ),
+    listOAuthClients: () =>
+      unwrap<OAuthClientRegistration[]>(client.v1.oauth.clients.get()),
+    createOAuthClient: (input: CreateOAuthClientInput) =>
+      unwrap<OAuthClientRegistration>(client.v1.oauth.clients.post(input)),
+    deleteOAuthClient: (clientId: string) =>
+      unwrap<{ clientId: string; disabled: boolean; revoked: boolean }>(
+        client.v1.oauth.clients({ clientId }).delete(),
+      ),
     exportGraph: () => unwrap<GraphExportResult>(client.v1.exports.post()),
     importGraph: (input: {
       confirmTenantId: string;
@@ -578,6 +607,12 @@ type EdenClient = {
       delete(input: { confirmTenantId: string }): EdenResult;
     };
     oauth: {
+      clients: {
+        get(): EdenResult;
+        post(input: CreateOAuthClientInput): EdenResult;
+      } & ((params: { clientId: string }) => {
+        delete(): EdenResult;
+      });
       connections: {
         get(): EdenResult;
       } & ((params: { clientId: string }) => {

@@ -17,6 +17,7 @@ scopes, expected tools, and this compatibility matrix stay in sync.
 | Streamable HTTP `POST /mcp` | Supported | `apps/api/test/http.integration.test.ts` posts JSON-RPC requests with `Accept: application/json, text/event-stream`. |
 | OAuth protected resource discovery | Supported | Local and live tests validate `/.well-known/oauth-protected-resource/mcp`. |
 | OAuth dynamic client registration | Supported | Local and live tests register Better Auth OAuth clients. |
+| Dashboard OAuth client registration | Supported | Authenticated users can create, list, and disable public PKCE MCP clients through `/v1/oauth/clients`. |
 | Authorization code with PKCE | Supported | Live API E2E exchanges a PKCE code for an MCP-scoped bearer token. |
 | Browser OAuth callback redirect | Supported | Local and live browser E2E register a client with a randomized localhost callback listener, accept consent in the browser, capture `code` and `state`, exchange the code, and call MCP. Live browser E2E proves bearer-token MCP access; local browser E2E keeps the development tenant header for localhost MCP routing. |
 | Bearer token audience validation | Supported | MCP verifies access-token audience against `<resource>/mcp`. |
@@ -52,6 +53,10 @@ Content-Type: application/json
 Scopes: openid profile memory:read memory:write
 ```
 
+For first-party or manual setup, sign in to the hosted dashboard and use the MCP
+panel to create a public PKCE OAuth client. The dashboard returns the safe
+client fields needed by MCP hosts and never exposes a client secret.
+
 The checked profile artifact can be used as a starting point for client-specific
 configuration:
 
@@ -63,7 +68,8 @@ Clients should run the normal MCP handshake:
 
 1. Discover OAuth metadata from `/.well-known/oauth-authorization-server/api/auth`.
 2. Discover protected-resource metadata from `/.well-known/oauth-protected-resource/mcp`.
-3. Register an OAuth client if the client supports dynamic registration.
+3. Register an OAuth client through the dashboard, or use dynamic registration
+   if the client supports it.
 4. Complete authorization code with PKCE and request `resource=<origin>/mcp`.
 5. Send `initialize`.
 6. Send `notifications/initialized`.

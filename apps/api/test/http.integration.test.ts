@@ -1468,6 +1468,114 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     oauthClient.client_id,
   );
 
+  const unauthenticatedClients = await worker.fetch("/v1/oauth/clients");
+  expect(unauthenticatedClients.status).toBe(401);
+
+  const invalidClient = await worker.fetch("/v1/oauth/clients", {
+    method: "POST",
+    headers: {
+      cookie,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      name: "Bad Redirect",
+      redirectUris: ["ftp://example.com/callback"],
+    }),
+  });
+  expect(invalidClient.status).toBe(400);
+  expect(await invalidClient.json()).toMatchObject({
+    error: "invalid_redirect_uri",
+  });
+
+  const managedClient = await getJson<OAuthManagedClientResponse>(
+    await worker.fetch("/v1/oauth/clients", {
+      method: "POST",
+      headers: {
+        cookie,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "Cursor MCP",
+        redirectUris: ["http://127.0.0.1:39123/callback"],
+      }),
+    }),
+  );
+  expect(managedClient).toMatchObject({
+    name: "Cursor MCP",
+    redirectUris: ["http://127.0.0.1:39123/callback"],
+    tokenEndpointAuthMethod: "none",
+    grantTypes: ["authorization_code", "refresh_token"],
+    responseTypes: ["code"],
+    scopes: expect.arrayContaining(["memory:read", "memory:write"]),
+    public: true,
+    disabled: false,
+    requirePKCE: true,
+  });
+  expect(JSON.stringify(managedClient)).not.toContain("secret");
+
+  const listedClients = await getJson<OAuthManagedClientResponse[]>(
+    await worker.fetch("/v1/oauth/clients", {
+      headers: { cookie },
+    }),
+  );
+  expect(listedClients).toContainEqual(
+    expect.objectContaining({
+      clientId: managedClient.clientId,
+      name: "Cursor MCP",
+    }),
+  );
+
+  const secondSignUp = await worker.fetch("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Other Session User",
+      email: `other-${crypto.randomUUID()}@example.com`,
+      password: "password1234",
+    }),
+  });
+  await expectOk(secondSignUp);
+  const secondCookie = getCookieHeader(secondSignUp);
+  const otherUserClients = await getJson<OAuthManagedClientResponse[]>(
+    await worker.fetch("/v1/oauth/clients", {
+      headers: { cookie: secondCookie },
+    }),
+  );
+  expect(otherUserClients.map((client) => client.clientId)).not.toContain(
+    managedClient.clientId,
+  );
+  const crossUserDelete = await worker.fetch(
+    `/v1/oauth/clients/${managedClient.clientId}`,
+    {
+      method: "DELETE",
+      headers: { cookie: secondCookie },
+    },
+  );
+  expect(crossUserDelete.status).toBe(404);
+
+  const disabledClient = await getJson<OAuthDisableClientResponse>(
+    await worker.fetch(`/v1/oauth/clients/${managedClient.clientId}`, {
+      method: "DELETE",
+      headers: { cookie },
+    }),
+  );
+  expect(disabledClient).toEqual({
+    clientId: managedClient.clientId,
+    disabled: true,
+    revoked: true,
+  });
+  const afterDisable = await getJson<OAuthManagedClientResponse[]>(
+    await worker.fetch("/v1/oauth/clients", {
+      headers: { cookie },
+    }),
+  );
+  expect(afterDisable).toContainEqual(
+    expect.objectContaining({
+      clientId: managedClient.clientId,
+      disabled: true,
+    }),
+  );
+
   const memory = await getJson<MemoryResponse>(
     await worker.fetch("/v1/memories", {
       method: "POST",
@@ -2903,8 +3011,29 @@ type OAuthConnectionResponse = {
   scopes: string[];
 };
 
+type OAuthManagedClientResponse = {
+  clientId: string;
+  name: string;
+  redirectUris: string[];
+  tokenEndpointAuthMethod: string;
+  grantTypes: string[];
+  responseTypes: string[];
+  scopes: string[];
+  public: boolean;
+  disabled: boolean;
+  requirePKCE: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 type OAuthRevokeResponse = {
   clientId: string;
+  revoked: boolean;
+};
+
+type OAuthDisableClientResponse = {
+  clientId: string;
+  disabled: boolean;
   revoked: boolean;
 };
 

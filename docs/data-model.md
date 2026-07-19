@@ -36,7 +36,7 @@ in `apps/api/drizzle/`.
 | `account` | Better Auth provider/account credentials. | `account.user_id -> user.id`. |
 | `verification` | Better Auth verification state. | Independent auth support table. |
 | `jwks` | OAuth/JWT signing keys used by Better Auth OAuth Provider. | Read by MCP bearer verification. |
-| `oauth_client` | Dynamic OAuth client registrations for MCP and other clients. | Optional `user_id -> user.id`; revoked by client id. |
+| `oauth_client` | Dynamic and dashboard-managed OAuth client registrations for MCP and other clients. | Optional `user_id -> user.id`; first-party MCP rows are public PKCE clients owned by a user and disabled by client id. |
 | `oauth_access_token` | Issued OAuth access tokens. | Carries user/client/session references and scopes. |
 | `oauth_refresh_token` | Issued refresh tokens and revocation state. | `user_id` is required. |
 | `oauth_consent` | User consent records for OAuth clients/scopes. | `client_id` plus `user_id`. |
@@ -225,7 +225,9 @@ Both consumers retry failed messages and write structured error telemetry.
 ## OAuth and MCP
 
 Better Auth OAuth Provider owns discovery, dynamic client registration, consent,
-token issuance, JWKS, and bearer verification.
+token issuance, JWKS, and bearer verification. OpenMemory also exposes
+authenticated dashboard management routes over the same `oauth_client` rows for
+first-party public PKCE MCP clients.
 
 ```mermaid
 sequenceDiagram

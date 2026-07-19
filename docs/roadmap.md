@@ -74,7 +74,10 @@
   under `.tmp/benchmark-reports/`; the manual GitHub release workflow uploads
   those files as a `benchmark-reports` artifact.
 - Recall candidates pass through a deterministic reranker that combines retrieval score, retrieval reason, importance, confidence, recency, and currentness. When `OPENMEMORY_RERANK_MODEL` is configured with the Workers AI binding, API and MCP recall can also apply a bounded Workers AI rerank pass over the top candidates with deterministic fallback.
-- Authenticated users can list and revoke OAuth/MCP client connections through `/v1/oauth/connections`, and the TanStack MCP panel surfaces those connections.
+- Authenticated users can create, list, and disable first-party public PKCE
+  OAuth/MCP client registrations through `/v1/oauth/clients`; they can also
+  list and revoke OAuth/MCP client grants through `/v1/oauth/connections`, and
+  the TanStack MCP panel surfaces both registrations and grants.
 - `docs/mcp.md` documents MCP discovery, tool surface, generic streamable HTTP config, local development, and connection revocation.
 - `bun run test:mcp:sdk` dogfoods the MCP endpoint through the official
   TypeScript SDK `StreamableHTTPClientTransport` across named request profiles
@@ -181,8 +184,9 @@
      Cursor, Claude, and ChatGPT connector surfaces before broad hosted launch;
      the generic browser callback redirect/token exchange path is now covered
      by local and live E2E.
-   - Expand OAuth lifecycle UI from connection revocation into full client
-     registration/management if we need first-party clients.
+   - First-party OAuth client registration/management exists in the dashboard;
+     keep hardening it from real Cursor, Claude, ChatGPT, and MCP Inspector
+     setup feedback.
 
 3. RAG pipeline
   - Expand transcript connectors from first-party API/UI ingest into productized

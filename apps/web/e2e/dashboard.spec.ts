@@ -260,6 +260,17 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
   await expect(page.locator("pre.context").first()).toContainText(
     PROTECTED_RESOURCE_METADATA_URL,
   );
+  await expect(page.getByLabel("Client name")).toHaveValue(
+    "OpenMemory MCP Client",
+  );
+  await expect(page.getByLabel("Client name")).toBeDisabled();
+  await expect(page.getByLabel("Redirect URIs")).toHaveValue(
+    "http://127.0.0.1:39123/callback",
+  );
+  await expect(
+    page.getByRole("button", { name: "Create client" }),
+  ).toBeDisabled();
+  await expect(page.getByText("Sign in to register clients")).toBeVisible();
   await expect(page.getByText("No authorized clients")).toBeVisible();
   await page.screenshot({
     fullPage: true,
