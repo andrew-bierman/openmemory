@@ -1,0 +1,42 @@
+{
+  "$schema": "https://openmemory.local/schemas/social-oauth-dogfood.schema.json",
+  "baseUrl": "https://openmemory-api.abbierman101.workers.dev",
+  "readinessPath": "/v1/readiness",
+  "updatedAt": "2026-07-19",
+  "providers": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "required": true,
+      "status": "pending",
+      "expectedReadinessStatus": "ready",
+      "requiredSecrets": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"],
+      "callbackPaths": ["/api/auth/callback/github"],
+      "checklist": [
+        "Create or verify the production GitHub OAuth app.",
+        "Install GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET as Cloudflare Worker secrets.",
+        "Confirm /v1/readiness reports auth.socialProviders.github.status as ready.",
+        "Complete hosted sign-in through GitHub and verify the dashboard session resolves the signed-in user."
+      ],
+      "evidence": null,
+      "notes": "Pending hosted GitHub OAuth app setup and social sign-in dogfooding."
+    },
+    {
+      "id": "google",
+      "name": "Google",
+      "required": true,
+      "status": "pending",
+      "expectedReadinessStatus": "ready",
+      "requiredSecrets": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
+      "callbackPaths": ["/api/auth/callback/google"],
+      "checklist": [
+        "Create or verify the production Google OAuth client.",
+        "Install GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET as Cloudflare Worker secrets.",
+        "Confirm /v1/readiness reports auth.socialProviders.google.status as ready.",
+        "Complete hosted sign-in through Google and verify the dashboard session resolves the signed-in user."
+      ],
+      "evidence": null,
+      "notes": "Pending hosted Google OAuth client setup and social sign-in dogfooding."
+    }
+  ]
+}

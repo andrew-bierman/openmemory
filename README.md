@@ -16,8 +16,9 @@ MCP runtime for tool access.
 > OAuth callback verification, larger recall benchmarks, typed relationship
 > diagnostics, production telemetry, and release validation gates are working.
 > Manual vendor-surface MCP dogfooding for MCP Inspector, Cursor, Claude, and
-> ChatGPT is tracked as a strict release gate; higher-volume production
-> operations remain an active roadmap item.
+> ChatGPT plus hosted GitHub/Google social OAuth dogfooding are tracked as
+> strict release gates; higher-volume production operations remain an active
+> roadmap item.
 
 ## Why OpenMemory
 
@@ -250,6 +251,12 @@ bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_ID
 bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 
+Hosted GitHub and Google social sign-in evidence is tracked in
+[`config/social-oauth-dogfood.json`](config/social-oauth-dogfood.json). Normal
+CI validates the status artifact with `bun run social-oauth:status`; the strict
+launch gate is `bun run social-oauth:check` and is expected to fail until both
+providers include hosted readiness and sign-in evidence.
+
 Auth storage uses `AUTH_DB` D1 through Drizzle when configured and falls back to
 an in-memory adapter for local tests and development.
 
@@ -274,7 +281,9 @@ as a `benchmark-reports` artifact.
 
 Before calling a hosted release broadly production-ready, update the MCP vendor
 dogfood ledger with real MCP Inspector, Cursor, Claude, and ChatGPT evidence and
-run the manual `MCP Vendor Dogfood` GitHub Actions workflow in strict mode.
+run the manual `MCP Vendor Dogfood` GitHub Actions workflow in strict mode. Do
+the same for hosted GitHub and Google sign-in evidence with the manual
+`Social OAuth Dogfood` workflow.
 
 For the faster pull-request loop:
 
@@ -377,6 +386,8 @@ Current priorities:
   reports before broad hosted usage.
 - Complete the strict MCP vendor dogfood gate for MCP Inspector, Cursor, Claude,
   and ChatGPT after the generic browser callback verifier is green.
+- Complete the strict social OAuth dogfood gate for GitHub and Google after
+  production OAuth app secrets are installed.
 - Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
 
 See [docs/roadmap.md](docs/roadmap.md) for the current working baseline and
