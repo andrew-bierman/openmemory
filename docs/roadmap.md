@@ -155,6 +155,10 @@
   - optional Workers AI reranking exists behind explicit configuration, but
     model choice, thresholds, and latency/cost budgets still need production
     trace review before broad hosted launch.
+- Graph/RAG production review is tracked in
+  `config/rag-production-review.json`; the normal status check is CI-safe, and
+  the strict gate remains pending until hosted graph benchmark trend, semantic
+  RAG trace review, and rerank threshold review evidence is recorded.
 - Graph performance has larger local smoke coverage, release benchmark
   artifacts, graph-specific product signals, relationship diagnostics,
   production request telemetry, a recurring hosted synthetic benchmark, and
@@ -217,6 +221,11 @@
      corpora.
    - Review hosted benchmark trend summaries across production deploys and tune
      graph/RAG thresholds from observed trends.
+   - Update `config/rag-production-review.json` with hosted graph benchmark
+     trend, semantic RAG trace review, and rerank threshold review evidence, then
+     run `bun run rag:production-review:check` or the strict
+     `RAG Production Review` workflow before declaring graph/RAG production
+     posture complete.
 
 4. Web app expansion
    - Expand hosted navigation polish from alpha feedback.

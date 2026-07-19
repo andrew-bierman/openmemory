@@ -17,8 +17,8 @@ MCP runtime for tool access.
 > diagnostics, production telemetry, and release validation gates are working.
 > Manual vendor-surface MCP dogfooding for MCP Inspector, Cursor, Claude, and
 > ChatGPT plus hosted GitHub/Google social OAuth dogfooding are tracked as
-> strict release gates; higher-volume production operations remain an active
-> roadmap item.
+> strict release gates. Graph/RAG production trend review is also tracked as a
+> strict launch gate before broader hosted positioning.
 
 ## Why OpenMemory
 
@@ -283,7 +283,10 @@ Before calling a hosted release broadly production-ready, update the MCP vendor
 dogfood ledger with real MCP Inspector, Cursor, Claude, and ChatGPT evidence and
 run the manual `MCP Vendor Dogfood` GitHub Actions workflow in strict mode. Do
 the same for hosted GitHub and Google sign-in evidence with the manual
-`Social OAuth Dogfood` workflow.
+`Social OAuth Dogfood` workflow. Review graph/RAG production evidence in
+[`config/rag-production-review.json`](config/rag-production-review.json), then
+run the strict `RAG Production Review` workflow for hosted graph benchmark
+trend, semantic RAG trace review, and rerank threshold review.
 
 For the faster pull-request loop:
 
@@ -353,6 +356,13 @@ bounded graph, measures hosted recall latency, and writes
 `OPENMEMORY_LIVE_GRAPH_SIZE` to request a size; the test clamps live graph size
 between 40 and 160 memories.
 
+Graph/RAG production review evidence is tracked in
+[`config/rag-production-review.json`](config/rag-production-review.json). Normal
+CI validates the status artifact with `bun run rag:production-review:status`;
+the strict launch gate is `bun run rag:production-review:check` and is expected
+to fail until hosted graph benchmark trend, semantic RAG trace review, and
+rerank threshold review are recorded.
+
 Convert external MemoryBench-style JSON or JSONL fixtures into an OpenMemory
 graph export for local restore/import evaluation:
 
@@ -388,6 +398,8 @@ Current priorities:
   and ChatGPT after the generic browser callback verifier is green.
 - Complete the strict social OAuth dogfood gate for GitHub and Google after
   production OAuth app secrets are installed.
+- Complete the strict RAG production review gate after hosted graph benchmark
+  trend, semantic RAG trace review, and rerank threshold review are recorded.
 - Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
 
 See [docs/roadmap.md](docs/roadmap.md) for the current working baseline and
