@@ -10,7 +10,7 @@ Vectorize and Workers AI for semantic recall, R2 for exports, and Cloudflare's
 MCP runtime for tool access.
 
 > Status: alpha. The core memory API, graph store, OAuth-backed MCP endpoint,
-> recall flow, source ingestion, async ingestion jobs, exports, restore, repair
+> recall flow, source and conversation ingestion, async ingestion jobs, exports, restore, repair
 > path, dashboard, extraction workers, and local integration suite are working. The
 > hosted profile/onboarding UI, named MCP request-profile dogfooding, browser
 > OAuth callback verification, larger recall benchmarks, typed relationship
@@ -25,6 +25,8 @@ to provide the infrastructure layer behind a more portable experience:
 
 - Store facts, preferences, decisions, profile details, source chunks, and
   evolving context in a user-owned memory graph.
+- Ingest AI chat transcripts as role-preserving conversation chunks with
+  durable `conversationId` provenance.
 - Recall useful context through keyword, graph, and semantic retrieval.
 - Let MCP-compatible tools read and write memory through OAuth-backed identity.
 - Keep the operational footprint small by using Cloudflare services end to end.
@@ -38,11 +40,11 @@ to provide the infrastructure layer behind a more portable experience:
 - Canonical typed graph relationship taxonomy shared by the API, Durable
   Object graph store, Eden client, stats, tests, and web explorer.
 - Memory create, read, update, soft-forget, search, profile, context, graph
-  neighbors, graph stats, source ingestion, R2 export, graph restore, and
-  Vectorize repair APIs.
+  neighbors, graph stats, source ingestion, conversation transcript ingestion,
+  R2 export, graph restore, and Vectorize repair APIs.
 - Chunked source/document ingestion with source and chunk provenance.
-- Async source ingestion jobs backed by Cloudflare Queues, Workflows, and the
-  tenant Durable Object job ledger.
+- Async source and conversation ingestion jobs backed by Cloudflare Queues,
+  Workflows, and the tenant Durable Object job ledger.
 - Async entity and relationship extraction workers that enrich memory metadata
   and add relationship-specific graph edges.
 - Deterministic recall reranking that combines retrieval score, reason,
@@ -169,6 +171,8 @@ Useful endpoints:
 - `POST /v1/ingest`
 - `POST /v1/sources`
 - `POST /v1/sources/async`
+- `POST /v1/conversations`
+- `POST /v1/conversations/async`
 - `GET /v1/sources/:sourceId`
 - `GET /v1/profile`
 - `GET /v1/readiness`

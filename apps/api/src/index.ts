@@ -11,6 +11,7 @@ import {
   ForgetMemorySchema,
   GraphEdgeSchema,
   GraphExportPayloadSchema,
+  IngestConversationSchema,
   IngestSourceSchema,
   normalizeTenantId,
   UpdateMemorySchema,
@@ -71,20 +72,21 @@ import {
 } from "./semantic-index";
 import {
   getGraphForTenant,
+  type IngestionQueueMessage,
+  ingestConversationTranscript,
   ingestSourceDocument,
   processSourceIngestionMessage,
   SOURCE_INGESTION_QUEUE_NAME,
-  type SourceIngestionMessage,
 } from "./source-ingestion";
 
 export { MemoryGraph };
 
 export class SourceIngestionWorkflow extends WorkflowEntrypoint<
   Env,
-  SourceIngestionMessage
+  IngestionQueueMessage
 > {
   async run(
-    event: Readonly<WorkflowEvent<SourceIngestionMessage>>,
+    event: Readonly<WorkflowEvent<IngestionQueueMessage>>,
     step: WorkflowStep,
   ) {
     return step.do(
@@ -221,11 +223,41 @@ const contextBody = t.Object({
 const sourceBody = t.Object({
   content: t.String({ minLength: 1, maxLength: 500_000 }),
   source: t.Optional(t.String({ minLength: 1, maxLength: 120 })),
+  conversationId: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
   title: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
   tags: t.Optional(
     t.Array(t.String({ minLength: 1, maxLength: 80 }), { maxItems: 50 }),
   ),
   metadata: t.Optional(t.Record(t.String(), t.Unknown())),
+  chunkSize: t.Optional(t.Number({ minimum: 400, maximum: 4_000 })),
+  overlap: t.Optional(t.Number({ minimum: 0, maximum: 800 })),
+});
+
+const conversationMessageBody = t.Object({
+  role: t.Union([
+    t.Literal("system"),
+    t.Literal("developer"),
+    t.Literal("user"),
+    t.Literal("assistant"),
+    t.Literal("tool"),
+  ]),
+  content: t.String({ minLength: 1, maxLength: 200_000 }),
+  name: t.Optional(t.String({ minLength: 1, maxLength: 120 })),
+  timestamp: t.Optional(t.String()),
+});
+
+const conversationBody = t.Object({
+  conversationId: t.String({ minLength: 1, maxLength: 200 }),
+  source: t.Optional(t.String({ minLength: 1, maxLength: 120 })),
+  title: t.Optional(t.String({ minLength: 1, maxLength: 200 })),
+  tags: t.Optional(
+    t.Array(t.String({ minLength: 1, maxLength: 80 }), { maxItems: 50 }),
+  ),
+  metadata: t.Optional(t.Record(t.String(), t.Unknown())),
+  messages: t.Array(conversationMessageBody, {
+    minItems: 1,
+    maxItems: 1_000,
+  }),
   chunkSize: t.Optional(t.Number({ minimum: 400, maximum: 4_000 })),
   overlap: t.Optional(t.Number({ minimum: 0, maximum: 800 })),
 });
@@ -576,6 +608,83 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       return status(202, job);
     },
     { body: sourceBody },
+  )
+  .post(
+    "/v1/conversations",
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+
+      const input = IngestConversationSchema.parse({
+        source: "conversation",
+        tags: [],
+        metadata: {},
+        ...body,
+      });
+      const sourceId = createSourceId();
+      const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+      return status(
+        201,
+        await ingestConversationTranscript({
+          env,
+          graph,
+          input,
+          sourceId,
+          tenantId,
+          extractionReason: "source",
+        }),
+      );
+    },
+    { body: conversationBody },
+  )
+  .post(
+    "/v1/conversations/async",
+    async ({ body, headers, request, status }) => {
+      const { tenant, graph } = await withTenant(request, headers);
+      if (!graph) {
+        return status(errorStatus(tenantError(tenant)), tenant);
+      }
+      if (!env.SOURCE_INGESTION_QUEUE) {
+        return status(503, {
+          error: "source_ingestion_queue_unavailable" as const,
+        });
+      }
+
+      const input = IngestConversationSchema.parse({
+        source: "conversation",
+        tags: [],
+        metadata: {},
+        ...body,
+      });
+      const sourceId = createSourceId();
+      const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
+      const job = await graph.createIngestionJob({
+        sourceId,
+        input,
+        metadata: {
+          kind: "conversation",
+          conversationId: input.conversationId,
+          strategy: "queue-workflow-conversation-ingestion-v1",
+          queue: SOURCE_INGESTION_QUEUE_NAME,
+        },
+      });
+      await env.SOURCE_INGESTION_QUEUE.send(
+        {
+          kind: "conversation",
+          version: 1,
+          sourceId,
+          tenantId,
+          input,
+          requestedAt: job.createdAt,
+        },
+        { contentType: "json" },
+      );
+
+      return status(202, job);
+    },
+    { body: conversationBody },
   )
   .get(
     "/v1/sources/:sourceId",
@@ -1120,11 +1229,25 @@ async function startMemoryExtractionWorkflow(
   }
 }
 
-function parseSourceIngestionMessage(value: unknown): SourceIngestionMessage {
+function parseSourceIngestionMessage(value: unknown): IngestionQueueMessage {
   if (!isRecord(value)) {
     throw new Error("Invalid source ingestion queue message.");
   }
+  if (value.kind === "conversation") {
+    return {
+      kind: "conversation",
+      version: 1,
+      sourceId: String(value.sourceId),
+      tenantId: String(value.tenantId),
+      input: IngestConversationSchema.parse(value.input),
+      requestedAt:
+        typeof value.requestedAt === "string"
+          ? value.requestedAt
+          : new Date().toISOString(),
+    };
+  }
   return {
+    kind: "source",
     version: 1,
     sourceId: String(value.sourceId),
     tenantId: String(value.tenantId),
@@ -1142,7 +1265,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function startSourceIngestionWorkflow(
   requestEnv: Env,
-  message: SourceIngestionMessage,
+  message: IngestionQueueMessage,
 ) {
   const graph = getGraphForTenant(requestEnv, message.tenantId);
   await graph.startIngestionJob(message.sourceId);

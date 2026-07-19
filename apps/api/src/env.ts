@@ -7,7 +7,7 @@ import type {
 } from "@cloudflare/workers-types";
 import type { MemoryExtractionMessage } from "./extraction-worker";
 import type { MemoryGraph } from "./memory-graph";
-import type { SourceIngestionMessage } from "./source-ingestion";
+import type { IngestionQueueMessage } from "./source-ingestion";
 
 export type Env = {
   MEMORY_GRAPHS: MemoryGraphNamespace;
@@ -18,8 +18,8 @@ export type Env = {
   OPENMEMORY_ANALYTICS?: AnalyticsEngineBinding;
   MEMORY_EXTRACTION_QUEUE?: Queue<MemoryExtractionMessage>;
   MEMORY_EXTRACTION_WORKFLOW?: WorkflowBinding<MemoryExtractionMessage>;
-  SOURCE_INGESTION_QUEUE?: Queue<SourceIngestionMessage>;
-  SOURCE_INGESTION_WORKFLOW?: WorkflowBinding<SourceIngestionMessage>;
+  SOURCE_INGESTION_QUEUE?: Queue<IngestionQueueMessage>;
+  SOURCE_INGESTION_WORKFLOW?: WorkflowBinding<IngestionQueueMessage>;
   EMBEDDING_MODEL: string;
   OPENMEMORY_RERANK_MODEL?: string;
   OPENMEMORY_RERANK_TIMEOUT_MS?: string;

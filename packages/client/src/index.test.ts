@@ -86,6 +86,54 @@ describe("OpenMemory client", () => {
       },
     ]);
   });
+
+  test("ingests conversation transcripts through the typed RPC surface", async () => {
+    const requests: Array<{ url: string; method: string; body: unknown }> = [];
+    const api = createOpenMemoryClient("https://api.openmemory.test", {
+      fetch: fakeFetch(async (input, init) => {
+        const request = new Request(input, init);
+        requests.push({
+          url: request.url,
+          method: request.method,
+          body: await request.json(),
+        });
+
+        return Response.json({
+          sourceId: "src_1",
+          chunkCount: 1,
+          memories: [],
+          edges: [],
+        });
+      }),
+    });
+
+    const result = await api.ingestConversation({
+      conversationId: "chat_1",
+      messages: [
+        {
+          role: "user",
+          content: "Remember the Atlas launch decision.",
+        },
+      ],
+    });
+
+    expect(result.sourceId).toBe("src_1");
+    expect(requests).toEqual([
+      {
+        url: "https://api.openmemory.test/v1/conversations",
+        method: "POST",
+        body: {
+          conversationId: "chat_1",
+          messages: [
+            {
+              role: "user",
+              content: "Remember the Atlas launch decision.",
+            },
+          ],
+        },
+      },
+    ]);
+  });
 });
 
 function fakeFetch(

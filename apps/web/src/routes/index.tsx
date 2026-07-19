@@ -1,6 +1,7 @@
 import {
   type Account,
   type AccountDeletionResult,
+  type ConversationMessageInput,
   createOpenMemoryClient,
   type GraphEdge,
   type GraphExportResult,
@@ -185,6 +186,12 @@ function Home() {
   const [password, setPassword] = useState("");
   const [content, setContent] = useState("");
   const [ingestContent, setIngestContent] = useState("");
+  const [ingestMode, setIngestMode] = useState<"document" | "conversation">(
+    "conversation",
+  );
+  const [ingestConversationId, setIngestConversationId] = useState(
+    `conversation-${crypto.randomUUID()}`,
+  );
   const [ingestSource, setIngestSource] = useState("conversation");
   const [workspaceName, setWorkspaceName] = useState("");
   const [profileName, setProfileName] = useState("");
@@ -530,7 +537,25 @@ function Home() {
     onSuccess: invalidateDashboard,
   });
   const ingestSourceMutation = useMutation({
-    mutationFn: api.ingestSource,
+    mutationFn: async (input: {
+      content: string;
+      conversationId: string;
+      mode: "document" | "conversation";
+      source: string;
+      tags: string[];
+    }) =>
+      input.mode === "conversation"
+        ? api.ingestConversation({
+            conversationId: input.conversationId,
+            source: input.source || "conversation",
+            tags: input.tags,
+            messages: parseConversationTranscript(input.content),
+          })
+        : api.ingestSource({
+            content: input.content,
+            source: input.source || "document",
+            tags: input.tags,
+          }),
     onError: (caught) => setError(formatError(caught)),
     onMutate: () => {
       setError(null);
@@ -691,10 +716,15 @@ function Home() {
     event.preventDefault();
     const result = await ingestSourceMutation.mutateAsync({
       content: ingestContent,
+      conversationId: ingestConversationId,
+      mode: ingestMode,
       source: ingestSource,
       tags: parseTags(tags),
     });
     setIngestContent("");
+    if (ingestMode === "conversation") {
+      setIngestConversationId(`conversation-${crypto.randomUUID()}`);
+    }
     setLastSourceIngest(result);
   }
 
@@ -1040,6 +1070,38 @@ function Home() {
                     </div>
                   </div>
                   <div className="field">
+                    <Label htmlFor="ingestMode">Mode</Label>
+                    <Select
+                      id="ingestMode"
+                      onChange={(event) =>
+                        setIngestMode(
+                          event.target.value === "document"
+                            ? "document"
+                            : "conversation",
+                        )
+                      }
+                      value={ingestMode}
+                    >
+                      <option value="conversation">Conversation</option>
+                      <option value="document">Document</option>
+                    </Select>
+                  </div>
+                  {ingestMode === "conversation" ? (
+                    <div className="field">
+                      <Label htmlFor="ingestConversationId">
+                        Conversation id
+                      </Label>
+                      <Input
+                        id="ingestConversationId"
+                        onChange={(event) =>
+                          setIngestConversationId(event.target.value)
+                        }
+                        required
+                        value={ingestConversationId}
+                      />
+                    </div>
+                  ) : null}
+                  <div className="field">
                     <Label htmlFor="ingestSource">Source</Label>
                     <Input
                       id="ingestSource"
@@ -1052,12 +1114,22 @@ function Home() {
                     <Textarea
                       id="ingestContent"
                       onChange={(event) => setIngestContent(event.target.value)}
+                      placeholder={
+                        ingestMode === "conversation"
+                          ? "user: What should OpenMemory remember?\nassistant: It should link facts, decisions, and source chunks across AI chats."
+                          : undefined
+                      }
                       required
                       value={ingestContent}
                     />
                   </div>
                   <Button
-                    disabled={isLoading || !ingestContent.trim()}
+                    disabled={
+                      isLoading ||
+                      !ingestContent.trim() ||
+                      (ingestMode === "conversation" &&
+                        !ingestConversationId.trim())
+                    }
                     type="submit"
                   >
                     Ingest
@@ -1292,17 +1364,17 @@ function OnboardingEmptyState({
     <div className="empty-state onboarding-empty">
       <h3>Start your memory graph</h3>
       <p>
-        Capture a short fact from the sidebar, ingest a source document, or
-        connect an MCP client so external AI tools can read and write context.
+        Capture a short fact from the sidebar, ingest a conversation, or connect
+        an MCP client so external AI tools can read and write context.
       </p>
       <div className="onboarding-steps">
         <span>1. Save a profile or project memory</span>
-        <span>2. Ingest source notes for graph edges</span>
+        <span>2. Ingest a chat or document for graph edges</span>
         <span>3. Connect MCP after OAuth sign-in</span>
       </div>
       <div className="row">
         <Button onClick={onGoToIngest} type="button" variant="outline">
-          Ingest source
+          Open ingest
         </Button>
         <Button onClick={onGoToAdmin} type="button" variant="outline">
           {hasSession ? "Review account" : "Sign in"}
@@ -1736,8 +1808,8 @@ function SourceIngestSummaryPanel({
         className="source-result-panel empty"
         aria-label="Source ingest summary"
       >
-        <span>No source ingested yet</span>
-        <p>Submit a document to create chunk memories and graph edges.</p>
+        <span>No ingest yet</span>
+        <p>Submit a conversation or document to create memories and edges.</p>
       </section>
     );
   }
@@ -1748,7 +1820,7 @@ function SourceIngestSummaryPanel({
   return (
     <section className="source-result-panel" aria-label="Source ingest summary">
       <div className="panel-heading">
-        <span>Source indexed</span>
+        <span>Ingestion indexed</span>
         <strong>{summary.sourceId}</strong>
       </div>
       <ul className="source-result-grid">
@@ -2340,6 +2412,42 @@ function parseTags(value: string) {
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+}
+
+function parseConversationTranscript(
+  value: string,
+): ConversationMessageInput[] {
+  const messages = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map(parseConversationLine);
+
+  return messages.length > 0
+    ? messages
+    : [
+        {
+          role: "user",
+          content: value.trim(),
+        },
+      ];
+}
+
+function parseConversationLine(line: string): ConversationMessageInput {
+  const match = /^(system|developer|user|assistant|tool)\s*:\s*(.+)$/i.exec(
+    line,
+  );
+  if (!match) {
+    return {
+      role: "user",
+      content: line,
+    };
+  }
+
+  return {
+    role: match[1].toLowerCase() as ConversationMessageInput["role"],
+    content: match[2].trim(),
+  };
 }
 
 function getBrowserProductionDefaultApiUrl() {

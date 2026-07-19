@@ -360,8 +360,27 @@ export type IngestResult = {
 };
 
 export type SourceIngestInput = CreateMemoryInput & {
+  conversationId?: string;
   title?: string;
   metadata?: Record<string, unknown>;
+  chunkSize?: number;
+  overlap?: number;
+};
+
+export type ConversationMessageInput = {
+  role: "system" | "developer" | "user" | "assistant" | "tool";
+  content: string;
+  name?: string;
+  timestamp?: string;
+};
+
+export type ConversationIngestInput = {
+  conversationId: string;
+  source?: string;
+  title?: string;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+  messages: ConversationMessageInput[];
   chunkSize?: number;
   overlap?: number;
 };
@@ -483,6 +502,8 @@ export function createOpenMemoryClient(
       unwrap<IngestResult>(client.v1.ingest.post(input)),
     ingestSource: (input: SourceIngestInput) =>
       unwrap<SourceIngestResult>(client.v1.sources.post(input)),
+    ingestConversation: (input: ConversationIngestInput) =>
+      unwrap<SourceIngestResult>(client.v1.conversations.post(input)),
     getContext: (q: string) =>
       unwrap<ContextResult>(
         client.v1.context.post({ q, limit: 8, includeProfile: true }),
@@ -518,6 +539,9 @@ type EdenClient = {
     };
     sources: {
       post(input: SourceIngestInput): EdenResult;
+    };
+    conversations: {
+      post(input: ConversationIngestInput): EdenResult;
     };
     context: {
       post(input: {
