@@ -1,14 +1,14 @@
 {
   "documentedRepositoryGate": {
-    "commit": "987cb52881c050c08a9aae377c87a5f5b9c43f1f",
-    "mainCiRun": "29666296422",
-    "mainCiUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29666296422",
-    "workersBuildUrl": "https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/a6925ab9-cc15-468a-9289-d4f2cf801d65"
+    "commit": "3e4b35fa57c0dfb2d7cc45359858145dbf272813",
+    "mainCiRun": "29666583941",
+    "mainCiUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29666583941",
+    "workersBuildUrl": "https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/9f6dc277-e53e-4b23-97d7-adbeb425518e"
   },
   "latestVerifiedRuntimeCandidate": {
-    "commit": "987cb52881c050c08a9aae377c87a5f5b9c43f1f",
-    "liveSmokeRun": "29666375515",
-    "liveSmokeUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29666375515",
+    "commit": "3e4b35fa57c0dfb2d7cc45359858145dbf272813",
+    "liveSmokeRun": "29666897021",
+    "liveSmokeUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29666897021",
     "remoteCleanupCounters": {
       "oauth_client": 0,
       "live_users": 0,
@@ -16,17 +16,17 @@
     }
   },
   "benchmarkEvidence": {
-    "releaseValidationCommit": "ae433710f37b7d784833c47d37b1d8da5dd8276e",
-    "releaseValidationRun": "29664622501",
+    "releaseValidationCommit": "3e4b35fa57c0dfb2d7cc45359858145dbf272813",
+    "releaseValidationRun": "29666687105",
     "releaseValidationLocalRecallMrr": 1,
     "releaseValidationHitAt3": 1,
-    "releaseValidationGraphRecallMs": 19.92,
-    "releaseValidationScaleRecallMs": 20.51,
-    "releaseValidationScale1000RecallMs": 65.73,
-    "liveBenchmarkRun": "29664622502",
+    "releaseValidationGraphRecallMs": 18.82,
+    "releaseValidationScaleRecallMs": 21.28,
+    "releaseValidationScale1000RecallMs": 39.67,
+    "liveBenchmarkRun": "29666687365",
     "liveBenchmarkActiveMemories": 80,
     "liveBenchmarkEdges": 79,
-    "liveBenchmarkRecallMs": 1071.36,
+    "liveBenchmarkRecallMs": 946.48,
     "liveBenchmarkThresholdMs": 12000
   },
   "screenshotDirectory": ".tmp/screenshots/launch-readiness"
