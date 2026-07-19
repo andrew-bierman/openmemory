@@ -10,6 +10,21 @@ Named client request profiles live in
 root `bun run check` gate validates that profile artifact, required OAuth
 scopes, expected tools, and this compatibility matrix stay in sync.
 
+Real external-client dogfooding evidence lives in
+[`config/mcp-vendor-dogfood.json`](../config/mcp-vendor-dogfood.json). The
+normal status check allows pending vendor evidence:
+
+```sh
+bun run mcp:vendor-dogfood:status
+```
+
+The strict launch gate fails until MCP Inspector, Cursor, Claude, and ChatGPT
+entries are marked passed with evidence:
+
+```sh
+bun run mcp:vendor-dogfood:check
+```
+
 ## Protocol Coverage
 
 | Client behavior | Status | Evidence |
@@ -36,10 +51,10 @@ scopes, expected tools, and this compatibility matrix stay in sync.
 | Client | Status | Evidence | Notes |
 | --- | --- | --- | --- |
 | Official MCP TypeScript SDK `StreamableHTTPClientTransport` | Tested in CI | `bun run test:mcp:sdk` starts local Wrangler, connects to `/mcp`, lists tools/resources/prompts, calls `remember` and `recall`, reads `openmemory://profile` and `openmemory://recent`, and gets the `context` prompt. | Uses the local tenant header because CI cannot complete browser OAuth. Production clients should use OAuth. |
-| MCP Inspector | Config-shape smoke in CI plus generic browser callback verification | `bun run test:mcp:sdk` runs an `mcp-inspector-config-shape` request profile with Inspector-like headers through the official transport; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Manual Inspector UI dogfooding remains useful before broad hosted launch. |
-| Cursor | Config-shape smoke in CI plus generic browser callback verification | `bun run test:mcp:sdk` runs a `cursor-remote-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Requires the user/client OAuth flow against the deployed Worker in real Cursor. |
-| Claude remote MCP connector / Messages API MCP connector | Config-shape smoke in CI plus generic browser callback verification | `bun run test:mcp:sdk` runs a `claude-remote-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Requires provider-side OAuth configuration in real Claude surfaces. |
-| ChatGPT connector / Apps SDK MCP client | Config-shape smoke in CI plus generic browser callback verification | `bun run test:mcp:sdk` runs a `chatgpt-connector-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Requires provider-side OAuth configuration in real ChatGPT connector surfaces. |
+| MCP Inspector | Config-shape smoke in CI plus generic browser callback verification; real vendor evidence pending | `bun run test:mcp:sdk` runs an `mcp-inspector-config-shape` request profile with Inspector-like headers through the official transport; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Strict dogfood evidence is tracked as `mcp-inspector` in `config/mcp-vendor-dogfood.json`. |
+| Cursor | Config-shape smoke in CI plus generic browser callback verification; real vendor evidence pending | `bun run test:mcp:sdk` runs a `cursor-remote-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Strict dogfood evidence is tracked as `cursor` in `config/mcp-vendor-dogfood.json`. |
+| Claude remote MCP connector / Messages API MCP connector | Config-shape smoke in CI plus generic browser callback verification; real vendor evidence pending | `bun run test:mcp:sdk` runs a `claude-remote-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Strict dogfood evidence is tracked as `claude` in `config/mcp-vendor-dogfood.json`. |
+| ChatGPT connector / Apps SDK MCP client | Config-shape smoke in CI plus generic browser callback verification; real vendor evidence pending | `bun run test:mcp:sdk` runs a `chatgpt-connector-mcp-config-shape` profile against `/mcp`; browser E2E proves the OAuth callback mechanics with a client-owned localhost listener. | Strict dogfood evidence is tracked as `chatgpt` in `config/mcp-vendor-dogfood.json`. |
 
 ## Client Expectations
 
@@ -82,8 +97,10 @@ Clients should run the normal MCP handshake:
 ## Known Gaps
 
 - Manual external-client OAuth callback dogfooding remains recommended before a
-  high-volume hosted launch, but named Inspector, Cursor, Claude, and
-  ChatGPT-style streamable HTTP request shapes are smoke-tested in CI and the
+  high-volume hosted launch. Its canonical status is
+  `config/mcp-vendor-dogfood.json`; run `bun run mcp:vendor-dogfood:check` as
+  the strict gate after updating MCP Inspector, Cursor, Claude, and ChatGPT
+  evidence. Named streamable HTTP request shapes are smoke-tested in CI and the
   generic browser callback redirect/token-exchange path is covered by local and
   live browser E2E. Live browser E2E is the bearer-token proof; local browser
   E2E preserves localhost tenant-header routing after token exchange.

@@ -169,6 +169,9 @@
 - Optional GitHub and Google login provider readiness is visible in
   `/v1/readiness`; hosted social login still requires installing real OAuth app
   client IDs and secrets.
+- Real MCP Inspector, Cursor, Claude, and ChatGPT vendor-surface dogfooding is
+  tracked in `config/mcp-vendor-dogfood.json`; the normal status check is
+  CI-safe, and the strict gate remains pending until evidence is recorded.
 - Repository public-launch operations are complete: Discussions, topics/about
   metadata, public visibility, and the first tagged alpha release are live.
 - Launch copy and first-feedback triage guidance live in
@@ -185,6 +188,9 @@
      Cursor, Claude, and ChatGPT connector surfaces before broad hosted launch;
      the generic browser callback redirect/token exchange path is now covered
      by local and live E2E.
+   - Update `config/mcp-vendor-dogfood.json` with evidence from those runs and
+     run `bun run mcp:vendor-dogfood:check` or the strict `MCP Vendor Dogfood`
+     workflow before declaring hosted vendor compatibility complete.
    - First-party OAuth client registration/management exists in the dashboard;
      keep hardening it from real Cursor, Claude, ChatGPT, and MCP Inspector
      setup feedback.

@@ -12,11 +12,12 @@ MCP runtime for tool access.
 > Status: alpha. The core memory API, graph store, OAuth-backed MCP endpoint,
 > recall flow, source and conversation ingestion, async ingestion jobs, exports, restore, repair
 > path, dashboard, extraction workers, and local integration suite are working. The
-> hosted profile/onboarding UI, named MCP request-profile dogfooding, browser
+> hosted profile/onboarding UI, named MCP request-profile smoke, browser
 > OAuth callback verification, larger recall benchmarks, typed relationship
 > diagnostics, production telemetry, and release validation gates are working.
-> Manual vendor-surface MCP dogfooding and higher-volume production operations
-> remain active roadmap items.
+> Manual vendor-surface MCP dogfooding for MCP Inspector, Cursor, Claude, and
+> ChatGPT is tracked as a strict release gate; higher-volume production
+> operations remain an active roadmap item.
 
 ## Why OpenMemory
 
@@ -227,6 +228,13 @@ See [docs/mcp.md](docs/mcp.md) and
 generic client configuration, tested client request shapes, local development,
 tools, and connection revocation.
 
+Real vendor-surface dogfooding for MCP Inspector, Cursor, Claude, and ChatGPT
+is tracked in
+[`config/mcp-vendor-dogfood.json`](config/mcp-vendor-dogfood.json). Normal CI
+validates the status artifact with `bun run mcp:vendor-dogfood:status`; the
+strict launch gate is `bun run mcp:vendor-dogfood:check` and is expected to
+fail until all required vendor entries include real evidence.
+
 ## Auth
 
 The Worker serves Better Auth at `/api/auth/*` and exposes OAuth/OIDC discovery
@@ -263,6 +271,10 @@ Maintainers can also run the manual `Release Qualification` GitHub Actions
 workflow before publishing a tag. It records the full local release gate and a
 configurable high-volume graph scale run, then uploads benchmark JSONL reports
 as a `benchmark-reports` artifact.
+
+Before calling a hosted release broadly production-ready, update the MCP vendor
+dogfood ledger with real MCP Inspector, Cursor, Claude, and ChatGPT evidence and
+run the manual `MCP Vendor Dogfood` GitHub Actions workflow in strict mode.
 
 For the faster pull-request loop:
 
@@ -363,8 +375,8 @@ Current priorities:
 - Expand recall quality benchmarks with larger MemoryBench-style fixtures.
 - Compare recurring hosted graph benchmark artifacts with local benchmark
   reports before broad hosted usage.
-- Deepen MCP client compatibility testing in real vendor surfaces after the
-  generic browser callback verifier is green.
+- Complete the strict MCP vendor dogfood gate for MCP Inspector, Cursor, Claude,
+  and ChatGPT after the generic browser callback verifier is green.
 - Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
 
 See [docs/roadmap.md](docs/roadmap.md) for the current working baseline and

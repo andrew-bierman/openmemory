@@ -41,9 +41,13 @@ larger hosted push.
   Wrangler integration with Queues and Workflows.
 - Entity and relationship extraction workers are covered by local Wrangler
   integration with Queues and Workflows.
-- The official MCP TypeScript SDK client is dogfooded in CI, and named
+- The official MCP TypeScript SDK client is dogfooded in CI, and named MCP
   Inspector, Cursor, Claude, and ChatGPT-style request profiles are
   smoke-tested and documented across tools, resources, and prompts.
+- Real MCP Inspector, Cursor, Claude, and ChatGPT vendor-surface dogfooding is
+  tracked in `config/mcp-vendor-dogfood.json`; normal CI validates the pending
+  status, and the strict launch gate fails until required entries pass with
+  evidence.
 - Local and live browser E2E verify the generic MCP OAuth callback flow with a
   randomized localhost callback listener, consent UI, PKCE token exchange, and
   MCP calls. Live browser E2E proves bearer-token MCP access; local browser E2E
@@ -104,7 +108,9 @@ larger hosted push.
   account settings, team/tenant management, and confirmed account deletion.
 - [x] MCP protocol compatibility matrix is tested and documented for tools,
   resources, prompts, and named request profiles.
-- [x] Named external MCP request profiles are dogfooded and documented.
+- [x] Named external MCP request profiles are smoke-tested and documented.
+- [ ] Real MCP Inspector, Cursor, Claude, and ChatGPT vendor-surface OAuth
+  dogfooding has passed with evidence in `config/mcp-vendor-dogfood.json`.
 - [x] Generic browser OAuth callback behavior for MCP clients is verified in
   local and live browser E2E.
 - [x] Dashboard-managed public PKCE MCP client registration, listing, and
