@@ -57,6 +57,15 @@ The workflow thresholds are:
   request volume
 - alert on any source ingestion or memory extraction worker failure in 5 minutes
 
+Graph/RAG production launch review is tracked separately from alerting in
+`config/rag-production-review.json`. Before broad hosted launch, update hosted
+graph benchmark trend, semantic RAG trace review, and rerank threshold review
+evidence, then run:
+
+```sh
+bun run rag:production-review:check
+```
+
 GitHub scheduled smoke plus the Worker Cron monitor are the default alpha alert
 path. The scheduled CI `Analytics Engine threshold check` job is the first
 Analytics Engine-backed threshold path. Cloudflare Notifications, Grafana, or

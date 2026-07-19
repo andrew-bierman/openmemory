@@ -30,6 +30,10 @@ larger hosted push.
   scale.
 - Hosted production graph benchmark has passed against the deployed Worker with
   an 80-memory throwaway graph, including account cleanup.
+- Graph/RAG production review is tracked in
+  `config/rag-production-review.json`; normal CI validates the pending status,
+  and the strict launch gate fails until hosted graph benchmark trend, semantic
+  RAG trace review, and rerank threshold review are recorded.
 - Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, semantic
   provider diagnostics, source ingestion, R2 export, tenant readiness snapshots,
   OAuth provider readiness diagnostics, browser-session readiness, and hosted UI
@@ -130,6 +134,9 @@ larger hosted push.
 - [x] Entity and relationship extraction workers are implemented.
 - [x] Larger recall and graph performance benchmarks run in CI or release
   qualification, with JSONL benchmark artifacts for release review.
+- [ ] Hosted graph benchmark trend, semantic RAG trace review, and rerank
+  threshold review have passed with evidence in
+  `config/rag-production-review.json`.
 
 ## Operational Readiness Checklist
 

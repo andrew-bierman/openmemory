@@ -200,6 +200,18 @@ To generate the same summary from local JSONL files:
 bun run benchmark:trend -- .tmp/benchmark-reports/live-production.jsonl --out .tmp/benchmark-reports/live-production-summary.md
 ```
 
+Broad hosted launch also requires a recorded graph/RAG production review. Update
+`config/rag-production-review.json` after reviewing hosted graph benchmark
+trend, semantic RAG trace review, and rerank threshold review evidence, then
+run:
+
+```sh
+bun run rag:production-review:check
+```
+
+Use the manual `RAG Production Review` workflow in strict mode for the durable
+GitHub Actions record.
+
 ## Release Evidence
 
 For each release, record:
@@ -217,4 +229,4 @@ For each release, record:
 Do not publish a release as broadly production-ready while launch readiness
 still has unchecked operational controls, async ingestion, extraction workers,
 real MCP Inspector, Cursor, Claude, and ChatGPT vendor dogfooding, or hosted
-GitHub and Google social OAuth dogfooding.
+GitHub and Google social OAuth dogfooding, or graph/RAG production review.
