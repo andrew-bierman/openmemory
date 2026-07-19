@@ -15,6 +15,15 @@ The release validation command runs formatting, secret scanning, type checks,
 unit/integration tests, the production build, MCP SDK smoke tests, local
 Playwright E2E, recall benchmarks, and the heavier opt-in scale gate.
 
+It also validates the MCP vendor dogfood status artifact in allow-pending mode.
+Before broad hosted launch, replace pending entries in
+`config/mcp-vendor-dogfood.json` with real MCP Inspector, Cursor, Claude, and
+ChatGPT evidence and run the strict gate:
+
+```sh
+bun run mcp:vendor-dogfood:check
+```
+
 The local browser E2E suite also captures launch-review screenshots under
 `.tmp/screenshots/launch-readiness/`. Those artifacts are intentionally ignored
 by git and can be regenerated with:
@@ -116,6 +125,10 @@ release:validate` and, by default, follows it with the 1,000-memory local scale
 gate. Set `scale_graph_size` to `0` only when intentionally skipping the
 additional high-volume local gate for a maintenance-only release.
 
+Use the manual `MCP Vendor Dogfood` workflow in strict mode after updating
+`config/mcp-vendor-dogfood.json`; it is the durable GitHub Actions record for
+real MCP Inspector, Cursor, Claude, and ChatGPT surface compatibility.
+
 The workflow uploads the generated `.tmp/benchmark-reports/*.jsonl` files as a
 `benchmark-reports` artifact so release reviewers can compare graph latency and
 recall-quality evidence across candidate commits.
@@ -189,4 +202,4 @@ For each release, record:
 
 Do not publish a release as broadly production-ready while launch readiness
 still has unchecked operational controls, async ingestion, extraction workers,
-or named external MCP client dogfooding.
+or real MCP Inspector, Cursor, Claude, and ChatGPT vendor dogfooding.

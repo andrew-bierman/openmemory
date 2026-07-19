@@ -1,0 +1,72 @@
+{
+  "$schema": "https://openmemory.local/schemas/mcp-vendor-dogfood.schema.json",
+  "baseUrl": "https://openmemory-api.abbierman101.workers.dev",
+  "serverPath": "/mcp",
+  "updatedAt": "2026-07-19",
+  "vendors": [
+    {
+      "id": "mcp-inspector",
+      "name": "MCP Inspector",
+      "required": true,
+      "status": "pending",
+      "transport": "streamable-http",
+      "oauthMode": "authorization-code-pkce",
+      "checklist": [
+        "Create a dashboard-managed public PKCE MCP client.",
+        "Complete the hosted OAuth consent and callback flow from MCP Inspector.",
+        "List tools, resources, and prompts.",
+        "Call remember, recall, profile, and forget with the bearer token."
+      ],
+      "evidence": null,
+      "notes": "Pending real Inspector UI OAuth dogfooding against the deployed Worker."
+    },
+    {
+      "id": "cursor",
+      "name": "Cursor",
+      "required": true,
+      "status": "pending",
+      "transport": "streamable-http",
+      "oauthMode": "authorization-code-pkce",
+      "checklist": [
+        "Register a dashboard-managed public PKCE MCP client with Cursor callback settings.",
+        "Complete the hosted OAuth consent flow from Cursor.",
+        "List tools, resources, and prompts.",
+        "Call remember, recall, profile, and forget with the bearer token."
+      ],
+      "evidence": null,
+      "notes": "Pending real Cursor remote MCP OAuth dogfooding against the deployed Worker."
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "required": true,
+      "status": "pending",
+      "transport": "streamable-http",
+      "oauthMode": "authorization-code-pkce",
+      "checklist": [
+        "Register a dashboard-managed public PKCE MCP client with Claude connector callback settings.",
+        "Complete the hosted OAuth consent flow from Claude.",
+        "List tools, resources, and prompts where the Claude surface exposes them.",
+        "Call remember, recall, profile, and forget with the bearer token."
+      ],
+      "evidence": null,
+      "notes": "Pending real Claude remote MCP connector or Messages API MCP connector dogfooding."
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "required": true,
+      "status": "pending",
+      "transport": "streamable-http",
+      "oauthMode": "authorization-code-pkce",
+      "checklist": [
+        "Register a dashboard-managed public PKCE MCP client with ChatGPT connector callback settings.",
+        "Complete the hosted OAuth consent flow from ChatGPT.",
+        "List tools, resources, and prompts where the ChatGPT surface exposes them.",
+        "Call remember, recall, profile, and forget with the bearer token."
+      ],
+      "evidence": null,
+      "notes": "Pending real ChatGPT connector or Apps SDK MCP client dogfooding."
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+name: MCP Vendor Dogfood
+
+on:
+  workflow_dispatch:
+    inputs:
+      strict:
+        description: Fail until every required external MCP client has passed evidence
+        required: false
+        default: "false"
+        type: boolean
+
+jobs:
+  dogfood-gate:
+    name: Validate MCP vendor dogfood evidence
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate status artifact
+        if: ${{ !inputs.strict }}
+        run: bun run mcp:vendor-dogfood:status
+
+      - name: Run strict launch gate
+        if: ${{ inputs.strict }}
+        run: bun run mcp:vendor-dogfood:check
