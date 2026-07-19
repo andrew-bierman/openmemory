@@ -289,8 +289,9 @@ non-default ports and exercises the dashboard, charts, memory table, source
 ingest, graph explorer, operations readiness, admin settings, MCP setup panel,
 and a real browser OAuth callback listener for MCP bearer-token exchange. The
 hosted browser smoke additionally covers Better Auth signup, profile/workspace
-updates, team member invite/remove, browser OAuth callback verification, seeded
-OAuth connection revocation, readiness, recall, forget, and confirmed account
+updates, team member invite/remove, dashboard-managed MCP OAuth client
+registration/disable, browser OAuth callback verification, seeded OAuth
+connection revocation, readiness, recall, forget, and confirmed account
 deletion.
 
 Optional clean container reproduction:

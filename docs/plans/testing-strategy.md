@@ -136,7 +136,9 @@ This uses `OPENMEMORY_LIVE_BASE_URL` when provided and otherwise targets the dep
 - Opt-in production E2E smoke in `apps/api/test/live.e2e.test.ts`, including
   remote Workers AI and Vectorize semantic indexing/recall checks after
   `/v1/index/repair` reports the sampled semantic index is current.
-- Opt-in hosted UI browser E2E in `apps/api/e2e/live-ui.spec.ts`.
+- Opt-in hosted UI browser E2E in `apps/api/e2e/live-ui.spec.ts`, including
+  session auth, account/team settings, dashboard-managed MCP OAuth client
+  registration and disable, browser OAuth callback verification, and cleanup.
 - Local browser E2E in `apps/web/e2e/dashboard.spec.ts` covers dashboard,
   graph inspection, graph import preview, source ingest, MCP setup, operations,
   and screenshot capture.

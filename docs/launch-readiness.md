@@ -107,6 +107,8 @@ larger hosted push.
 - [x] Named external MCP request profiles are dogfooded and documented.
 - [x] Generic browser OAuth callback behavior for MCP clients is verified in
   local and live browser E2E.
+- [x] Dashboard-managed public PKCE MCP client registration, listing, and
+  disable flows are verified in hosted browser E2E.
 - [x] AI chat transcript ingestion stores role-preserving conversation chunks
   with `conversationId` provenance, message-range metadata, graph links, and
   recall coverage.
