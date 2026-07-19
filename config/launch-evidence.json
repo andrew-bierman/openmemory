@@ -1,14 +1,14 @@
 {
   "documentedRepositoryGate": {
-    "commit": "ae433710f37b7d784833c47d37b1d8da5dd8276e",
-    "mainCiRun": "29664533575",
-    "mainCiUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29664533575",
-    "workersBuildUrl": "https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/b08e35a6-9d52-4c33-a584-29680090eb95"
+    "commit": "987cb52881c050c08a9aae377c87a5f5b9c43f1f",
+    "mainCiRun": "29666296422",
+    "mainCiUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29666296422",
+    "workersBuildUrl": "https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/a6925ab9-cc15-468a-9289-d4f2cf801d65"
   },
   "latestVerifiedRuntimeCandidate": {
-    "commit": "3f1603557c3e82351ea78734889aa8a61062e7c0",
-    "liveSmokeRun": "29663910810",
-    "liveSmokeUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29663910810",
+    "commit": "987cb52881c050c08a9aae377c87a5f5b9c43f1f",
+    "liveSmokeRun": "29666375515",
+    "liveSmokeUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29666375515",
     "remoteCleanupCounters": {
       "oauth_client": 0,
       "live_users": 0,

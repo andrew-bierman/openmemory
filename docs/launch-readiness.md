@@ -128,17 +128,17 @@ larger hosted push.
   protected-resource metadata, with Analytics Engine telemetry and optional
   webhook/email/PagerDuty alert dispatch.
 - [x] Documented repository gate
-  `ae433710f37b7d784833c47d37b1d8da5dd8276e` has green main CI:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29664533575`.
+  `987cb52881c050c08a9aae377c87a5f5b9c43f1f` has green main CI:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29666296422`.
 - [x] Documented repository gate
-  `ae433710f37b7d784833c47d37b1d8da5dd8276e` has a green Cloudflare Workers
+  `987cb52881c050c08a9aae377c87a5f5b9c43f1f` has a green Cloudflare Workers
   Build:
-  `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/b08e35a6-9d52-4c33-a584-29680090eb95`.
+  `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/a6925ab9-cc15-468a-9289-d4f2cf801d65`.
 - [x] Latest verified runtime candidate
-  `3f1603557c3e82351ea78734889aa8a61062e7c0` has green live smoke proving
+  `987cb52881c050c08a9aae377c87a5f5b9c43f1f` has green live smoke proving
   hosted auth, graph recall, readiness, R2 export, OAuth/MCP, hosted UI, remote
-  Workers AI, and Vectorize semantic recall:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29663910810`.
+  Workers AI, Vectorize semantic recall, and conversation transcript ingestion:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29666375515`.
 - [x] Remote D1 cleanup counters after current live smoke are zero:
   `oauth_client=0`, `live_users=0`, `live_benchmark_users=0`.
 - [x] Latest full local release validation evidence passed on
