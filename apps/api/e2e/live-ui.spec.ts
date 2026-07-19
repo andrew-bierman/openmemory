@@ -123,6 +123,72 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
   await invitedMember.getByRole("button", { name: "Remove" }).click();
   await expect(invitedMember).toHaveCount(0);
 
+  await page
+    .locator(".tabs")
+    .getByRole("button", { name: "MCP", exact: true })
+    .click();
+  await expect(page).toHaveURL(/view=mcp/);
+  await expect(page.getByLabel("Client name")).toBeEnabled();
+  const managedClientName = `Live MCP Client ${crypto.randomUUID().slice(0, 8)}`;
+  const managedRedirectUri = "http://127.0.0.1:39123/callback";
+  await page.getByLabel("Client name").fill(managedClientName);
+  await page.getByLabel("Redirect URIs").fill(managedRedirectUri);
+  const [managedClientResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes("/v1/oauth/clients") &&
+        response.request().method() === "POST",
+    ),
+    page.getByRole("button", { name: "Create client" }).click(),
+  ]);
+  expect(managedClientResponse.ok()).toBe(true);
+  const managedClient = (await managedClientResponse.json()) as {
+    clientId: string;
+    name: string;
+    redirectUris: string[];
+    scopes: string[];
+    disabled: boolean;
+    requirePKCE: boolean;
+    public: boolean;
+  };
+  expect(managedClient).toMatchObject({
+    name: managedClientName,
+    redirectUris: [managedRedirectUri],
+    disabled: false,
+    requirePKCE: true,
+    public: true,
+  });
+  expect(managedClient.scopes).toEqual(
+    expect.arrayContaining([
+      "openid",
+      "profile",
+      "memory:read",
+      "memory:write",
+    ]),
+  );
+  const managedClientCard = page.locator("article", {
+    hasText: managedClient.clientId,
+  });
+  await expect(managedClientCard).toContainText(managedClientName);
+  await expect(managedClientCard).toContainText(managedRedirectUri);
+  await expect(managedClientCard).toContainText("memory:write");
+
+  const [managedClientDeleteResponse] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response
+          .url()
+          .includes(`/v1/oauth/clients/${managedClient.clientId}`) &&
+        response.request().method() === "DELETE",
+    ),
+    managedClientCard.getByRole("button", { name: "Disable" }).click(),
+  ]);
+  expect(managedClientDeleteResponse.ok()).toBe(true);
+  await expect(managedClientCard).toContainText("disabled");
+  await expect(
+    managedClientCard.getByRole("button", { name: "Disabled" }),
+  ).toBeDisabled();
+
   const oauthClient = await verifyMcpOAuthCallbackFlow(page, {
     baseUrl: new URL(page.url()).origin,
     clientName: "OpenMemory Live Full Smoke",

@@ -44,7 +44,8 @@
   PKCE, MCP `remember`, `recall`, `profile`, and `forget`.
 - Opt-in browser E2E covers deployed login/signup, dashboard remember, refresh,
   recall, forget, browser-session readiness access, profile/workspace updates,
-  team member invite/remove, browser OAuth callback capture for MCP bearer-token
+  team member invite/remove, dashboard-managed MCP OAuth client
+  registration/disable, browser OAuth callback capture for MCP bearer-token
   exchange, seeded OAuth/MCP connection revocation, and confirmed account
   deletion.
 - `/v1/sources` chunks longer source/document content, preserves source/chunk provenance metadata, indexes each chunk, and creates graph edges between adjacent chunks.
@@ -189,7 +190,7 @@
      setup feedback.
 
 3. RAG pipeline
-  - Expand transcript connectors from first-party API/UI ingest into productized
+   - Expand transcript connectors from first-party API/UI ingest into productized
     imports for specific AI chat surfaces.
    - Improve extraction quality with Workers AI once deterministic extraction
      has enough production traces to evaluate.
