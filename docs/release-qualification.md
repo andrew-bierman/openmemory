@@ -121,10 +121,10 @@ The workflow uploads the generated `.tmp/benchmark-reports/*.jsonl` files as a
 recall-quality evidence across candidate commits.
 
 The latest recorded release gate for
-`ae433710f37b7d784833c47d37b1d8da5dd8276e` passed in
-`https://github.com/andrew-bierman/openmemory/actions/runs/29664622501` with
-recall MRR `1.0`, Hit@3 `1.0`, 220-memory graph recall `19.92ms`,
-360-memory graph recall `20.51ms`, and 1,000-memory graph recall `65.73ms`.
+`3e4b35fa57c0dfb2d7cc45359858145dbf272813` passed in
+`https://github.com/andrew-bierman/openmemory/actions/runs/29666687105` with
+recall MRR `1.0`, Hit@3 `1.0`, 220-memory graph recall `18.82ms`,
+360-memory graph recall `21.28ms`, and 1,000-memory graph recall `39.67ms`.
 
 Launch-readiness evidence pointers live in
 `config/launch-evidence.json`. Keep that manifest and
@@ -159,6 +159,13 @@ deployments. The workflow restores recent successful benchmark artifacts,
 combines them with the current run, and uploads
 `.tmp/benchmark-reports/live-production-summary.md` with latest, average, best,
 worst, threshold, and run-over-run delta summaries.
+
+The latest hosted production benchmark for
+`3e4b35fa57c0dfb2d7cc45359858145dbf272813` passed in
+`https://github.com/andrew-bierman/openmemory/actions/runs/29666687365` with
+80 active memories, 79 edges, recall latency `946.48ms`, and a `12000ms`
+threshold. Its trend summary analyzed 5 unique runs, ignored 102 duplicate
+artifact rows, and reported average recall latency `736.22ms`.
 
 To generate the same summary from local JSONL files:
 

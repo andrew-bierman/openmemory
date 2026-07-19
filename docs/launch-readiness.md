@@ -128,28 +128,28 @@ larger hosted push.
   protected-resource metadata, with Analytics Engine telemetry and optional
   webhook/email/PagerDuty alert dispatch.
 - [x] Documented repository gate
-  `987cb52881c050c08a9aae377c87a5f5b9c43f1f` has green main CI:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29666296422`.
+  `3e4b35fa57c0dfb2d7cc45359858145dbf272813` has green main CI:
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29666583941`.
 - [x] Documented repository gate
-  `987cb52881c050c08a9aae377c87a5f5b9c43f1f` has a green Cloudflare Workers
+  `3e4b35fa57c0dfb2d7cc45359858145dbf272813` has a green Cloudflare Workers
   Build:
-  `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/a6925ab9-cc15-468a-9289-d4f2cf801d65`.
+  `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/9f6dc277-e53e-4b23-97d7-adbeb425518e`.
 - [x] Latest verified runtime candidate
-  `987cb52881c050c08a9aae377c87a5f5b9c43f1f` has green live smoke proving
+  `3e4b35fa57c0dfb2d7cc45359858145dbf272813` has green live smoke proving
   hosted auth, graph recall, readiness, R2 export, OAuth/MCP, hosted UI, remote
   Workers AI, Vectorize semantic recall, and conversation transcript ingestion:
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29666375515`.
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29666897021`.
 - [x] Remote D1 cleanup counters after current live smoke are zero:
   `oauth_client=0`, `live_users=0`, `live_benchmark_users=0`.
 - [x] Latest full local release validation evidence passed on
-  `ae433710f37b7d784833c47d37b1d8da5dd8276e` in
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29664622501`
+  `3e4b35fa57c0dfb2d7cc45359858145dbf272813` in
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29666687105`
   with `bun run release:validate`, including local recall MRR `1.0`, hit@3
-  `1.0`, 220-memory graph recall `19.92ms`, 360-memory graph recall
-  `20.51ms`, and 1,000-memory graph recall `65.73ms`.
+  `1.0`, 220-memory graph recall `18.82ms`, 360-memory graph recall
+  `21.28ms`, and 1,000-memory graph recall `39.67ms`.
 - [x] Latest hosted production graph benchmark evidence passed in
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29664622502`:
-  80 active memories, 79 edges, recall latency `1071.36ms` versus a `12000ms`
+  `https://github.com/andrew-bierman/openmemory/actions/runs/29666687365`:
+  80 active memories, 79 edges, recall latency `946.48ms` versus a `12000ms`
   threshold.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
