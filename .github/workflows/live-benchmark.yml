@@ -37,11 +37,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir -p .tmp/benchmark-reports/history
+          HISTORY_DIR="$RUNNER_TEMP/openmemory-benchmark-history"
+          rm -rf "$HISTORY_DIR"
+          mkdir -p "$HISTORY_DIR" .tmp/benchmark-reports
           for run_id in $(gh run list --workflow "Live Production Benchmark" --status success --limit 10 --json databaseId --jq '.[].databaseId'); do
-            gh run download "$run_id" --name live-production-benchmark --dir ".tmp/benchmark-reports/history/$run_id" || true
+            gh run download "$run_id" --name live-production-benchmark --dir "$HISTORY_DIR/$run_id" || true
           done
-          find .tmp/benchmark-reports/history -name '*.jsonl' -print0 | xargs -0 cat > .tmp/benchmark-reports/live-production-history.jsonl || true
+          find "$HISTORY_DIR" -path '*/history/*' -prune -o -name '*.jsonl' -print0 | xargs -0 cat > .tmp/benchmark-reports/live-production-history.jsonl || true
 
       - name: Run hosted graph benchmark
         run: bun run test:benchmark:live
@@ -49,7 +51,9 @@ jobs:
       - name: Write benchmark trend summary
         if: always()
         run: |
-          cat .tmp/benchmark-reports/live-production-history.jsonl .tmp/benchmark-reports/live-production.jsonl > .tmp/benchmark-reports/live-production-trend.jsonl 2>/dev/null || true
+          : > .tmp/benchmark-reports/live-production-trend.jsonl
+          [ -s .tmp/benchmark-reports/live-production-history.jsonl ] && cat .tmp/benchmark-reports/live-production-history.jsonl >> .tmp/benchmark-reports/live-production-trend.jsonl
+          [ -s .tmp/benchmark-reports/live-production.jsonl ] && cat .tmp/benchmark-reports/live-production.jsonl >> .tmp/benchmark-reports/live-production-trend.jsonl
           bun run benchmark:trend -- .tmp/benchmark-reports/live-production-trend.jsonl --out .tmp/benchmark-reports/live-production-summary.md
 
       - name: Upload benchmark report
@@ -57,5 +61,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: live-production-benchmark
-          path: .tmp/benchmark-reports/*
+          path: |
+            .tmp/benchmark-reports/live-production.jsonl
+            .tmp/benchmark-reports/live-production-history.jsonl
+            .tmp/benchmark-reports/live-production-trend.jsonl
+            .tmp/benchmark-reports/live-production-summary.md
           if-no-files-found: ignore
