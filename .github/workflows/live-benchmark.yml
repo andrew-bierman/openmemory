@@ -38,12 +38,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           HISTORY_DIR="$RUNNER_TEMP/openmemory-benchmark-history"
+          MAX_ARTIFACT_BYTES=1048576
           rm -rf "$HISTORY_DIR"
           mkdir -p "$HISTORY_DIR" .tmp/benchmark-reports
           for run_id in $(gh run list --workflow "Live Production Benchmark" --status success --limit 10 --json databaseId --jq '.[].databaseId'); do
-            gh run download "$run_id" --name live-production-benchmark --dir "$HISTORY_DIR/$run_id" || true
+            artifact_size=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id/artifacts" --jq '.artifacts[] | select(.name == "live-production-benchmark") | .size_in_bytes' | head -n 1)
+            if [ -n "$artifact_size" ] && [ "$artifact_size" -le "$MAX_ARTIFACT_BYTES" ]; then
+              gh run download "$run_id" --name live-production-benchmark --dir "$HISTORY_DIR/$run_id" || true
+            else
+              echo "Skipping live-production-benchmark artifact for run $run_id because size ${artifact_size:-unknown} exceeds $MAX_ARTIFACT_BYTES bytes."
+            fi
           done
-          find "$HISTORY_DIR" -path '*/history/*' -prune -o -name '*.jsonl' -print0 | xargs -0 cat > .tmp/benchmark-reports/live-production-history.jsonl || true
+          find "$HISTORY_DIR" -name 'live-production.jsonl' -print0 | xargs -0 cat > .tmp/benchmark-reports/live-production-history.jsonl || true
 
       - name: Run hosted graph benchmark
         run: bun run test:benchmark:live
@@ -63,7 +69,5 @@ jobs:
           name: live-production-benchmark
           path: |
             .tmp/benchmark-reports/live-production.jsonl
-            .tmp/benchmark-reports/live-production-history.jsonl
-            .tmp/benchmark-reports/live-production-trend.jsonl
             .tmp/benchmark-reports/live-production-summary.md
           if-no-files-found: ignore
