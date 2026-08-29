@@ -360,8 +360,9 @@ Graph/RAG production review evidence is tracked in
 [`config/rag-production-review.json`](config/rag-production-review.json). Normal
 CI validates the status artifact with `bun run rag:production-review:status`;
 the strict launch gate is `bun run rag:production-review:check` and is expected
-to fail until hosted graph benchmark trend, semantic RAG trace review, and
-rerank threshold review are recorded.
+to fail until semantic RAG trace review and rerank threshold review are
+recorded. Hosted graph benchmark trend evidence passed on August 29, 2026 in
+`https://github.com/andrew-bierman/openmemory/actions/runs/33231544217`.
 
 Convert external MemoryBench-style JSON or JSONL fixtures into an OpenMemory
 graph export for local restore/import evaluation:

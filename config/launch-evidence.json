@@ -23,10 +23,10 @@
     "releaseValidationGraphRecallMs": 18.82,
     "releaseValidationScaleRecallMs": 21.28,
     "releaseValidationScale1000RecallMs": 39.67,
-    "liveBenchmarkRun": "29666687365",
+    "liveBenchmarkRun": "33231544217",
     "liveBenchmarkActiveMemories": 80,
     "liveBenchmarkEdges": 79,
-    "liveBenchmarkRecallMs": 946.48,
+    "liveBenchmarkRecallMs": 2895.96,
     "liveBenchmarkThresholdMs": 12000
   },
   "screenshotDirectory": ".tmp/screenshots/launch-readiness"

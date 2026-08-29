@@ -158,13 +158,12 @@
     trace review before broad hosted launch.
 - Graph/RAG production review is tracked in
   `config/rag-production-review.json`; the normal status check is CI-safe, and
-  the strict gate remains pending until hosted graph benchmark trend, semantic
-  RAG trace review, and rerank threshold review evidence is recorded.
+  the strict gate remains pending until semantic RAG trace review and rerank
+  threshold review evidence is recorded.
 - Graph performance has larger local smoke coverage, release benchmark
   artifacts, graph-specific product signals, relationship diagnostics,
   production request telemetry, a recurring hosted synthetic benchmark, and
-  guarded hosted benchmark trend summaries, but still needs human review of
-  those trends across multiple production runs before a hosted SaaS launch.
+  accepted hosted benchmark trend summaries for alpha readiness.
 - Graph restore supports preview, whole-tenant replace, additive merge,
   explicit duplicate overwrite recovery, and deterministic semantic merge of
   two changed memory records.

@@ -31,9 +31,9 @@ larger hosted push.
 - Hosted production graph benchmark has passed against the deployed Worker with
   an 80-memory throwaway graph, including account cleanup.
 - Graph/RAG production review is tracked in
-  `config/rag-production-review.json`; normal CI validates the pending status,
-  and the strict launch gate fails until hosted graph benchmark trend, semantic
-  RAG trace review, and rerank threshold review are recorded.
+  `config/rag-production-review.json`; normal CI validates the mixed
+  passed/pending status, and the strict launch gate fails until semantic RAG
+  trace review and rerank threshold review are recorded.
 - Better Auth, OAuth/OIDC discovery, MCP bearer flow, graph recall, semantic
   provider diagnostics, source ingestion, R2 export, tenant readiness snapshots,
   OAuth provider readiness diagnostics, browser-session readiness, and hosted UI
@@ -134,8 +134,9 @@ larger hosted push.
 - [x] Entity and relationship extraction workers are implemented.
 - [x] Larger recall and graph performance benchmarks run in CI or release
   qualification, with JSONL benchmark artifacts for release review.
-- [ ] Hosted graph benchmark trend, semantic RAG trace review, and rerank
-  threshold review have passed with evidence in
+- [x] Hosted graph benchmark trend has passed with evidence in
+  `config/rag-production-review.json`.
+- [ ] Semantic RAG trace review and rerank threshold review have passed with evidence in
   `config/rag-production-review.json`.
 
 ## Operational Readiness Checklist
@@ -170,9 +171,10 @@ larger hosted push.
   `1.0`, 220-memory graph recall `18.82ms`, 360-memory graph recall
   `21.28ms`, and 1,000-memory graph recall `39.67ms`.
 - [x] Latest hosted production graph benchmark evidence passed in
-  `https://github.com/andrew-bierman/openmemory/actions/runs/29666687365`:
-  80 active memories, 79 edges, recall latency `946.48ms` versus a `12000ms`
-  threshold.
+  `https://github.com/andrew-bierman/openmemory/actions/runs/33231544217`:
+  trend summary analyzed 10 runs, latest recall latency `2895.96ms`, average
+  recall latency `1221.60ms`, and a `12000ms` threshold. The artifact is 956
+  bytes and contains only the current benchmark JSONL plus markdown summary.
 - [x] Cloudflare WAF or global rate limiting is configured for production abuse
   control.
 - [x] Log dashboard or saved queries exist for `openmemory.request`,
