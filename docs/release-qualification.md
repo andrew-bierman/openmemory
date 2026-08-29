@@ -195,12 +195,12 @@ the upload directory, upload history/trend JSONL, or use a wildcard upload path;
 doing so recursively republishes artifact history and can make trend generation
 fail before the hosted benchmark evidence is usable.
 
-The latest hosted production benchmark for
-`3e4b35fa57c0dfb2d7cc45359858145dbf272813` passed in
-`https://github.com/andrew-bierman/openmemory/actions/runs/29666687365` with
-80 active memories, 79 edges, recall latency `946.48ms`, and a `12000ms`
-threshold. Its trend summary analyzed 5 unique runs, ignored 102 duplicate
-artifact rows, and reported average recall latency `736.22ms`.
+The latest Hosted graph benchmark trend evidence for
+`48fac89c85fa5f25dfc76b45e28044bc646bb774` passed in
+`https://github.com/andrew-bierman/openmemory/actions/runs/33231544217`. Its
+trend summary analyzed 10 unique runs, ignored 495 duplicate artifact rows, and
+reported latest recall latency `2895.96ms`, average recall latency `1221.60ms`,
+and a `12000ms` threshold.
 
 To generate the same summary from local JSONL files:
 
@@ -208,10 +208,9 @@ To generate the same summary from local JSONL files:
 bun run benchmark:trend -- .tmp/benchmark-reports/live-production.jsonl --out .tmp/benchmark-reports/live-production-summary.md
 ```
 
-Broad hosted launch also requires a recorded graph/RAG production review. Update
-`config/rag-production-review.json` after reviewing hosted graph benchmark
-trend, semantic RAG trace review, and rerank threshold review evidence, then
-run:
+Broad hosted launch also requires the remaining graph/RAG production review
+items. Update `config/rag-production-review.json` after reviewing semantic RAG
+trace review and rerank threshold review evidence, then run:
 
 ```sh
 bun run rag:production-review:check

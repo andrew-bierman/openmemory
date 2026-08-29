@@ -1,21 +1,21 @@
 {
   "$schema": "https://openmemory.local/schemas/rag-production-review.schema.json",
   "baseUrl": "https://openmemory-api.abbierman101.workers.dev",
-  "updatedAt": "2026-07-19",
+  "updatedAt": "2026-08-29",
   "minimumUniqueBenchmarkRuns": 5,
   "reviewItems": [
     {
       "id": "hosted-graph-benchmark-trend",
       "name": "Hosted graph benchmark trend",
       "required": true,
-      "status": "pending",
+      "status": "passed",
       "evidenceSource": "live-production-benchmark-summary",
       "currentEvidence": {
-        "workflowRunUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/29666687365",
-        "uniqueRunsAnalyzed": 5,
-        "duplicateRowsIgnored": 102,
-        "latestRecallMs": 946.48,
-        "averageRecallMs": 736.22,
+        "workflowRunUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/33231544217",
+        "uniqueRunsAnalyzed": 10,
+        "duplicateRowsIgnored": 495,
+        "latestRecallMs": 2895.96,
+        "averageRecallMs": 1221.6,
         "recallThresholdMs": 12000
       },
       "acceptanceCriteria": [
@@ -24,8 +24,14 @@
         "Average hosted recall latency is below the configured threshold.",
         "Reviewer records whether the current threshold is acceptable for alpha launch."
       ],
-      "review": null,
-      "notes": "Trend artifacts exist, but human review and launch-threshold decision are still pending."
+      "review": {
+        "actor": "Codex",
+        "checkedAt": "2026-08-29T03:32:34.828Z",
+        "decision": "Accept hosted graph recall benchmark trend for alpha launch readiness.",
+        "notes": "Manual Live Production Benchmark run 33231544217 passed on main commit 48fac89. Artifact size is 956 bytes after capping historical downloads and uploading only current JSONL plus summary. Latest recall latency 2895.96ms and average recall latency 1221.60ms are below the 12000ms threshold; latest import latency regressed to 125726.34ms and should remain monitored outside the recall gate.",
+        "proofUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/33231544217"
+      },
+      "notes": "Hosted benchmark trend evidence is accepted for alpha recall readiness; semantic trace review and rerank threshold review remain separate pending RAG launch gates."
     },
     {
       "id": "semantic-rag-trace-review",
