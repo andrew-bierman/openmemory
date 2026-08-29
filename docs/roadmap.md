@@ -180,7 +180,8 @@
   evidence is recorded.
 - Real MCP Inspector, Cursor, Claude, and ChatGPT vendor-surface dogfooding is
   tracked in `config/mcp-vendor-dogfood.json`; the normal status check is
-  CI-safe, and the strict gate remains pending until evidence is recorded.
+  CI-safe, MCP Inspector has passed, and the strict gate remains pending until
+  Cursor, Claude, and ChatGPT evidence is recorded.
 - Repository public-launch operations are complete: Discussions, topics/about
   metadata, public visibility, and the first tagged alpha release are live.
 - Launch copy and first-feedback triage guidance live in
@@ -197,16 +198,15 @@
      workflow before declaring hosted social login complete.
 
 2. MCP production flow
-   - Manually test full interactive OAuth callback flows in MCP Inspector,
-     Cursor, Claude, and ChatGPT connector surfaces before broad hosted launch;
-     the generic browser callback redirect/token exchange path is now covered
-     by local and live E2E.
+   - Manually test full interactive OAuth callback flows in Cursor, Claude, and
+     ChatGPT connector surfaces before broad hosted launch; MCP Inspector CLI
+     dogfooding and the generic browser callback redirect/token exchange path
+     are now covered.
    - Update `config/mcp-vendor-dogfood.json` with evidence from those runs and
      run `bun run mcp:vendor-dogfood:check` or the strict `MCP Vendor Dogfood`
      workflow before declaring hosted vendor compatibility complete.
    - First-party OAuth client registration/management exists in the dashboard;
-     keep hardening it from real Cursor, Claude, ChatGPT, and MCP Inspector
-     setup feedback.
+     keep hardening it from real Cursor, Claude, ChatGPT, and MCP Inspector setup feedback.
 
 3. RAG pipeline
    - Expand transcript connectors from first-party API/UI ingest into productized
