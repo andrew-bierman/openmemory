@@ -16,15 +16,16 @@ unit/integration tests, the production build, MCP SDK smoke tests, local
 Playwright E2E, recall benchmarks, and the heavier opt-in scale gate.
 
 It also validates the MCP vendor dogfood status artifact in allow-pending mode.
-MCP Inspector dogfooding can be run from CI or a local shell with:
+MCP Inspector dogfooding passed in
+`https://github.com/andrew-bierman/openmemory/actions/runs/33257516761` and can
+be rerun from CI or a local shell with:
 
 ```sh
 bun run mcp:inspector:live
 ```
 
-Before broad hosted launch, replace pending entries in
-`config/mcp-vendor-dogfood.json` with real Cursor, Claude, and ChatGPT evidence
-and run the strict gate:
+Before broad hosted launch, replace the remaining pending entries in
+`config/mcp-vendor-dogfood.json` with real Cursor, Claude, and ChatGPT evidence and run the strict gate:
 
 ```sh
 bun run mcp:vendor-dogfood:check
@@ -242,5 +243,5 @@ For each release, record:
 
 Do not publish a release as broadly production-ready while launch readiness
 still has unchecked operational controls, async ingestion, extraction workers,
-real MCP Inspector, Cursor, Claude, and ChatGPT vendor dogfooding, enabled
-hosted social OAuth dogfooding, or graph/RAG production review.
+real Cursor, Claude, and ChatGPT vendor dogfooding, enabled hosted social OAuth
+dogfooding, or graph/RAG production review.

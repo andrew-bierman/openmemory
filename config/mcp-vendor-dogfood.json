@@ -2,13 +2,13 @@
   "$schema": "https://openmemory.local/schemas/mcp-vendor-dogfood.schema.json",
   "baseUrl": "https://openmemory-api.abbierman101.workers.dev",
   "serverPath": "/mcp",
-  "updatedAt": "2026-07-19",
+  "updatedAt": "2026-08-29",
   "vendors": [
     {
       "id": "mcp-inspector",
       "name": "MCP Inspector",
       "required": true,
-      "status": "pending",
+      "status": "passed",
       "transport": "streamable-http",
       "oauthMode": "authorization-code-pkce",
       "checklist": [
@@ -17,8 +17,14 @@
         "List tools, resources, and prompts.",
         "Call remember, recall, profile, and forget with the bearer token."
       ],
-      "evidence": null,
-      "notes": "Pending real Inspector UI OAuth dogfooding against the deployed Worker."
+      "evidence": {
+        "actor": "Codex",
+        "checkedAt": "2026-08-29T14:24:48.721Z",
+        "mcpClientId": "YWRacpYfpjOKOdKHtWzjOQOvCDHAprYr",
+        "notes": "MCP Inspector CLI ran against the hosted production /mcp endpoint using a dashboard-managed public PKCE client with the Inspector loopback callback URL. It listed tools, resources, and prompts, called remember, recall, profile, and forget, read openmemory://profile and openmemory://recent, fetched the context prompt, then cleaned up the throwaway hosted account.",
+        "proofUrl": "https://github.com/andrew-bierman/openmemory/actions/runs/33257516761"
+      },
+      "notes": "Passed real MCP Inspector CLI dogfooding against the deployed Worker."
     },
     {
       "id": "cursor",

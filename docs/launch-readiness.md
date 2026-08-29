@@ -54,9 +54,9 @@ larger hosted push.
   Inspector, Cursor, Claude, and ChatGPT-style request profiles are
   smoke-tested and documented across tools, resources, and prompts.
 - Real MCP Inspector, Cursor, Claude, and ChatGPT vendor-surface dogfooding is
-  tracked in `config/mcp-vendor-dogfood.json`; normal CI validates the pending
-  status, and the strict launch gate fails until required entries pass with
-  evidence.
+  tracked in `config/mcp-vendor-dogfood.json`; MCP Inspector has passed, normal
+  CI validates the mixed passed/pending status, and the strict launch gate
+  fails until Cursor, Claude, and ChatGPT pass with evidence.
 - Local and live browser E2E verify the generic MCP OAuth callback flow with a
   randomized localhost callback listener, consent UI, PKCE token exchange, and
   MCP calls. Live browser E2E proves bearer-token MCP access; local browser E2E
@@ -107,6 +107,10 @@ larger hosted push.
   after the providers are re-enabled.
 - [x] MCP endpoint exposes `remember`, `recall`, `profile`, and `forget`.
 - [x] MCP endpoint exposes profile/recent resources and a context prompt.
+- [x] MCP Inspector has passed real hosted dogfooding with evidence in
+  `config/mcp-vendor-dogfood.json`.
+- [ ] Cursor, Claude, and ChatGPT have passed real hosted MCP dogfooding with
+  evidence in `config/mcp-vendor-dogfood.json`.
 - [x] Graph memory CRUD, recall, source chunks, exports, restore, and repair
   paths work.
 - [x] Tenant graph purge supports account-deletion workflows with explicit

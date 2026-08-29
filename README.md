@@ -15,11 +15,11 @@ MCP runtime for tool access.
 > hosted profile/onboarding UI, named MCP request-profile smoke, browser
 > OAuth callback verification, larger recall benchmarks, typed relationship
 > diagnostics, production telemetry, and release validation gates are working.
-> Manual vendor-surface MCP dogfooding for MCP Inspector, Cursor, Claude, and
-> ChatGPT is tracked as a strict release gate. Hosted GitHub/Google social OAuth
-> is disabled for alpha until production OAuth app credentials are installed.
-> Graph/RAG production trend review is also tracked as a strict launch gate
-> before broader hosted positioning.
+> Manual vendor-surface MCP dogfooding for MCP Inspector has passed. Cursor,
+> Claude, and ChatGPT dogfooding remain tracked as strict release gates. Hosted
+> GitHub/Google social OAuth is disabled for alpha until production OAuth app
+> credentials are installed. Graph/RAG production trend review is also tracked
+> as a strict launch gate before broader hosted positioning.
 
 ## Why OpenMemory
 
@@ -230,12 +230,10 @@ See [docs/mcp.md](docs/mcp.md) and
 generic client configuration, tested client request shapes, local development,
 tools, and connection revocation.
 
-Real vendor-surface dogfooding for MCP Inspector, Cursor, Claude, and ChatGPT
-is tracked in
+Real vendor-surface dogfooding for MCP Inspector, Cursor, Claude, and ChatGPT is tracked in
 [`config/mcp-vendor-dogfood.json`](config/mcp-vendor-dogfood.json). Normal CI
-validates the status artifact with `bun run mcp:vendor-dogfood:status`; the
-strict launch gate is `bun run mcp:vendor-dogfood:check` and is expected to
-fail until all required vendor entries include real evidence.
+validates the status artifact with `bun run mcp:vendor-dogfood:status`; the strict launch gate is `bun run mcp:vendor-dogfood:check` and is expected to fail until Cursor, Claude, and ChatGPT include real evidence. MCP Inspector passed through the `MCP Inspector Dogfood` workflow:
+`https://github.com/andrew-bierman/openmemory/actions/runs/33257516761`.
 
 ## Auth
 
@@ -397,8 +395,7 @@ Current priorities:
 - Expand recall quality benchmarks with larger MemoryBench-style fixtures.
 - Compare recurring hosted graph benchmark artifacts with local benchmark
   reports before broad hosted usage.
-- Complete the strict MCP vendor dogfood gate for MCP Inspector, Cursor, Claude,
-  and ChatGPT after the generic browser callback verifier is green.
+- Complete the strict MCP vendor dogfood gate for Cursor, Claude, and ChatGPT.
 - Re-enable and complete the social OAuth dogfood gate for GitHub and Google
   after production OAuth app secrets are installed.
 - Complete the strict RAG production review gate after hosted graph benchmark
