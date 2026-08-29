@@ -51,6 +51,7 @@
     "rag:production-review:status": "bun scripts/rag-production-review-check.ts --allow-pending",
     "launch:evidence:check": "bun scripts/launch-evidence-check.ts",
     "mcp:profiles:check": "bun scripts/mcp-client-profile-check.ts",
+    "mcp:inspector:live": "bun scripts/mcp-inspector-dogfood.ts",
     "mcp:vendor-dogfood:check": "bun scripts/mcp-vendor-dogfood-check.ts",
     "mcp:vendor-dogfood:status": "bun scripts/mcp-vendor-dogfood-check.ts --allow-pending",
     "social-oauth:check": "bun scripts/social-oauth-dogfood-check.ts",

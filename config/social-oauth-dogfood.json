@@ -2,12 +2,12 @@
   "$schema": "https://openmemory.local/schemas/social-oauth-dogfood.schema.json",
   "baseUrl": "https://openmemory-api.abbierman101.workers.dev",
   "readinessPath": "/v1/readiness",
-  "updatedAt": "2026-07-19",
+  "updatedAt": "2026-08-29",
   "providers": [
     {
       "id": "github",
       "name": "GitHub",
-      "required": true,
+      "required": false,
       "status": "pending",
       "expectedReadinessStatus": "ready",
       "requiredSecrets": ["GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET"],
@@ -19,12 +19,12 @@
         "Complete hosted sign-in through GitHub and verify the dashboard session resolves the signed-in user."
       ],
       "evidence": null,
-      "notes": "Pending hosted GitHub OAuth app setup and social sign-in dogfooding."
+      "notes": "Disabled for alpha launch until the production GitHub OAuth app client id and secret are installed."
     },
     {
       "id": "google",
       "name": "Google",
-      "required": true,
+      "required": false,
       "status": "pending",
       "expectedReadinessStatus": "ready",
       "requiredSecrets": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"],
@@ -36,7 +36,7 @@
         "Complete hosted sign-in through Google and verify the dashboard session resolves the signed-in user."
       ],
       "evidence": null,
-      "notes": "Pending hosted Google OAuth client setup and social sign-in dogfooding."
+      "notes": "Disabled for alpha launch until the production Google OAuth client id and secret are installed."
     }
   ]
 }

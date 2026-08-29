@@ -16,19 +16,26 @@ unit/integration tests, the production build, MCP SDK smoke tests, local
 Playwright E2E, recall benchmarks, and the heavier opt-in scale gate.
 
 It also validates the MCP vendor dogfood status artifact in allow-pending mode.
+MCP Inspector dogfooding can be run from CI or a local shell with:
+
+```sh
+bun run mcp:inspector:live
+```
+
 Before broad hosted launch, replace pending entries in
-`config/mcp-vendor-dogfood.json` with real MCP Inspector, Cursor, Claude, and
-ChatGPT evidence and run the strict gate:
+`config/mcp-vendor-dogfood.json` with real Cursor, Claude, and ChatGPT evidence
+and run the strict gate:
 
 ```sh
 bun run mcp:vendor-dogfood:check
 ```
 
-The same posture applies to hosted social login. Install
+Hosted social login is disabled for alpha. When it is re-enabled, install
 `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`, and
 `GOOGLE_CLIENT_SECRET`, verify GitHub and Google report `ready` in
-`/v1/readiness`, complete hosted sign-in through both providers, update
-`config/social-oauth-dogfood.json`, and run:
+`/v1/readiness`, complete hosted sign-in through both providers, mark the
+providers required in `config/social-oauth-dogfood.json`, update their
+evidence, and run:
 
 ```sh
 bun run social-oauth:check
@@ -235,5 +242,5 @@ For each release, record:
 
 Do not publish a release as broadly production-ready while launch readiness
 still has unchecked operational controls, async ingestion, extraction workers,
-real MCP Inspector, Cursor, Claude, and ChatGPT vendor dogfooding, or hosted
-GitHub and Google social OAuth dogfooding, or graph/RAG production review.
+real MCP Inspector, Cursor, Claude, and ChatGPT vendor dogfooding, enabled
+hosted social OAuth dogfooding, or graph/RAG production review.
