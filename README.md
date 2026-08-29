@@ -16,9 +16,10 @@ MCP runtime for tool access.
 > OAuth callback verification, larger recall benchmarks, typed relationship
 > diagnostics, production telemetry, and release validation gates are working.
 > Manual vendor-surface MCP dogfooding for MCP Inspector, Cursor, Claude, and
-> ChatGPT plus hosted GitHub/Google social OAuth dogfooding are tracked as
-> strict release gates. Graph/RAG production trend review is also tracked as a
-> strict launch gate before broader hosted positioning.
+> ChatGPT is tracked as a strict release gate. Hosted GitHub/Google social OAuth
+> is disabled for alpha until production OAuth app credentials are installed.
+> Graph/RAG production trend review is also tracked as a strict launch gate
+> before broader hosted positioning.
 
 ## Why OpenMemory
 
@@ -253,9 +254,10 @@ bun --cwd apps/api wrangler secret put GOOGLE_CLIENT_SECRET
 
 Hosted GitHub and Google social sign-in evidence is tracked in
 [`config/social-oauth-dogfood.json`](config/social-oauth-dogfood.json). Normal
-CI validates the status artifact with `bun run social-oauth:status`; the strict
-launch gate is `bun run social-oauth:check` and is expected to fail until both
-providers include hosted readiness and sign-in evidence.
+CI validates the status artifact with `bun run social-oauth:status`. The strict
+provider gate is currently disabled for alpha by marking both providers
+non-required; re-enable it after production OAuth credentials are installed and
+hosted sign-in evidence is recorded.
 
 Auth storage uses `AUTH_DB` D1 through Drizzle when configured and falls back to
 an in-memory adapter for local tests and development.
@@ -397,8 +399,8 @@ Current priorities:
   reports before broad hosted usage.
 - Complete the strict MCP vendor dogfood gate for MCP Inspector, Cursor, Claude,
   and ChatGPT after the generic browser callback verifier is green.
-- Complete the strict social OAuth dogfood gate for GitHub and Google after
-  production OAuth app secrets are installed.
+- Re-enable and complete the social OAuth dogfood gate for GitHub and Google
+  after production OAuth app secrets are installed.
 - Complete the strict RAG production review gate after hosted graph benchmark
   trend, semantic RAG trace review, and rerank threshold review are recorded.
 - Keep Cloudflare Git/Workers Builds as the preferred production deploy path.
