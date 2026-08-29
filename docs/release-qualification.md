@@ -187,11 +187,13 @@ combines them with the current run, and uploads
 `.tmp/benchmark-reports/live-production-summary.md` with latest, average, best,
 worst, threshold, and run-over-run delta summaries.
 
-The workflow restores historical artifacts under `$RUNNER_TEMP` and uploads
-only explicit report files from `.tmp/benchmark-reports`. Do not restore old
-artifacts under the upload directory or use a wildcard upload path; doing so
-recursively republishes artifact history and can make trend generation fail
-before the hosted benchmark evidence is usable.
+The workflow restores historical artifacts under `$RUNNER_TEMP`, skips
+historical benchmark artifacts larger than 1 MiB, reads only prior
+`live-production.jsonl` files into the trend input, and uploads only the current
+benchmark JSONL plus the markdown summary. Do not restore old artifacts under
+the upload directory, upload history/trend JSONL, or use a wildcard upload path;
+doing so recursively republishes artifact history and can make trend generation
+fail before the hosted benchmark evidence is usable.
 
 The latest hosted production benchmark for
 `3e4b35fa57c0dfb2d7cc45359858145dbf272813` passed in

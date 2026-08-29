@@ -135,10 +135,10 @@
   signals.
 - The `Live Production Benchmark` workflow runs a bounded synthetic hosted
   graph benchmark, writes JSONL recall-latency evidence, and uploads it as a
-  GitHub Actions artifact for production comparison. It also restores recent
-  successful benchmark artifacts outside the uploaded report directory, then
-  uploads a flattened markdown trend summary with latest, average, best, worst,
-  threshold, and run-over-run deltas.
+  GitHub Actions artifact for production comparison. It also restores only
+  small, current-run JSONL evidence from recent successful benchmark artifacts
+  outside the uploaded report directory, then uploads a markdown trend summary
+  with latest, average, best, worst, threshold, and run-over-run deltas.
 - `scripts/setup-cloudflare.sh` documents and automates resource creation for a fresh account.
 - `infra/cloudflare/r2-lifecycle.json` and `bun run setup:r2-lifecycle`
   configure the R2 export bucket to expire tenant graph exports after 90 days.
