@@ -99,3 +99,30 @@ An independent interim review found that retrying an old share request after pur
 The MCP follow-up adds explicit shared read tools and scope without expanding default personal consent. Its real local PKCE test checks personal-token denial, successful shared list/read/search, private recall isolation, share revocation, membership removal and OAuth disconnection. It uses actual local D1/DO/provider flows; this is not real Cursor/Claude/ChatGPT evidence. Shared service concurrency barriers separately cover revocation observed before final checks. Authorization is not a global transaction across D1 and DOs; previously returned data and already-authorized concurrent responses cannot be retracted.
 
 Apply migration 0006 after 0004/0005 only through a separately approved deployment. No production migration, deployment, credential creation, external invitation, grant, push or publication occurred. Complete final integrated browser/code review and candidate qualification before treating this implementation as ready; live vendor/RAG gates above remain outstanding.
+
+### Migration verification before enabling traffic
+
+During the separately approved deployment window, apply migrations 0004, 0005 and 0006 in order, then run these read-only assertions on the target D1 database before allowing new invitations or shares. Every count should be zero and `foreign_key_check` should return no rows. Preserve a pre-migration backup and investigate any mismatch; do not repair by accepting legacy non-owner memberships. A missing historical owner membership requires reviewed repair using the stable workspace owner user ID.
+
+```sql
+PRAGMA foreign_key_check;
+SELECT count(*) AS missing_or_invalid_owner_memberships
+FROM workspace w LEFT JOIN workspace_member m
+  ON m.workspace_id=w.id AND m.user_id=w.owner_user_id
+WHERE m.id IS NULL OR m.role<>'owner' OR m.status<>'active'
+  OR m.accepted_at IS NULL;
+SELECT count(*) AS implicitly_accepted_nonowners
+FROM workspace_member m JOIN workspace w ON w.id=m.workspace_id
+WHERE m.user_id<>w.owner_user_id AND m.accepted_at IS NOT NULL;
+SELECT count(*) AS duplicate_accepted_memberships FROM (
+  SELECT workspace_id,user_id FROM workspace_member
+  WHERE accepted_at IS NOT NULL GROUP BY workspace_id,user_id HAVING count(*)>1
+);
+SELECT count(*) AS unexpected_initial_shares FROM workspace_share_directory;
+SELECT count(*) AS unexpected_initial_invitations FROM workspace_invitation;
+SELECT count(*) AS unbound_consents FROM oauth_consent WHERE grant_version='';
+```
+
+The zero-share, zero-invitation and zero-accepted-nonowner assertions apply immediately after first migration, not after legitimate team activity. Verify index `workspace_member_user_idx` and `workspace_share_directory_page_idx` plus migration records before enabling compatible code. After deployment, use separately approved disposable accounts to verify invite acceptance/replay, private versus shared reads, removal/rejoin, revocation, workspace deletion and shared OAuth consent. Never substitute these local tests for those deployment checks.
+
+Final review also reproduced a dashboard account-switch exposure while the next user's memory request was paused; identity-scoped query keys and cancellation discard previous-user data. A separate focus regression preserves an invitation secret during successful same-membership reauthorization while clearing shared results before reload. MCP `shared_workspaces` provides accepted IDs/names/roles so clients can discover shared resources without administration authority. Local 26-share pagination returned 25 then 1 with no duplicates or missing records; its first page took 83.87 ms in one emulator run. Per-item fresh checks remain deliberately uncached; hosted fan-out latency needs deployment measurement.
