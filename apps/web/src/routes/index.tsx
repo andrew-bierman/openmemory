@@ -183,9 +183,6 @@ function Home() {
     "openmemory:token",
     "",
   );
-  const [email, setEmail] = useLocalStorage("openmemory:email", "");
-  const [name, setName] = useLocalStorage("openmemory:name", "");
-  const [password, setPassword] = useState("");
   const [content, setContent] = useState("");
   const [ingestContent, setIngestContent] = useState("");
   const [ingestMode, setIngestMode] = useState<"document" | "conversation">(
@@ -785,31 +782,6 @@ function Home() {
     await forgetMemoryMutation.mutateAsync(id);
   }
 
-  async function signIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await authMutation.mutateAsync({
-      path: "/api/auth/sign-in/email",
-      body: {
-        email,
-        password,
-        rememberMe: true,
-      },
-    });
-    setPassword("");
-  }
-
-  async function signUp() {
-    await authMutation.mutateAsync({
-      path: "/api/auth/sign-up/email",
-      body: {
-        email,
-        password,
-        name: name || email,
-      },
-    });
-    setPassword("");
-  }
-
   async function signOut() {
     await authMutation.mutateAsync({
       path: "/api/auth/sign-out",
@@ -1331,26 +1303,18 @@ function Home() {
                 connections={oauthConnections}
                 deleteConfirmEmail={deleteConfirmEmail}
                 deleteConfirmTenantId={deleteConfirmTenantId}
-                email={email}
                 isLoading={isLoading}
                 lastAccountDeletion={lastAccountDeletion}
-                name={name}
                 onDeleteAccount={deleteCurrentAccount}
                 onRevoke={revokeOAuthConnection}
                 onSaveProfile={saveCurrentProfile}
                 onRenameWorkspace={renameCurrentWorkspace}
-                onSignIn={signIn}
                 onSignOut={signOut}
-                onSignUp={signUp}
-                password={password}
-                profileName={profileName || account?.user.name || name}
+                profileName={profileName || account?.user.name || ""}
                 sessionUser={sessionUser}
                 setApiUrl={setApiUrl}
                 setDeleteConfirmEmail={setDeleteConfirmEmail}
                 setDeleteConfirmTenantId={setDeleteConfirmTenantId}
-                setEmail={setEmail}
-                setName={setName}
-                setPassword={setPassword}
                 setProfileName={setProfileName}
                 setTenantId={setTenantId}
                 setToken={setToken}

@@ -237,3 +237,28 @@ export const workspaceAudit = sqliteTable("workspace_audit", {
   action: text("action").notNull(),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
 });
+
+// Epoch milliseconds; separate from Better Auth verification records so OAuth
+// codes and refresh grants remain untouched by passwordless consumption.
+export const passwordlessOtp = sqliteTable(
+  "passwordless_otp",
+  {
+    email: text("email").primaryKey(),
+    hash: text("hash").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+  },
+  (table) => [index("passwordless_otp_expires_at_idx").on(table.expiresAt)],
+);
+
+export const passwordlessThrottle = sqliteTable(
+  "passwordless_throttle",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+  },
+  (table) => [
+    index("passwordless_throttle_expires_at_idx").on(table.expiresAt),
+  ],
+);

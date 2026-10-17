@@ -6,26 +6,35 @@ the current repo, CI, deployment, or runtime behavior proves them.
 
 ## Current Launch Posture
 
-**2026-10-17: not release-ready.** The locally qualified application candidate is
-`c8751124774905327676cf5b4d27a182255539a4`. Its external SSD manifest is
-`../openmemory-validation-artifacts-20261017/results/queue-routing-final-summary.json`:
-185 tests in 25 files and all 18 qualification steps passed (build, six TypeScript
-checks, lint, SDK smoke, scale and security checks). Queue routing now supports
-isolated physical queue names with production defaults; the actual workerd
-regression covers 13 routing/failure cases. Two local compound-engineering
-reviewers found no issues. No external review was dispatched.
+**2026-10-17: not release-ready.** The passwordless candidate is identified by
+`currentLocalCandidate` in `config/launch-evidence.json`. Its SSD qualification
+manifest is `../openmemory-validation-artifacts-20261017/results/passwordless-final-summary.json`.
+Better Auth and its MCP OAuth provider remain in place. Email OTP uses durable
+single-use hashes and throttles; password APIs and implicit signup are disabled.
+Admission is checked against current approved identities for sessions and MCP.
+Existing credential rows, IDs, memberships and grants are retained.
 
-Three headless browser tests passed on the prior candidate
-`1a8e03376b0e03ac28582cca0f0b91627a5234ad`; they were not rerun for this backend-only
-routing change. This candidate has not been deployed or tested against production.
+Three headless browser tests passed, including actual OTP-page login with a
+synthetic mailbox and MCP consent. Local review found no retained findings.
+Synthetic transport and local client profiles are not real email or vendor proof.
+This candidate has not been deployed or tested against production. See
+[the rollout prerequisites](passwordless-auth-rollout.md) and
+[live fixture requirements](passwordless-live-qualification.md).
+
+Before cutover, configure and prove real email delivery and prove existing users
+can access their preserved accounts using the alternative login. Customer access
+uses application admission; Cloudflare Access is optional for internal operations
+and imposes no customer user-count cap. Scheduled live jobs require approved
+passwordless fixtures before they can provide new qualification evidence.
+
 The opt-in maintenance integration remains included. A separate closed bridge
-built from the recovered exact production executable passed 63 local HTTP checks
-and a dry-run bundle; this does not prove hosted closure.
+built from the recovered production executable passed 63 local HTTP checks and
+a dry-run bundle; this does not prove hosted closure.
 
 The proposed minimal synthetic staging target is
 `om-qual-20261017-api.abbierman101.workers.dev`. Billing-plan/usage and Access
 organization read requests returned 403 with existing authentication; account
-headroom and private-ingress readiness remain unverified. Resource creation,
+headroom remains unverified. Access is not a customer-auth prerequisite. Resource creation,
 staging credentials/grants and the bounded run require separate approval;
 permanent teardown requires later action-time approval against actual resource
 IDs. No staging resources or credentials were created.

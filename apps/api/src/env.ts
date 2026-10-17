@@ -12,6 +12,8 @@ import type { IngestionQueueMessage } from "./source-ingestion";
 export type Env = {
   MEMORY_GRAPHS: MemoryGraphNamespace;
   AUTH_DB?: D1Database;
+  OPENMEMORY_AUTH_ALLOWED_EMAILS?: string;
+  AUTH_EMAIL?: { fetch(request: Request): Promise<Response> };
   MEMORY_VECTORS?: VectorizeIndex;
   AI?: Ai;
   MEMORY_EXPORTS?: R2Bucket;

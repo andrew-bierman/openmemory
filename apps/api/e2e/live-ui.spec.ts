@@ -1,18 +1,50 @@
 import { expect, test } from "@playwright/test";
 import { verifyMcpOAuthCallbackFlow } from "./mcp-oauth-callback";
 
+test.use({ trace: "off", screenshot: "off", video: "off" });
+
 test.skip(
   process.env.OPENMEMORY_LIVE_E2E !== "true",
   "Set OPENMEMORY_LIVE_E2E=true to run live browser E2E.",
 );
 
-test("hosted UI signs up, stores memory, and recalls context", async ({
+test("hosted UI uses an approved session, stores memory, and recalls context", async ({
   page,
 }) => {
   test.setTimeout(120_000);
-  const email = `ui-e2e-${crypto.randomUUID()}@example.com`;
-  const inviteEmail = `ui-invite-${crypto.randomUUID()}@example.com`;
-  const password = "password1234";
+  const fixture = approvedFixture("OPENMEMORY_LIVE_UI");
+  const email = fixture.email;
+  const inviteEmail = process.env.OPENMEMORY_LIVE_UI_INVITE_EMAIL;
+  if (
+    !inviteEmail ||
+    inviteEmail === email ||
+    process.env.OPENMEMORY_LIVE_UI_INVITE_APPROVAL !== inviteEmail
+  ) {
+    throw new Error(
+      "Set OPENMEMORY_LIVE_UI_INVITE_EMAIL to a separately approved disposable identity",
+    );
+  }
+  const verified = await page.request.get(`${fixture.origin}/v1/account`, {
+    headers: { cookie: fixture.cookie, origin: fixture.origin },
+    maxRedirects: 0,
+  });
+  if (!verified.ok())
+    throw new Error("Disposable fixture session validation failed");
+  assertFixtureAccount(await verified.json(), fixture);
+  await page.context().addCookies(
+    fixture.cookie.split(";").map((part) => {
+      const index = part.indexOf("=");
+      if (index < 1) throw new Error("Invalid session cookie header");
+      return {
+        name: part.slice(0, index).trim(),
+        value: part.slice(index + 1).trim(),
+        url: fixture.origin,
+        secure: true,
+        httpOnly: true,
+        sameSite: "Lax" as const,
+      };
+    }),
+  );
   const memory = `UI E2E stores Graph Indexing context ${crypto.randomUUID()}`;
   const displayName = `UI Admin ${crypto.randomUUID().slice(0, 8)}`;
   const workspaceName = `UI Workspace ${crypto.randomUUID().slice(0, 8)}`;
@@ -25,13 +57,7 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
     }
   });
 
-  await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "OpenMemory" })).toBeVisible();
-  await page.locator("#name").fill("UI E2E");
-  await page.locator("#email").fill(email);
-  await page.locator("#password").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click();
-
+  await page.goto(`${fixture.origin}/`);
   await expect(page).toHaveURL(/\/(\?view=recall)?$/);
   await expect(
     page.getByRole("heading", { name: "Memory Dashboard" }),
@@ -211,8 +237,13 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
     .click();
   await expect(oauthCard).not.toContainText(oauthClient.clientId);
 
-  await page.getByLabel("Confirm email").fill(account.user.email);
-  await page.getByLabel("Confirm tenant id").fill(account.workspace.tenantId);
+  assertFixtureAccount(account, fixture);
+  const beforeDelete = await page.request.get(`${fixture.origin}/v1/account`);
+  if (!beforeDelete.ok())
+    throw new Error("Cannot revalidate account before cleanup");
+  assertFixtureAccount(await beforeDelete.json(), fixture);
+  await page.getByLabel("Confirm email").fill(fixture.email);
+  await page.getByLabel("Confirm tenant id").fill(fixture.tenantId);
   const [accountDeletionResponse] = await Promise.all([
     page.waitForResponse(
       (response) =>
@@ -228,3 +259,52 @@ test("hosted UI signs up, stores memory, and recalls context", async ({
 
   expect(errors).toEqual([]);
 });
+
+// Provision these disposable identities outside the runner after approval.
+// Never infer deletion authority from the account returned by the server.
+function approvedFixture(prefix: string) {
+  const email = process.env[`${prefix}_EMAIL`];
+  const tenantId = process.env[`${prefix}_TENANT_ID`];
+  const cookie = process.env[`${prefix}_SESSION_COOKIE`];
+  const target = process.env.OPENMEMORY_LIVE_BASE_URL;
+  if (
+    !email ||
+    !tenantId ||
+    !cookie ||
+    !target ||
+    process.env[`${prefix}_DISPOSABLE_APPROVAL`] !== `${email}:${tenantId}`
+  ) {
+    throw new Error(
+      `Missing approved disposable fixture for ${prefix}; see docs/passwordless-live-qualification.md`,
+    );
+  }
+  const url = new URL(target);
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash ||
+    /[\r\n]/.test(cookie)
+  ) {
+    throw new Error(
+      "Live fixture requires an explicit HTTPS origin and valid session cookie",
+    );
+  }
+  return { email, tenantId, cookie, origin: url.origin };
+}
+
+function assertFixtureAccount(
+  account: { user: { email: string }; workspace: { tenantId: string } },
+  fixture: ReturnType<typeof approvedFixture>,
+) {
+  if (
+    account.user.email !== fixture.email ||
+    account.workspace.tenantId !== fixture.tenantId
+  ) {
+    throw new Error(
+      "Fixture identity mismatch; refusing mutations and cleanup",
+    );
+  }
+}

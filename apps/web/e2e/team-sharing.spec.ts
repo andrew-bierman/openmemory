@@ -16,9 +16,9 @@ test("accepted teammates see only explicitly shared versions and lose revoked ac
     const context = await browser.newContext();
     contexts.push(context);
     const email = `team-${name}-${crypto.randomUUID()}@example.com`;
-    const signup = await context.request.post(`${API}/api/auth/sign-up/email`, {
+    const signup = await context.request.post(`${API}/api/__test/session`, {
       headers,
-      data: { name, email, password: "Team-test-password-123" },
+      data: { name, email },
     });
     expect(signup.ok(), await signup.text()).toBe(true);
     const accountResponse = await context.request.get(`${API}/v1/account`, {
@@ -189,10 +189,10 @@ test("accepted teammates see only explicitly shared versions and lose revoked ac
     });
     try {
       const changed = await owner.context.request.post(
-        `${API}/api/auth/sign-in/email`,
+        `${API}/api/__test/session`,
         {
           headers,
-          data: { email: member.email, password: "Team-test-password-123" },
+          data: { email: member.email, name: "Member" },
         },
       );
       expect(changed.ok(), await changed.text()).toBe(true);
