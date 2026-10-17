@@ -235,7 +235,17 @@ export async function processSourceIngestionMessage(
   message: IngestionQueueMessage,
 ) {
   const graph = getGraphForTenant(env, message.tenantId);
-  await graph.startIngestionJob(message.sourceId);
+  const job = await graph.startIngestionJob(message.sourceId);
+  // Purging a tenant also removes its ingestion jobs. A delayed delivery must
+  // not recreate that tenant's data from the content retained in the message.
+  if (!job) {
+    return {
+      sourceId: message.sourceId,
+      chunkCount: 0,
+      memories: [],
+      edges: [],
+    } satisfies SourceIngestionResult;
+  }
 
   try {
     const result =
