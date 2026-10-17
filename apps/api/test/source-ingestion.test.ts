@@ -79,7 +79,7 @@ describe("source ingestion lifecycle", () => {
       edges: [],
     });
     expect(get).toHaveBeenCalledWith("tenant-a");
-    expect(startIngestionJob).toHaveBeenCalledWith("source-shared");
+    expect(startIngestionJob).toHaveBeenCalledWith("source-shared", undefined);
     expect(otherGraph.startIngestionJob).not.toHaveBeenCalled();
     for (const mutation of [
       createMemory,

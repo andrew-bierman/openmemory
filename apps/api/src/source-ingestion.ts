@@ -13,13 +13,14 @@ import {
 } from "./extraction-worker";
 import type { MemoryGraph } from "./memory-graph";
 import { enrichMemoryInput } from "./memory-signals";
-import { indexMemory } from "./semantic-index";
+import { deleteTenantVectors, indexMemory } from "./semantic-index";
 
 export const SOURCE_INGESTION_QUEUE_NAME = "openmemory-source-ingestion";
 
 export type SourceIngestionMessage = {
   kind?: "source";
   version: 1;
+  generation?: number;
   sourceId: string;
   tenantId: string;
   input: IngestSourceInput;
@@ -29,6 +30,7 @@ export type SourceIngestionMessage = {
 export type ConversationIngestionMessage = {
   kind: "conversation";
   version: 1;
+  generation?: number;
   sourceId: string;
   tenantId: string;
   input: IngestConversationInput;
@@ -51,9 +53,12 @@ export async function ingestSourceDocument(options: {
   graph: MemoryGraph;
   input: IngestSourceInput;
   extractionReason?: MemoryExtractionMessage["reason"];
+  generation?: number;
   sourceId: string;
   tenantId: string;
 }): Promise<SourceIngestionResult> {
+  const generation =
+    options.generation ?? (await options.graph.getIngestionGeneration());
   const input = IngestSourceSchema.parse(options.input);
   const chunks = chunkSourceContent(input.content, {
     chunkSize: input.chunkSize,
@@ -88,41 +93,57 @@ export async function ingestSourceDocument(options: {
           type: "insight",
         }),
       ),
+      generation,
     );
-    await indexMemory(options.env, options.tenantId, memory);
+    await indexMemoryWithGeneration(
+      options.env,
+      options.tenantId,
+      options.graph,
+      memory,
+      generation,
+    );
     await enqueueMemoryExtraction(options.env, {
+      generation,
       memoryId: memory.id,
       reason: options.extractionReason ?? "source",
       tenantId: options.tenantId,
     });
     memories.push(memory);
-    edges.push(...(await options.graph.linkRelatedMemories(memory.id)));
+    edges.push(
+      ...(await options.graph.linkRelatedMemories(memory.id, generation)),
+    );
 
     const previous = memories.at(-2);
     if (previous) {
       edges.push(
-        await options.graph.addEdge({
-          sourceId: previous.id,
-          targetId: memory.id,
-          relationship: "next_chunk",
-          weight: 0.9,
-          metadata: {
-            sourceId: options.sourceId,
-            createdBy: "ingestSource",
+        await options.graph.addEdge(
+          {
+            sourceId: previous.id,
+            targetId: memory.id,
+            relationship: "next_chunk",
+            weight: 0.9,
+            metadata: {
+              sourceId: options.sourceId,
+              createdBy: "ingestSource",
+            },
           },
-        }),
+          generation,
+        ),
       );
       edges.push(
-        await options.graph.addEdge({
-          sourceId: memory.id,
-          targetId: previous.id,
-          relationship: "previous_chunk",
-          weight: 0.9,
-          metadata: {
-            sourceId: options.sourceId,
-            createdBy: "ingestSource",
+        await options.graph.addEdge(
+          {
+            sourceId: memory.id,
+            targetId: previous.id,
+            relationship: "previous_chunk",
+            weight: 0.9,
+            metadata: {
+              sourceId: options.sourceId,
+              createdBy: "ingestSource",
+            },
           },
-        }),
+          generation,
+        ),
       );
     }
   }
@@ -140,9 +161,12 @@ export async function ingestConversationTranscript(options: {
   graph: MemoryGraph;
   input: IngestConversationInput;
   extractionReason?: MemoryExtractionMessage["reason"];
+  generation?: number;
   sourceId: string;
   tenantId: string;
 }): Promise<SourceIngestionResult> {
+  const generation =
+    options.generation ?? (await options.graph.getIngestionGeneration());
   const input = IngestConversationSchema.parse(options.input);
   const chunks = chunkConversationMessages(input.messages, {
     chunkSize: input.chunkSize,
@@ -181,43 +205,59 @@ export async function ingestConversationTranscript(options: {
           importance: 0.64,
         }),
       ),
+      generation,
     );
-    await indexMemory(options.env, options.tenantId, memory);
+    await indexMemoryWithGeneration(
+      options.env,
+      options.tenantId,
+      options.graph,
+      memory,
+      generation,
+    );
     await enqueueMemoryExtraction(options.env, {
+      generation,
       memoryId: memory.id,
       reason: options.extractionReason ?? "source",
       tenantId: options.tenantId,
     });
     memories.push(memory);
-    edges.push(...(await options.graph.linkRelatedMemories(memory.id)));
+    edges.push(
+      ...(await options.graph.linkRelatedMemories(memory.id, generation)),
+    );
 
     const previous = memories.at(-2);
     if (previous) {
       edges.push(
-        await options.graph.addEdge({
-          sourceId: previous.id,
-          targetId: memory.id,
-          relationship: "next_chunk",
-          weight: 0.92,
-          metadata: {
-            sourceId: options.sourceId,
-            conversationId: input.conversationId,
-            createdBy: "ingestConversation",
+        await options.graph.addEdge(
+          {
+            sourceId: previous.id,
+            targetId: memory.id,
+            relationship: "next_chunk",
+            weight: 0.92,
+            metadata: {
+              sourceId: options.sourceId,
+              conversationId: input.conversationId,
+              createdBy: "ingestConversation",
+            },
           },
-        }),
+          generation,
+        ),
       );
       edges.push(
-        await options.graph.addEdge({
-          sourceId: memory.id,
-          targetId: previous.id,
-          relationship: "previous_chunk",
-          weight: 0.92,
-          metadata: {
-            sourceId: options.sourceId,
-            conversationId: input.conversationId,
-            createdBy: "ingestConversation",
+        await options.graph.addEdge(
+          {
+            sourceId: memory.id,
+            targetId: previous.id,
+            relationship: "previous_chunk",
+            weight: 0.92,
+            metadata: {
+              sourceId: options.sourceId,
+              conversationId: input.conversationId,
+              createdBy: "ingestConversation",
+            },
           },
-        }),
+          generation,
+        ),
       );
     }
   }
@@ -230,12 +270,38 @@ export async function ingestConversationTranscript(options: {
   };
 }
 
+// Vectorize cannot participate in the graph SQL transaction. Check on both sides
+// of the provider call and compensate a late upsert with a tenant-scoped delete.
+// Provider failure/eventual consistency can delay physical deletion; recall still
+// hydrates through the canonical graph, whose mutations are generation-fenced.
+export async function indexMemoryWithGeneration(
+  env: Env,
+  tenantId: string,
+  graph: Pick<MemoryGraph, "getIngestionGeneration">,
+  memory: { id: string },
+  generation: number,
+) {
+  if ((await graph.getIngestionGeneration()) !== generation) {
+    throw new Error("ingestion_cancelled_by_purge");
+  }
+  const result = await indexMemory(env, tenantId, memory, generation);
+  if ((await graph.getIngestionGeneration()) !== generation) {
+    if (result.error !== "stale_memory_generation")
+      await deleteTenantVectors(env, tenantId, [memory.id], generation);
+    throw new Error("ingestion_cancelled_by_purge");
+  }
+  return result;
+}
+
 export async function processSourceIngestionMessage(
   env: Env,
   message: IngestionQueueMessage,
 ) {
   const graph = getGraphForTenant(env, message.tenantId);
-  const job = await graph.startIngestionJob(message.sourceId);
+  const job = await graph.startIngestionJob(
+    message.sourceId,
+    message.generation,
+  );
   // Purging a tenant also removes its ingestion jobs. A delayed delivery must
   // not recreate that tenant's data from the content retained in the message.
   if (!job) {
@@ -256,6 +322,7 @@ export async function processSourceIngestionMessage(
             input: message.input,
             sourceId: message.sourceId,
             tenantId: message.tenantId,
+            generation: job.generation,
           })
         : await ingestSourceDocument({
             env,
@@ -263,13 +330,26 @@ export async function processSourceIngestionMessage(
             input: message.input,
             sourceId: message.sourceId,
             tenantId: message.tenantId,
+            generation: job.generation,
           });
-    await graph.completeIngestionJob(message.sourceId, result);
+    await graph.completeIngestionJob(message.sourceId, result, job.generation);
     return result;
   } catch (error) {
-    await graph.failIngestionJob(message.sourceId, {
-      message: error instanceof Error ? error.message : "unknown error",
-    });
+    if ((await graph.getIngestionGeneration()) !== job.generation) {
+      return {
+        sourceId: message.sourceId,
+        chunkCount: 0,
+        memories: [],
+        edges: [],
+      } satisfies SourceIngestionResult;
+    }
+    await graph.failIngestionJob(
+      message.sourceId,
+      {
+        message: error instanceof Error ? error.message : "unknown error",
+      },
+      job.generation,
+    );
     throw error;
   }
 }

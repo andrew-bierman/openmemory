@@ -27,7 +27,12 @@ export type SemanticIndexDiagnostic = {
   status: "current" | "needs_repair" | "unchecked" | "unconfigured";
 };
 
-export async function indexMemory(env: Env, tenantId: string, memory: unknown) {
+export async function indexMemory(
+  env: Env,
+  tenantId: string,
+  memory: unknown,
+  expectedGeneration?: number,
+) {
   if (!isMemoryForIndex(memory)) {
     return {
       attempted: false,
@@ -35,8 +40,8 @@ export async function indexMemory(env: Env, tenantId: string, memory: unknown) {
       error: "invalid_memory_shape",
     } satisfies SemanticIndexResult;
   }
-
-  const vectorId = semanticVectorId(tenantId, memory.id);
+  let generation = expectedGeneration ?? 0;
+  let vectorId = semanticVectorId(tenantId, memory.id, generation);
   try {
     if (!env.AI || !env.MEMORY_VECTORS) {
       return {
@@ -46,8 +51,23 @@ export async function indexMemory(env: Env, tenantId: string, memory: unknown) {
         error: "semantic_bindings_unavailable",
       } satisfies SemanticIndexResult;
     }
-
-    const embedding = await embed(env, memory.content);
+    const graph = env.MEMORY_GRAPHS.get(env.MEMORY_GRAPHS.idFromName(tenantId));
+    generation = expectedGeneration ?? (await graph.getIngestionGeneration());
+    vectorId = semanticVectorId(tenantId, memory.id, generation);
+    const canonical = await graph.getMemory(memory.id);
+    if (
+      canonical?.status !== "active" ||
+      !canonical.isLatest ||
+      (await graph.getIngestionGeneration()) !== generation
+    ) {
+      return {
+        attempted: false,
+        indexed: false,
+        vectorId,
+        error: "stale_memory_generation",
+      } satisfies SemanticIndexResult;
+    }
+    const embedding = await embed(env, canonical.content);
     if (!embedding) {
       return {
         attempted: true,
@@ -56,20 +76,30 @@ export async function indexMemory(env: Env, tenantId: string, memory: unknown) {
         error: "embedding_unavailable",
       } satisfies SemanticIndexResult;
     }
-
     await env.MEMORY_VECTORS.upsert([
       {
         id: vectorId,
         values: embedding,
         metadata: {
-          tenantId,
-          memoryId: memory.id,
-          source: memory.source,
-          status: memory.status,
-          isLatest: memory.isLatest,
+          // tenantId is the indexed partition key. Generation zero preserves legacy vectors.
+          tenantId: semanticTenantPartition(tenantId, generation),
+          generation,
+          memoryId: canonical.id,
+          source: canonical.source,
+          status: canonical.status,
+          isLatest: canonical.isLatest,
         },
       },
     ]);
+    if ((await graph.getIngestionGeneration()) !== generation) {
+      await deleteTenantVectors(env, tenantId, [canonical.id], generation);
+      return {
+        attempted: true,
+        indexed: false,
+        vectorId,
+        error: "stale_memory_generation",
+      } satisfies SemanticIndexResult;
+    }
     return {
       attempted: true,
       indexed: true,
@@ -90,12 +120,16 @@ export async function semanticSearch(
   tenantId: string,
   q: string,
   limit: number,
+  expectedGeneration?: number,
 ) {
   try {
     if (!env.AI || !env.MEMORY_VECTORS) {
       return [];
     }
 
+    const graph = env.MEMORY_GRAPHS.get(env.MEMORY_GRAPHS.idFromName(tenantId));
+    const generation =
+      expectedGeneration ?? (await graph.getIngestionGeneration());
     const embedding = await embed(env, q);
     if (!embedding) {
       return [];
@@ -103,10 +137,15 @@ export async function semanticSearch(
 
     const matches = await env.MEMORY_VECTORS.query(embedding, {
       topK: Math.min(limit * 3, 50),
-      filter: { tenantId, status: "active", isLatest: true },
+      filter: {
+        tenantId: semanticTenantPartition(tenantId, generation),
+        status: "active",
+        isLatest: true,
+      },
       returnMetadata: true,
     });
 
+    if ((await graph.getIngestionGeneration()) !== generation) return [];
     return matches.matches
       .map((match) => match.metadata?.memoryId)
       .filter((id): id is string => typeof id === "string");
@@ -119,6 +158,7 @@ export async function deleteTenantVectors(
   env: Env,
   tenantId: string,
   memoryIds: string[],
+  generation = 0,
 ) {
   if (!env.MEMORY_VECTORS || memoryIds.length === 0) {
     return {
@@ -132,7 +172,7 @@ export async function deleteTenantVectors(
   for (let index = 0; index < memoryIds.length; index += 100) {
     const ids = memoryIds
       .slice(index, index + 100)
-      .map((memoryId) => semanticVectorId(tenantId, memoryId));
+      .map((memoryId) => semanticVectorId(tenantId, memoryId, generation));
     try {
       const result = await env.MEMORY_VECTORS.deleteByIds(ids);
       deleted += deleteCount(result, ids.length);
@@ -186,20 +226,25 @@ export async function getSemanticIndexDiagnostic(
   const staleSample = inventory.purgeableMemoryIds.slice(0, 25);
 
   try {
+    const graph = env.MEMORY_GRAPHS.get(env.MEMORY_GRAPHS.idFromName(tenantId));
+    const generation = await graph.getIngestionGeneration();
     const [existingExpectedVectors, existingStaleVectors] = await Promise.all([
-      getVectorsByMemoryIds(env, tenantId, expectedSample),
-      getVectorsByMemoryIds(env, tenantId, staleSample),
+      getVectorsByMemoryIds(env, tenantId, expectedSample, generation),
+      getVectorsByMemoryIds(env, tenantId, staleSample, generation),
     ]);
     const expectedVectorIds = new Set(
       existingExpectedVectors.map((vector) => vector.id),
     );
     const staleVectorIds = existingStaleVectors.map(
       (vector) =>
-        semanticMemoryIdFromVectorId(tenantId, vector.id) ?? vector.id,
+        semanticMemoryIdFromVectorId(tenantId, vector.id, generation) ??
+        vector.id,
     );
     const missingVectorSample = expectedSample.filter(
       (memoryId) =>
-        !expectedVectorIds.has(semanticVectorId(tenantId, memoryId)),
+        !expectedVectorIds.has(
+          semanticVectorId(tenantId, memoryId, generation),
+        ),
     );
     const repairRecommended =
       missingVectorSample.length > 0 || staleVectorIds.length > 0;
@@ -228,6 +273,7 @@ async function getVectorsByMemoryIds(
   env: Env,
   tenantId: string,
   memoryIds: string[],
+  generation = 0,
 ) {
   if (!env.MEMORY_VECTORS || memoryIds.length === 0) {
     return [];
@@ -237,19 +283,32 @@ async function getVectorsByMemoryIds(
   for (let index = 0; index < memoryIds.length; index += 100) {
     const ids = memoryIds
       .slice(index, index + 100)
-      .map((memoryId) => semanticVectorId(tenantId, memoryId));
+      .map((memoryId) => semanticVectorId(tenantId, memoryId, generation));
     vectors.push(...(await env.MEMORY_VECTORS.getByIds(ids)));
   }
 
   return vectors;
 }
 
-export function semanticVectorId(tenantId: string, memoryId: string) {
-  return `t_${hashTenantId(tenantId)}:${memoryId}`;
+// Reuse the existing tenantId metadata index; no new remote metadata index is required.
+export function semanticTenantPartition(tenantId: string, generation = 0) {
+  return generation === 0 ? tenantId : JSON.stringify([tenantId, generation]);
 }
 
-function semanticMemoryIdFromVectorId(tenantId: string, vectorId: string) {
-  const prefix = `t_${hashTenantId(tenantId)}:`;
+export function semanticVectorId(
+  tenantId: string,
+  memoryId: string,
+  generation = 0,
+) {
+  return `t_${hashTenantId(semanticTenantPartition(tenantId, generation))}:${memoryId}`;
+}
+
+function semanticMemoryIdFromVectorId(
+  tenantId: string,
+  vectorId: string,
+  generation = 0,
+) {
+  const prefix = `t_${hashTenantId(semanticTenantPartition(tenantId, generation))}:`;
   return vectorId.startsWith(prefix)
     ? vectorId.slice(prefix.length)
     : undefined;
