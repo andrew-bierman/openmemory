@@ -10,6 +10,7 @@ import {
 import type { Env } from "./env";
 
 const DEFAULT_MCP_SCOPES = ["openid", "profile", "memory:read", "memory:write"];
+const ALLOWED_MCP_SCOPES = [...DEFAULT_MCP_SCOPES, "memory:shared:read"];
 const MAX_REDIRECT_URIS = 10;
 const MAX_CLIENT_NAME_LENGTH = 120;
 const CLIENT_ID_PREFIX = "om_mcp";
@@ -303,10 +304,10 @@ function parseOAuthClientInput(input: CreateOAuthClientInput) {
   const scopes = Array.from(
     new Set(requestedScopes.map((scope) => scope.trim()).filter(Boolean)),
   );
-  if (!scopes.every((scope) => DEFAULT_MCP_SCOPES.includes(scope))) {
+  if (!scopes.every((scope) => ALLOWED_MCP_SCOPES.includes(scope))) {
     return {
       error: "invalid_scope" as const,
-      message: `Scopes must be limited to: ${DEFAULT_MCP_SCOPES.join(" ")}.`,
+      message: `Scopes must be limited to: ${ALLOWED_MCP_SCOPES.join(" ")}.`,
     };
   }
 

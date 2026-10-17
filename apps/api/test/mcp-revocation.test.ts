@@ -3,10 +3,37 @@ import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { beforeAll, describe, expect, test, vi } from "vitest";
 import type { Env } from "../src/env";
 import { createOpenMemoryMcpHandler } from "../src/mcp";
+import { listSharedMemories, readSharedMemory } from "../src/workspace-sharing";
+
+vi.mock("../src/workspace-sharing", () => ({
+  listSharedMemories: vi.fn(async () => ({ items: [], nextCursor: null })),
+  readSharedMemory: vi.fn(async () => ({ shareId: "share-A" })),
+}));
 
 // Exercise authentication with real signatures; transport and D1 are local doubles.
 vi.mock("agents/mcp", () => ({
-  createMcpHandler: () => async () => new Response("accepted"),
+  createMcpHandler:
+    (server: {
+      _registeredTools: Record<
+        string,
+        { handler: (args: Record<string, unknown>) => Promise<unknown> }
+      >;
+    }) =>
+    async (request: Request) => {
+      const body = (await request.json()) as {
+        method: string;
+        params?: { name: string; arguments: Record<string, unknown> };
+      };
+      if (body.method === "tools/call" && body.params) {
+        const tool = server._registeredTools[body.params.name];
+        return Response.json(
+          tool
+            ? await tool.handler(body.params.arguments)
+            : { error: "missing_tool" },
+        );
+      }
+      return new Response("accepted");
+    },
 }));
 
 const origin = "https://openmemory.test";
@@ -91,16 +118,36 @@ function fixture() {
     },
     MEMORY_GRAPHS: { idFromName: (name: string) => name, get: getGraph },
   } as unknown as Env;
-  const request = async (bearer: string) =>
+  const request = async (
+    bearer: string | undefined,
+    name?: string,
+    url = origin,
+  ) =>
     createOpenMemoryMcpHandler()(
-      new Request(`${origin}/mcp`, {
+      new Request(`${url}/mcp`, {
         method: "POST",
         headers: {
-          authorization: `Bearer ${bearer}`,
+          ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
           "content-type": "application/json",
           "x-openmemory-user-id": "victim",
         },
-        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: name ? "tools/call" : "tools/list",
+          ...(name
+            ? {
+                params: {
+                  name,
+                  arguments: {
+                    workspaceId: "workspace-A",
+                    shareId: "share-A",
+                    q: "term",
+                  },
+                },
+              }
+            : {}),
+        }),
       }),
       env,
       {} as ExecutionContext,
@@ -199,5 +246,87 @@ describe("MCP live grant enforcement", () => {
       401,
     );
     expect(f.getGraph).not.toHaveBeenCalled();
+  });
+});
+
+test("shared tools reject personal-only OAuth on hosted and localhost requests", async () => {
+  for (const url of [origin, "http://localhost:8787"]) {
+    const f = fixture();
+    const response = await f.request(await token(), "shared_list", url);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({
+      required_scope: "memory:shared:read",
+    });
+    expect(f.getGraph).not.toHaveBeenCalled();
+  }
+});
+
+test("shared callbacks use verified raw subject and fail closed without OAuth", async () => {
+  for (const name of ["shared_list", "shared_read", "shared_search"]) {
+    vi.mocked(listSharedMemories).mockClear();
+    vi.mocked(readSharedMemory).mockClear();
+    const f = fixture();
+    f.state.scopes = JSON.stringify(["memory:read", "memory:shared:read"]);
+    const denied = await f.request(undefined, name, "http://localhost:8787");
+    expect(await denied.json()).toMatchObject({ isError: true });
+    expect(listSharedMemories).not.toHaveBeenCalled();
+    expect(readSharedMemory).not.toHaveBeenCalled();
+    const allowed = await f.request(
+      await token({ scope: "memory:read memory:shared:read" }),
+      name,
+      "http://localhost:8787",
+    );
+    expect(allowed.headers.get("cache-control")).toBe("private, no-store");
+    expect(await allowed.json()).toMatchObject({ content: [{ type: "text" }] });
+    const service =
+      name === "shared_read" ? readSharedMemory : listSharedMemories;
+    expect(vi.mocked(service).mock.calls[0]?.slice(0, 3)).toEqual([
+      f.env,
+      subject,
+      "workspace-A",
+    ]);
+  }
+});
+test("shared service failures do not expose internal errors", async () => {
+  const f = fixture();
+  f.state.scopes = JSON.stringify(["memory:read", "memory:shared:read"]);
+  vi.mocked(readSharedMemory).mockRejectedValueOnce(
+    new Error("secret database content"),
+  );
+  const response = await f.request(
+    await token({ scope: "memory:read memory:shared:read" }),
+    "shared_read",
+  );
+  expect(await response.json()).toEqual({
+    isError: true,
+    content: [{ type: "text", text: "Shared memory unavailable." }],
+  });
+});
+
+test("local API key preserves personal access but grants no shared access", async () => {
+  const f = fixture();
+  f.env.OPENMEMORY_API_TOKEN = "local-test-key";
+  expect(
+    (await f.request("local-test-key", undefined, "http://localhost:8787"))
+      .status,
+  ).toBe(200);
+  const response = await f.request(
+    "local-test-key",
+    "shared_read",
+    "http://localhost:8787",
+  );
+  expect(await response.json()).toMatchObject({ isError: true });
+});
+
+test("shared-read scope alone does not replace base read scope", async () => {
+  const f = fixture();
+  f.state.scopes = JSON.stringify(["memory:shared:read"]);
+  const response = await f.request(
+    await token({ scope: "memory:shared:read" }),
+    "shared_read",
+  );
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({
+    required_scope: "memory:read",
   });
 });
