@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   sqliteTable,
   text,
@@ -119,15 +120,21 @@ export const oauthRefreshToken = sqliteTable("oauth_refresh_token", {
   scopes: text("scopes").notNull(),
 });
 
-export const oauthConsent = sqliteTable("oauth_consent", {
-  id: text("id").primaryKey(),
-  clientId: text("client_id").notNull(),
-  userId: text("user_id").notNull(),
-  referenceId: text("reference_id"),
-  scopes: text("scopes").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
-});
+export const oauthConsent = sqliteTable(
+  "oauth_consent",
+  {
+    id: text("id").primaryKey(),
+    clientId: text("client_id").notNull(),
+    userId: text("user_id").notNull(),
+    referenceId: text("reference_id"),
+    scopes: text("scopes").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  },
+  (table) => [
+    index("oauth_consent_user_client_idx").on(table.userId, table.clientId),
+  ],
+);
 
 export const workspace = sqliteTable("workspace", {
   id: text("id").primaryKey(),

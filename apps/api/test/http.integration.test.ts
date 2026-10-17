@@ -1349,9 +1349,24 @@ test("worker emits operational headers and rate limits repeated requests", async
 }, 45_000);
 
 test("worker API uses Better Auth session cookies as deployed tenant identity", async () => {
-  const worker = await startWorker({
+  const authOrigin = "http://openmemory.test";
+  const localWorker = await startWorker({
+    BETTER_AUTH_URL: authOrigin,
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
   });
+  const worker = {
+    ...localWorker,
+    baseUrl: authOrigin,
+    fetch(path: string, init?: RequestInit) {
+      const headers = new Headers(init?.headers);
+      headers.set("host", "openmemory.test");
+      headers.set("MF-Original-URL", `${authOrigin}${path}`);
+      headers.set("origin", authOrigin);
+      // Network destination stays loopback. Miniflare preserves this URL so
+      // the worker exercises deployed OAuth rather than its localhost bypass.
+      return localWorker.fetch(path, { ...init, headers });
+    },
+  };
   workers.push(worker);
 
   const email = `session-${crypto.randomUUID()}@example.com`;
@@ -1396,6 +1411,7 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     await worker.fetch(
       `/api/auth/oauth2/authorize?${new URLSearchParams({
         response_type: "code",
+        resource: `${authOrigin}/mcp`,
         client_id: oauthClient.client_id,
         redirect_uri: "http://127.0.0.1/callback",
         scope: "openid profile memory:read memory:write",
@@ -1436,6 +1452,44 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   const code = callback.searchParams.get("code");
   expect(code, callback.toString()).toBeTruthy();
 
+  const tokenResponse = await worker.fetch("/api/auth/oauth2/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      client_id: oauthClient.client_id,
+      code: code ?? "",
+      redirect_uri: "http://127.0.0.1/callback",
+      code_verifier: codeVerifier,
+      resource: `${authOrigin}/mcp`,
+    }),
+  });
+  expect(tokenResponse.status).toBe(200);
+  const issuedToken = (await tokenResponse.json()) as { access_token: string };
+  expect(typeof issuedToken.access_token).toBe("string");
+  const callWithIssuedToken = () =>
+    worker.fetch("/mcp", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${issuedToken.access_token}`,
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "x-openmemory-user-id": "must-not-override-oauth",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+  const headerOnlyMcp = await worker.fetch("/mcp", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "x-openmemory-user-id": "must-not-authorize-deployed-mcp",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+  });
+  expect(headerOnlyMcp.status).toBe(401);
+  expect((await callWithIssuedToken()).status).toBe(200);
+
   const connections = await getJson<OAuthConnectionResponse[]>(
     await worker.fetch("/v1/oauth/connections", {
       headers: { cookie },
@@ -1459,6 +1513,7 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     clientId: oauthClient.client_id,
     revoked: true,
   });
+  expect((await callWithIssuedToken()).status).toBe(401);
   const afterRevoke = await getJson<OAuthConnectionResponse[]>(
     await worker.fetch("/v1/oauth/connections", {
       headers: { cookie },
@@ -1597,6 +1652,44 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     }),
   );
   expect(memories.map((item) => item.id)).toContain(memory.id);
+
+  // Real session identities must win over caller-controlled development headers.
+  const foreignHeaders = {
+    cookie: secondCookie,
+    "x-openmemory-user-id": session.user.id,
+    "content-type": "application/json",
+  };
+  for (const method of ["GET", "PATCH", "DELETE"]) {
+    const response = await worker.fetch(`/v1/memories/${memory.id}`, {
+      method,
+      headers: foreignHeaders,
+      ...(method === "PATCH"
+        ? { body: JSON.stringify({ content: "Cross-user overwrite" }) }
+        : {}),
+    });
+    expect(response.status, `cross-user ${method}`).toBe(404);
+  }
+  const foreignSearch = await getJson<SearchResponse[]>(
+    await worker.fetch("/v1/search", {
+      method: "POST",
+      headers: foreignHeaders,
+      body: JSON.stringify({ q: "Cookie sessions identify OpenMemory tenant" }),
+    }),
+  );
+  expect(foreignSearch).toEqual([]);
+  const foreignExport = await getJson<GraphExportResponse>(
+    await worker.fetch("/v1/exports", {
+      method: "POST",
+      headers: foreignHeaders,
+    }),
+  );
+  expect(foreignExport.memoryCount).toBe(0);
+  expect(foreignExport.key).not.toContain(`${session.user.id}/exports/`);
+  const ownMemory = await getJson<MemoryResponse>(
+    await worker.fetch(`/v1/memories/${memory.id}`, { headers: { cookie } }),
+  );
+  expect(ownMemory.content).toBe(memory.content);
+  expect(ownMemory.status).toBe("active");
 
   const readiness = await getJson<ReadinessResponse>(
     await worker.fetch("/v1/readiness", {
@@ -2549,13 +2642,17 @@ async function startWorkerOnce(env: Record<string, string>) {
       env: {
         ...process.env,
         NO_COLOR: "1",
-        TMPDIR: existsSync("/Volumes/CrucialX10")
-          ? "/Volumes/CrucialX10/tmp/openmemory-bun-tmp"
-          : tmpdir(),
+        TMPDIR:
+          process.env.TMPDIR ??
+          (existsSync("/Volumes/CrucialX10")
+            ? "/Volumes/CrucialX10/tmp/openmemory-bun-tmp"
+            : tmpdir()),
         WRANGLER_SEND_METRICS: "false",
-        XDG_CONFIG_HOME: existsSync("/Volumes/CrucialX10")
-          ? "/Volumes/CrucialX10/tmp/openmemory-xdg"
-          : join(tmpdir(), "openmemory-xdg"),
+        XDG_CONFIG_HOME:
+          process.env.XDG_CONFIG_HOME ??
+          (existsSync("/Volumes/CrucialX10")
+            ? "/Volumes/CrucialX10/tmp/openmemory-xdg"
+            : join(tmpdir(), "openmemory-xdg")),
       },
     },
   );
