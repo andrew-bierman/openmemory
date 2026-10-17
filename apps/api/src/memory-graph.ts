@@ -50,6 +50,24 @@ type ExtractedSignalsInput = {
   tags: string[];
 };
 
+type MemoryShareInput = {
+  memoryId: string;
+  workspaceId: string;
+  ownerMembershipId: string;
+  requestId: string;
+  generation: number;
+};
+
+type MemoryShareRow = {
+  share_id: string;
+  memory_id: string;
+  workspace_id: string;
+  owner_membership_id: string;
+  generation: number;
+  request_id: string;
+  revoked_at: string | null;
+};
+
 type MemoryGraphEnv = Record<string, unknown>;
 type SqlState = {
   storage: {
@@ -159,6 +177,167 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     ) {
       throw new Error("ingestion_cancelled_by_purge");
     }
+  }
+
+  // These RPCs trust the service to resolve identity and current workspace
+  // membership. All owner-local checks and writes stay in one synchronous turn.
+  async createMemoryShare(input: MemoryShareInput) {
+    for (const value of [
+      input.memoryId,
+      input.workspaceId,
+      input.ownerMembershipId,
+      input.requestId,
+    ]) {
+      if (typeof value !== "string" || !value.trim() || value.length > 128)
+        throw new Error("invalid_share_intent");
+    }
+    if (!Number.isSafeInteger(input.generation) || input.generation < 0)
+      throw new Error("invalid_share_generation");
+    this.assertIngestionGeneration(input.generation);
+    const prior = this.sqlState.storage.sql
+      .exec<MemoryShareRow>(
+        "select * from memory_shares where request_id = ?",
+        input.requestId,
+      )
+      .toArray()[0];
+    if (prior) {
+      if (
+        prior.memory_id !== input.memoryId ||
+        prior.workspace_id !== input.workspaceId ||
+        prior.owner_membership_id !== input.ownerMembershipId ||
+        prior.generation !== input.generation
+      )
+        throw new Error("share_intent_conflict");
+      const projection = this.projectMemoryShare(prior);
+      if (!projection) throw new Error("share_intent_revoked");
+      return projection;
+    }
+    const memory = this.getMemoryById(input.memoryId);
+    if (memory?.status !== "active" || !memory.isLatest)
+      throw new Error("share_unavailable");
+    const shareId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    this.sqlState.storage.sql.exec(
+      `insert into memory_shares (share_id, memory_id, workspace_id, owner_membership_id, generation, request_id, created_at)
+       values (?, ?, ?, ?, ?, ?, ?)`,
+      shareId,
+      input.memoryId,
+      input.workspaceId,
+      input.ownerMembershipId,
+      input.generation,
+      input.requestId,
+      now,
+    );
+    this.auditMemoryShare(
+      shareId,
+      input.workspaceId,
+      input.memoryId,
+      "created",
+    );
+    const projection = this.projectMemoryShare({
+      share_id: shareId,
+      memory_id: input.memoryId,
+      workspace_id: input.workspaceId,
+      owner_membership_id: input.ownerMembershipId,
+      generation: input.generation,
+      request_id: input.requestId,
+      revoked_at: null,
+    });
+    if (!projection) throw new Error("share_unavailable");
+    return projection;
+  }
+
+  async readMemoryShare(shareId: string, workspaceId: string) {
+    const grant = this.sqlState.storage.sql
+      .exec<MemoryShareRow>(
+        "select * from memory_shares where share_id = ? and workspace_id = ?",
+        shareId,
+        workspaceId,
+      )
+      .toArray()[0];
+    return grant ? this.projectMemoryShare(grant) : undefined;
+  }
+
+  async revokeMemoryShare(shareId: string, workspaceId: string) {
+    const grant = this.sqlState.storage.sql
+      .exec<MemoryShareRow>(
+        "select * from memory_shares where share_id = ? and workspace_id = ?",
+        shareId,
+        workspaceId,
+      )
+      .toArray()[0];
+    if (grant && !grant.revoked_at) {
+      this.sqlState.storage.sql.exec(
+        "update memory_shares set revoked_at = ? where share_id = ?",
+        new Date().toISOString(),
+        shareId,
+      );
+      this.auditMemoryShare(shareId, workspaceId, grant.memory_id, "revoked");
+    }
+    return { revoked: true };
+  }
+
+  private projectMemoryShare(grant: MemoryShareRow) {
+    if (
+      grant.revoked_at ||
+      grant.generation !== this.currentIngestionGeneration()
+    )
+      return undefined;
+    const retired = this.sqlState.storage.sql
+      .exec<{ retired: number }>(
+        "select retired from tenant_lifecycle where id = 1",
+      )
+      .toArray()[0]?.retired;
+    if (retired) return undefined;
+    const memory = this.getMemoryById(grant.memory_id);
+    if (memory?.status !== "active" || !memory.isLatest) return undefined;
+    return {
+      shareId: grant.share_id,
+      workspaceId: grant.workspace_id,
+      memoryId: memory.id,
+      content: memory.content,
+      type: memory.type,
+      tags: memory.tags,
+      ownerMembershipId: grant.owner_membership_id,
+      generation: grant.generation,
+    };
+  }
+
+  private auditMemoryShare(
+    shareId: string,
+    workspaceId: string,
+    memoryId: string,
+    event: string,
+  ) {
+    this.sqlState.storage.sql.exec(
+      "insert into memory_share_audit (share_id, workspace_id, memory_id, event, created_at) values (?, ?, ?, ?, ?)",
+      shareId,
+      workspaceId,
+      memoryId,
+      event,
+      new Date().toISOString(),
+    );
+  }
+
+  private invalidateMemoryShares(memoryId: string) {
+    const grants = this.sqlState.storage.sql
+      .exec<MemoryShareRow>(
+        "select * from memory_shares where memory_id = ? and revoked_at is null",
+        memoryId,
+      )
+      .toArray();
+    this.sqlState.storage.sql.exec(
+      "update memory_shares set revoked_at = ? where memory_id = ? and revoked_at is null",
+      new Date().toISOString(),
+      memoryId,
+    );
+    for (const grant of grants)
+      this.auditMemoryShare(
+        grant.share_id,
+        grant.workspace_id,
+        memoryId,
+        "memory_invalidated",
+      );
   }
 
   async createIngestionJob(input: IngestionJobInput) {
@@ -391,6 +570,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     this.upsertEntities(next.id, next.entityIds);
 
     if (data.relationship === "updates") {
+      this.invalidateMemoryShares(current.id);
       this.sqlState.storage.sql.exec(
         `update memories set status = 'superseded', is_latest = 0, updated_at = ? where id = ?`,
         now,
@@ -416,6 +596,7 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
 
   async forgetMemory(id: string, input: unknown) {
     const data = ForgetMemorySchema.parse(input);
+    this.invalidateMemoryShares(id);
     const memory = this.getMemoryById(id);
     if (!memory) {
       return undefined;
@@ -804,6 +985,8 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
         .exec<{ count: number }>(`select count(*) as count from ingestion_jobs`)
         .toArray();
 
+    this.sqlState.storage.sql.exec(`delete from memory_shares`);
+    this.sqlState.storage.sql.exec(`delete from memory_share_audit`);
     this.sqlState.storage.sql.exec(`delete from edges`);
     this.sqlState.storage.sql.exec(`delete from memory_tags`);
     this.sqlState.storage.sql.exec(`delete from memory_entities`);
@@ -1291,6 +1474,26 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       );
       insert or ignore into ingestion_generation (id, generation) values (1, 0);
 
+      create table if not exists memory_shares (
+        share_id text primary key,
+        memory_id text not null,
+        workspace_id text not null,
+        owner_membership_id text not null,
+        generation integer not null,
+        request_id text not null unique,
+        created_at text not null,
+        revoked_at text
+      );
+      create index if not exists memory_shares_memory_idx on memory_shares(memory_id);
+      create table if not exists memory_share_audit (
+        id integer primary key autoincrement,
+        share_id text not null,
+        workspace_id text not null,
+        memory_id text not null,
+        event text not null,
+        created_at text not null
+      );
+
       create table if not exists ingestion_jobs (
         source_id text primary key,
         status text not null,
@@ -1319,6 +1522,8 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
     statement: "insert" | "insert or replace",
     memory: MemoryRecord,
   ) {
+    if (statement === "insert or replace")
+      this.invalidateMemoryShares(memory.id);
     this.sqlState.storage.sql.exec(
       `${statement} into memories (
         id, content, source, conversation_id, tags_json, metadata_json, type, status,
