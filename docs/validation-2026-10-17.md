@@ -107,10 +107,11 @@ During the separately approved deployment window, apply migrations 0004, 0005 an
 ```sql
 PRAGMA foreign_key_check;
 SELECT count(*) AS missing_or_invalid_owner_memberships
-FROM workspace w LEFT JOIN workspace_member m
-  ON m.workspace_id=w.id AND m.user_id=w.owner_user_id
-WHERE m.id IS NULL OR m.role<>'owner' OR m.status<>'active'
-  OR m.accepted_at IS NULL;
+FROM workspace w
+WHERE (SELECT count(*) FROM workspace_member m
+  WHERE m.workspace_id=w.id AND m.user_id=w.owner_user_id
+    AND m.role='owner' AND m.status='active'
+    AND m.accepted_at IS NOT NULL)<>1;
 SELECT count(*) AS implicitly_accepted_nonowners
 FROM workspace_member m JOIN workspace w ON w.id=m.workspace_id
 WHERE m.user_id<>w.owner_user_id AND m.accepted_at IS NOT NULL;
@@ -126,3 +127,12 @@ SELECT count(*) AS unbound_consents FROM oauth_consent WHERE grant_version='';
 The zero-share, zero-invitation and zero-accepted-nonowner assertions apply immediately after first migration, not after legitimate team activity. Verify index `workspace_member_user_idx` and `workspace_share_directory_page_idx` plus migration records before enabling compatible code. After deployment, use separately approved disposable accounts to verify invite acceptance/replay, private versus shared reads, removal/rejoin, revocation, workspace deletion and shared OAuth consent. Never substitute these local tests for those deployment checks.
 
 Final review also reproduced a dashboard account-switch exposure while the next user's memory request was paused; identity-scoped query keys and cancellation discard previous-user data. A separate focus regression preserves an invitation secret during successful same-membership reauthorization while clearing shared results before reload. MCP `shared_workspaces` provides accepted IDs/names/roles so clients can discover shared resources without administration authority. Local 26-share pagination returned 25 then 1 with no duplicates or missing records; its first page took 83.87 ms in one emulator run. Per-item fresh checks remain deliberately uncached; hosted fan-out latency needs deployment measurement.
+
+
+### Nondestructive legacy-owner migration correction
+
+Migration 0006 preserves all historical membership rows and accepts exactly one deterministic owner membership (the lowest existing owner membership ID per workspace). Other legacy owner duplicates remain unaccepted and cannot authorize sharing. Owner repair prioritizes the accepted instance and preserves its acceptance timestamp, so repeated account reads cannot reactivate a historical duplicate. The invariant SQL above deliberately ignores preserved inactive duplicates while requiring exactly one valid accepted owner.
+
+The focused SQLite regression first failed because the prior migration deleted a legacy row (`results/team-u1-preserve-red.log`). With the correction, all 10 workspace tests pass (`results/team-u1-preserve-green.log`), including row identity/history preservation and three account reads through the actual Drizzle-backed owner-repair path with stable authorization. These are local SQLite tests, not hosted D1 evidence.
+
+Hosted migration state remains unverified: the read-only Cloudflare identity check returned HTTP 400 / not logged in. This revision of 0006 may be used only after verifying that 0006 has not been applied to the target database. If an earlier version was applied, do not rerun or silently rewrite migration history; inspect the backup and prepare a separately reviewed forward migration and recovery plan. No hosted migration or data mutation was performed for this correction.

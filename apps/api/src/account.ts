@@ -1,5 +1,5 @@
 import { normalizeTenantId } from "@openmemory/core";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { resolveOpenMemorySession } from "./better-auth";
 import {
@@ -406,6 +406,11 @@ async function ensureOwnerMember(
         eq(workspaceMember.userId, user.userId),
       ),
     )
+    // Preserve the accepted membership instance; historical duplicates stay inactive.
+    .orderBy(
+      sql`${workspaceMember.acceptedAt} IS NULL`,
+      asc(workspaceMember.id),
+    )
     .limit(1);
 
   if (existing) {
@@ -414,7 +419,7 @@ async function ensureOwnerMember(
       .set({
         role: "owner",
         status: "active",
-        acceptedAt: now,
+        acceptedAt: existing.acceptedAt ?? now,
         userId: user.userId,
         updatedAt: now,
       })
