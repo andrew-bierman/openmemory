@@ -6,7 +6,8 @@ the current repo, CI, deployment, or runtime behavior proves them.
 
 ## Current Launch Posture
 
-**2026-10-17: not release-ready.** The passwordless candidate is identified by
+**2026-10-17: not release-ready.** The passwordless source candidate is
+`5afd7d6841eb242cfa73a478bec1ad433bd720da`, also recorded as
 `currentLocalCandidate` in `config/launch-evidence.json`. Its SSD qualification
 manifest is `../openmemory-validation-artifacts-20261017/results/passwordless-final-summary.json`.
 Better Auth and its MCP OAuth provider remain in place. Email OTP uses durable
