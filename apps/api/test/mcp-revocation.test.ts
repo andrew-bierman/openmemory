@@ -3,7 +3,21 @@ import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { beforeAll, describe, expect, test, vi } from "vitest";
 import type { Env } from "../src/env";
 import { createOpenMemoryMcpHandler } from "../src/mcp";
+import { listWorkspaces } from "../src/workspace-access";
 import { listSharedMemories, readSharedMemory } from "../src/workspace-sharing";
+
+vi.mock("../src/workspace-access", () => ({
+  listWorkspaces: vi.fn(async () => [
+    {
+      id: "workspace-A",
+      name: "Team A",
+      role: "member",
+      memberId: "internal-member",
+      ownerUserId: "private-owner",
+      invitationToken: "secret",
+    },
+  ]),
+}));
 
 vi.mock("../src/workspace-sharing", () => ({
   listSharedMemories: vi.fn(async () => ({ items: [], nextCursor: null })),
@@ -329,4 +343,34 @@ test("shared-read scope alone does not replace base read scope", async () => {
   expect(await response.json()).toMatchObject({
     required_scope: "memory:read",
   });
+});
+
+test("shared workspace discovery requires explicit scope and projects only public fields", async () => {
+  const f = fixture();
+  vi.mocked(listWorkspaces).mockClear();
+  for (const url of [origin, "http://localhost:8787"]) {
+    const denied = await f.request(await token(), "shared_workspaces", url);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toMatchObject({
+      required_scope: "memory:shared:read",
+    });
+  }
+  const local = await f.request(
+    undefined,
+    "shared_workspaces",
+    "http://localhost:8787",
+  );
+  expect(await local.json()).toMatchObject({ isError: true });
+  expect(listWorkspaces).not.toHaveBeenCalled();
+  f.state.scopes = JSON.stringify(["memory:read", "memory:shared:read"]);
+  const response = await f.request(
+    await token({ scope: "memory:read memory:shared:read" }),
+    "shared_workspaces",
+  );
+  expect(response.headers.get("cache-control")).toBe("private, no-store");
+  const result = (await response.json()) as { content: [{ text: string }] };
+  expect(JSON.parse(result.content[0].text)).toEqual([
+    { id: "workspace-A", name: "Team A", role: "member" },
+  ]);
+  expect(listWorkspaces).toHaveBeenCalledExactlyOnceWith(f.env, subject);
 });
