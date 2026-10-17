@@ -1,6 +1,7 @@
 const MCP_READ_SCOPE = "memory:read";
 const MCP_WRITE_SCOPE = "memory:write";
 const MCP_SHARED_TOOLS = new Set([
+  "shared_workspaces",
   "shared_list",
   "shared_read",
   "shared_search",
