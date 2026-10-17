@@ -2,6 +2,28 @@ import { describe, expect, test } from "vitest";
 import { createOpenMemoryClient } from ".";
 
 describe("OpenMemory client", () => {
+  test("legacy invitation client exposes the one-time acceptance capability", async () => {
+    const api = createOpenMemoryClient("https://api.openmemory.test", {
+      fetch: fakeFetch(async () =>
+        Response.json({
+          id: "invite",
+          email: "member@example.com",
+          role: "member",
+          status: "invited",
+          invitationId: "invite",
+          token: "test-capability",
+          expiresAt: "2026-10-24T00:00:00Z",
+        }),
+      ),
+    });
+    const invite = await api.inviteWorkspaceMember({
+      email: "member@example.com",
+    });
+    expect(invite.invitationId).toBe("invite");
+    expect(invite.token).toBe("test-capability");
+    expect(invite.expiresAt).toBe("2026-10-24T00:00:00Z");
+  });
+
   test("sends tenant, bearer, and credential options through Eden fetch", async () => {
     const requests: Array<{
       url: string;
