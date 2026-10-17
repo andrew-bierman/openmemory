@@ -610,7 +610,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         input,
         metadata: {
           strategy: "queue-workflow-source-ingestion-v1",
-          queue: SOURCE_INGESTION_QUEUE_NAME,
+          queue: env.SOURCE_INGESTION_QUEUE_NAME ?? SOURCE_INGESTION_QUEUE_NAME,
         },
       });
       await env.SOURCE_INGESTION_QUEUE.send(
@@ -687,7 +687,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           kind: "conversation",
           conversationId: input.conversationId,
           strategy: "queue-workflow-conversation-ingestion-v1",
-          queue: SOURCE_INGESTION_QUEUE_NAME,
+          queue: env.SOURCE_INGESTION_QUEUE_NAME ?? SOURCE_INGESTION_QUEUE_NAME,
         },
       });
       await env.SOURCE_INGESTION_QUEUE.send(
@@ -1185,13 +1185,21 @@ export default {
     ctx.waitUntil(runScheduledHealthMonitor(requestEnv));
   },
   queue(batch: MessageBatch<unknown>, requestEnv: Env) {
-    if (batch.queue === MEMORY_EXTRACTION_QUEUE_NAME) {
+    const extractionQueue =
+      requestEnv.MEMORY_EXTRACTION_QUEUE_NAME ?? MEMORY_EXTRACTION_QUEUE_NAME;
+    const sourceQueue =
+      requestEnv.SOURCE_INGESTION_QUEUE_NAME ?? SOURCE_INGESTION_QUEUE_NAME;
+    if (!extractionQueue || !sourceQueue || extractionQueue === sourceQueue) {
+      throw new Error("Queue names must be nonempty and distinct.");
+    }
+    if (batch.queue === extractionQueue) {
       return handleMemoryExtractionQueue(batch, requestEnv);
     }
-    if (batch.queue === SOURCE_INGESTION_QUEUE_NAME) {
+    if (batch.queue === sourceQueue) {
       return handleSourceIngestionQueue(batch, requestEnv);
     }
-    return handleSourceIngestionQueue(batch, requestEnv);
+    // Reject misconfigured delivery so the queue's retry/DLQ policy applies.
+    throw new Error("Unrecognized queue name.");
   },
 } satisfies ExportedHandler<Env>;
 
