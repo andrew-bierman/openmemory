@@ -32,15 +32,29 @@
   "screenshotDirectory": ".tmp/screenshots/launch-readiness",
   "historicalEvidenceNotice": "The existing repository, runtime, benchmark and cleanup fields are historical records for their named commits/runs, not qualification of the current local candidate.",
   "currentLocalCandidate": {
-    "commit": "8b4ebbeb7b2d4c768845694ebbe0b59b823491b5",
+    "commit": "1a8e03376b0e03ac28582cca0f0b91627a5234ad",
     "status": "locally-qualified",
     "hostedStatus": "not-run",
     "releaseReady": false,
-    "qualificationManifest": "../openmemory-validation-artifacts-20261017/results/qualified-8b4ebbe-summary.json",
+    "qualificationManifest": "../openmemory-validation-artifacts-20261017/results/qualified-1a8e033-summary.json",
     "pending": [
       "Real Cursor, Claude and ChatGPT OAuth/MCP evidence",
       "Production semantic RAG trace and rerank threshold review",
       "Approved migration/deployment and exact-candidate hosted qualification"
-    ]
+    ],
+    "checks": {
+      "testFiles": 24,
+      "testsPassed": 184,
+      "browserTestsPassed": 3,
+      "qualificationStepsPassed": 18
+    }
+  },
+  "maintenanceEvidence": {
+    "deployedVersion": "2609bb21-b95f-4437-a668-1a08105948a9",
+    "deployedExecutableSha256": "1e510aabb9d9c6f5d80d1e004794a1754651198e404cc7fb676196a050669289",
+    "deployedGitCommit": null,
+    "closedOldBuildHttpChecksPassed": 63,
+    "productionClosureTested": false,
+    "originalDeployedAssetsRoutingVerified": false
   }
 }

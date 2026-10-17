@@ -7,8 +7,8 @@ the current repo, CI, deployment, or runtime behavior proves them.
 ## Current Launch Posture
 
 **2026-10-17: not release-ready.** The locally qualified application candidate is
-`8b4ebbeb7b2d4c768845694ebbe0b59b823491b5`. Its external SSD manifest is
-`../openmemory-validation-artifacts-20261017/results/qualified-8b4ebbe-summary.json`: 175 tests in 22 files, three headless browser tests, build, six TypeScript checks, lint, SDK smoke, scale and security checks passed. It has not been deployed or tested against production. Subsequent maintenance integration has its own local evidence; it does not establish the unidentified old-source bridge.
+`1a8e03376b0e03ac28582cca0f0b91627a5234ad`. Its external SSD manifest is
+`../openmemory-validation-artifacts-20261017/results/qualified-1a8e033-summary.json`: 184 tests in 24 files, three headless browser tests, build, six TypeScript checks, lint, SDK smoke, scale and security checks passed. It has not been deployed or tested against production. The opt-in candidate maintenance integration is included. A separate closed bridge built from the recovered exact production executable passed 63 local HTTP checks and a dry-run bundle; this does not prove hosted closure.
 
 The historical CI/runtime/cleanup entries below remain evidence only for their
 named commits and runs. They must not be attributed to this candidate. Real
@@ -18,7 +18,7 @@ remain pending. Request-profile simulation is not vendor evidence.
 Read-only production inspection found migrations 0004–0006 unapplied, one
 missing-owner-membership workspace (not one total workspace), and two
 extraction DLQ messages. Primary queue backlog was zero at the snapshot; DLQ
-message age and exact deployed source/asset-routing parity remain unknown.
+message age, original deployed asset bytes/routing and the deployed Git commit remain unknown. The exact deployed executable is verified by matching pinned/current downloads and active-version ETag; its migration tag and compatibility settings match the local bridge.
 No production mutation was performed.
 
 OpenMemory is close to an alpha open-source release aimed at technical early
