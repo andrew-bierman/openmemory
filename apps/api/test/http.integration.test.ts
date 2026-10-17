@@ -2180,7 +2180,20 @@ test("team REST requires accepted membership and revokes selected-version access
         role: "member",
       }),
     );
+  const ownerMemory = await getJson<MemoryResponse>(
+    await owner.request("/v1/memories", "POST", {
+      content: "Future accepted teammates may read this",
+    }),
+  );
+  const ownerShare = await getJson<{ shareId: string }>(
+    await owner.request(`${team}/shares`, "POST", {
+      memoryId: ownerMemory.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const ownerSharedPath = `${team}/shares/${ownerShare.shareId}`;
   const first = await invite();
+  expect((await member.request(ownerSharedPath)).status).toBe(404);
   expect((await member.request(`${team}/shares`)).status).toBe(404);
   expect(
     (
@@ -2207,6 +2220,11 @@ test("team REST requires accepted membership and revokes selected-version access
       )
     ).status,
   ).toBeGreaterThanOrEqual(400);
+  // A grant made before acceptance includes future accepted recipients.
+  expect(
+    (await getJson<{ content: string }>(await member.request(ownerSharedPath)))
+      .content,
+  ).toBe("Future accepted teammates may read this");
   const selected = await getJson<MemoryResponse>(
     await member.request("/v1/memories", "POST", {
       content: "Shared architecture selected version",
@@ -2279,6 +2297,7 @@ test("team REST requires accepted membership and revokes selected-version access
     404,
   );
   expect((await member.request(`${team}/shares`)).status).toBe(404);
+  expect((await member.request(ownerSharedPath)).status).toBe(404);
   const second = await invite();
   const rejoined = await getJson<{ memberId: string }>(
     await member.request(
@@ -2288,6 +2307,8 @@ test("team REST requires accepted membership and revokes selected-version access
     ),
   );
   expect(rejoined.memberId).not.toBe(accepted.memberId);
+  // Fresh recipient acceptance restores access to another current member's live grant.
+  await expectOk(await member.request(ownerSharedPath));
   expect((await owner.request(`${team}/shares/${shared.shareId}`)).status).toBe(
     404,
   );

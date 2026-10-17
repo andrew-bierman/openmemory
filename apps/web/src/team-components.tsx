@@ -413,7 +413,9 @@ function TeamDetails({
           Owner: you ({userId}). This shares the selected version, content, type
           and tags with all current and future accepted members of {team.name}.
           New versions stay private. Revocation stops future access but cannot
-          retract copies already received.
+          retract copies already received. If a removed member rejoins, they can
+          read still-active team shares again. Their old authored shares stay
+          unavailable until they explicitly share again.
         </p>
         <Label htmlFor="share-memory">Your active memory version</Label>
         <Select
