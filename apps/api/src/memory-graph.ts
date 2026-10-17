@@ -212,11 +212,24 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
       if (!projection) throw new Error("share_intent_revoked");
       return projection;
     }
+    const consumed = this.sqlState.storage.sql
+      .exec<{ request_id: string }>(
+        "select request_id from consumed_share_intents where request_id = ?",
+        input.requestId,
+      )
+      .toArray()[0];
+    if (consumed) throw new Error("share_intent_revoked");
     const memory = this.getMemoryById(input.memoryId);
     if (memory?.status !== "active" || !memory.isLatest)
       throw new Error("share_unavailable");
     const shareId = crypto.randomUUID();
     const now = new Date().toISOString();
+    // Keep only the consumed intent identifier across purge. A retry may carry
+    // a freshly captured generation; it is still not a new sharing decision.
+    this.sqlState.storage.sql.exec(
+      "insert into consumed_share_intents (request_id) values (?)",
+      input.requestId,
+    );
     this.sqlState.storage.sql.exec(
       `insert into memory_shares (share_id, memory_id, workspace_id, owner_membership_id, generation, request_id, created_at)
        values (?, ?, ?, ?, ?, ?, ?)`,
@@ -1485,6 +1498,11 @@ export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
         revoked_at text
       );
       create index if not exists memory_shares_memory_idx on memory_shares(memory_id);
+      create table if not exists consumed_share_intents (
+        request_id text primary key
+      );
+      insert or ignore into consumed_share_intents (request_id)
+        select request_id from memory_shares;
       create table if not exists memory_share_audit (
         id integer primary key autoincrement,
         share_id text not null,
