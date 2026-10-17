@@ -20,6 +20,7 @@ import type { Env } from "./env";
 import { getRequiredMcpScopesForRequest } from "./mcp-scopes";
 import type { MemoryGraph } from "./memory-graph";
 import { buildRecallContext } from "./recall";
+import { listWorkspaces } from "./workspace-access";
 import { listSharedMemories, readSharedMemory } from "./workspace-sharing";
 
 export function createOpenMemoryMcpHandler() {
@@ -137,6 +138,19 @@ async function handleMcpRequest(
       return { ...textTool("Shared memory unavailable."), isError: true };
     }
   }
+  server.tool(
+    "shared_workspaces",
+    "Discover accepted workspaces for shared-memory tools. Returns workspace IDs, names, and your roles.",
+    {},
+    async () =>
+      sharedResult(async (actorId) =>
+        (await listWorkspaces(env, actorId)).map(({ id, name, role }) => ({
+          id,
+          name,
+          role,
+        })),
+      ),
+  );
   server.tool(
     "shared_list",
     "List explicitly shared read-only memories in an accepted workspace. Personal memories are excluded.",

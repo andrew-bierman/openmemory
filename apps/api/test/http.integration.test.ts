@@ -1992,6 +1992,22 @@ test("shared MCP requires explicit PKCE scope and current team grants", async ()
     ).status,
   ).toBe(403);
   const shared = await token(scopes);
+  const discovery = await getJson<{
+    result: { content: Array<{ text: string }> };
+  }>(await call(shared, "shared_workspaces", {}));
+  const discovered = JSON.parse(
+    discovery.result.content[0]?.text ?? "[]",
+  ) as Array<{ id: string; name: string; role: string }>;
+  expect(discovered).toContainEqual({
+    id: workspaceId,
+    name: owner.account.workspace.name,
+    role: "member",
+  });
+  expect(
+    discovered.every(
+      (entry) => Object.keys(entry).sort().join(",") === "id,name,role",
+    ),
+  ).toBe(true);
   for (const [name, args] of [
     ["shared_list", { workspaceId }],
     ["shared_read", { workspaceId, shareId: share.shareId }],
@@ -2040,6 +2056,76 @@ test("shared MCP requires explicit PKCE scope and current team grants", async ()
   );
   expect((await call(shared, "shared_list", { workspaceId })).status).toBe(401);
 }, 45_000);
+
+test("shared pages bound results and continue without dropping authorized records", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+  const signup = await worker.fetch("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Pagination",
+      email: `pagination-${crypto.randomUUID()}@example.com`,
+      password: "password1234",
+    }),
+  });
+  await expectOk(signup);
+  const cookie = getCookieHeader(signup);
+  const request = (path: string, body?: unknown) =>
+    worker.fetch(path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { cookie, "content-type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  const account = await getJson<AccountResponse>(await request("/v1/account"));
+  const path = `/v1/workspaces/${account.workspace.id}/shares`;
+  const expected = new Set<string>();
+  for (let index = 0; index < 26; index++) {
+    const memory = await getJson<MemoryResponse>(
+      await request("/v1/memories", {
+        content: `Shared pagination record ${index}`,
+      }),
+    );
+    const share = await getJson<{ shareId: string }>(
+      await request(path, {
+        memoryId: memory.id,
+        requestId: crypto.randomUUID(),
+      }),
+    );
+    expected.add(share.shareId);
+  }
+  const started = performance.now();
+  const first = await getJson<{
+    items: Array<{ shareId: string }>;
+    nextCursor?: string;
+  }>(await request(path));
+  const elapsed = performance.now() - started;
+  expect(first.items).toHaveLength(25);
+  expect(first.nextCursor).toBeTruthy();
+  const next = await getJson<{
+    items: Array<{ shareId: string }>;
+    nextCursor?: string;
+  }>(
+    await request(
+      `${path}?cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
+    ),
+  );
+  expect(next.items).toHaveLength(1);
+  expect(next.nextCursor).toBeUndefined();
+  expect(
+    new Set([...first.items, ...next.items].map((item) => item.shareId)),
+  ).toEqual(expected);
+  console.info(
+    JSON.stringify({
+      event: "shared_page_local_latency",
+      returned: first.items.length,
+      elapsedMs: Number(elapsed.toFixed(2)),
+      hostedEvidence: false,
+    }),
+  );
+}, 30_000);
 
 test("team REST requires accepted membership and revokes selected-version access", async () => {
   const worker = await startWorker({
