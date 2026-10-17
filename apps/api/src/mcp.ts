@@ -19,6 +19,7 @@ import { resolveAuthBaseUrl } from "./better-auth";
 import type { Env } from "./env";
 import { getRequiredMcpScopesForRequest } from "./mcp-scopes";
 import type { MemoryGraph } from "./memory-graph";
+import { isAllowedAuthUser } from "./passwordless";
 import { buildRecallContext } from "./recall";
 import { listWorkspaces } from "./workspace-access";
 import { listSharedMemories, readSharedMemory } from "./workspace-sharing";
@@ -450,6 +451,8 @@ async function hasCurrentMcpGrant(env: Env, payload: JWTPayload) {
   ) {
     return false;
   }
+
+  if (!(await isAllowedAuthUser(env, payload.sub))) return false;
 
   // Check the consenting user, not the client owner: public OAuth clients can
   // legitimately be used by multiple users. Do not cache this revocation check.

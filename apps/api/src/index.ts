@@ -1531,33 +1531,117 @@ const LOGIN_HTML = `<!doctype html>
   <style>${PAGE_STYLE}</style>
 </head>
 <body>
-  <header><h1>OpenMemory</h1><a href="/"><button class="ghost">Dashboard</button></a></header>
+  <header><h1>OpenMemory</h1><a href="/">Dashboard</a></header>
   <main>
-    <div class="panel auth-card">
+    <div class="panel auth-card stack">
+      <h2>Sign in</h2>
+      <p>Use your invited email address. No password needed.</p>
+      <div id="error" role="alert" class="error hidden"></div>
+      <p id="status" role="status">Checking sign-in availability…</p>
       <form id="authForm" class="stack">
-        <h2>Account</h2>
-        <div id="error" class="error hidden"></div>
-        <div><label for="name">Name</label><input id="name" autocomplete="name" value="OpenMemory User" /></div>
         <div><label for="email">Email</label><input id="email" autocomplete="email" required type="email" /></div>
-        <div><label for="password">Password</label><input id="password" autocomplete="current-password" minlength="8" required type="password" /></div>
-        <div class="row"><button id="signIn" type="submit">Sign in</button><button id="signUp" class="secondary" type="button">Create account</button></div>
+        <button id="sendCode" disabled type="submit">Send sign-in code</button>
       </form>
+      <form id="verifyForm" class="stack" hidden>
+        <div><label for="otp">Email code</label><input id="otp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" minlength="6" required /></div>
+        <button id="verifyCode" disabled type="submit">Verify and sign in</button>
+      </form>
+      <div id="providers" class="stack"></div>
     </div>
   </main>
   <script>
     const form = document.querySelector("#authForm");
+    const verifyForm = document.querySelector("#verifyForm");
+    const email = document.querySelector("#email");
+    const otp = document.querySelector("#otp");
+    const sendCode = document.querySelector("#sendCode");
+    const verifyCode = document.querySelector("#verifyCode");
     const error = document.querySelector("#error");
-    function showError(message) { error.textContent = message; error.classList.remove("hidden"); }
-    async function auth(path) {
-      error.classList.add("hidden");
-      const body = { email: email.value, password: password.value, name: name.value || email.value };
-      const response = await fetch(path, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      if (!response.ok) throw new Error(await response.text());
-      const next = new URLSearchParams(location.search).get("redirect") || "/";
-      location.href = next;
+    const status = document.querySelector("#status");
+    const providers = document.querySelector("#providers");
+    let sentEmail = "";
+    let emailEnabled = false;
+    let busy = false;
+    function nextURL() {
+      try {
+        const next = new URL(new URLSearchParams(location.search).get("redirect") || "/", location.origin);
+        if (next.origin === location.origin && !next.username && !next.password) return next.href;
+      } catch {}
+      return location.origin + "/";
     }
-    form.onsubmit = (event) => { event.preventDefault(); auth("/api/auth/sign-in/email").catch((caught) => showError(caught.message)); };
-    signUp.onclick = () => auth("/api/auth/sign-up/email").catch((caught) => showError(caught.message));
+    function showError(message) { error.textContent = message; error.classList.remove("hidden"); }
+    function setBusy(value) {
+      busy = value;
+      sendCode.disabled = value || !emailEnabled;
+      verifyCode.disabled = value || !emailEnabled || !sentEmail;
+      email.disabled = value;
+    }
+    async function auth(path, body) {
+      const response = await fetch(path, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error("Sign-in could not be completed. Check your code or try again later.");
+      return response.json();
+    }
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      if (busy || !emailEnabled) return;
+      setBusy(true);
+      error.classList.add("hidden");
+      sentEmail = "";
+      otp.value = "";
+      verifyForm.hidden = true;
+      try {
+        const requestedEmail = email.value.trim();
+        await auth("/api/auth/email-otp/send-verification-otp", { email: requestedEmail, type: "sign-in" });
+        sentEmail = requestedEmail;
+        status.textContent = "If this address is eligible, a sign-in code has been sent. Check your inbox. Codes expire shortly.";
+        verifyForm.hidden = false;
+        sendCode.textContent = "Send another code";
+      } catch { showError("Unable to send a sign-in code. Please try again later."); }
+      finally { setBusy(false); }
+    };
+    email.oninput = () => { sentEmail = ""; otp.value = ""; verifyForm.hidden = true; setBusy(false); };
+    verifyForm.onsubmit = async (event) => {
+      event.preventDefault();
+      if (busy || !emailEnabled || !sentEmail) return;
+      setBusy(true);
+      error.classList.add("hidden");
+      try {
+        await auth("/api/auth/sign-in/email-otp", { email: sentEmail, otp: otp.value });
+        otp.value = "";
+        location.href = nextURL();
+      } catch { otp.value = ""; showError("Sign-in could not be completed. Check your code or request another."); }
+      finally { setBusy(false); }
+    };
+    async function loadCapabilities() {
+      try {
+        const response = await fetch("/api/auth/capabilities", { credentials: "include" });
+        if (!response.ok) throw new Error();
+        const capabilities = await response.json();
+        emailEnabled = capabilities.emailOTP === true;
+        setBusy(false);
+        status.textContent = emailEnabled ? "Private beta: sign-in is available to invited accounts." : "Email sign-in is currently unavailable. Contact your administrator.";
+        for (const provider of ["google", "github"]) {
+          if (!Array.isArray(capabilities.socialProviders) || !capabilities.socialProviders.includes(provider)) continue;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = provider === "google" ? "Continue with Google" : "Continue with GitHub";
+          button.onclick = async () => {
+            if (busy) return;
+            setBusy(true);
+            error.classList.add("hidden");
+            try {
+              const result = await auth("/api/auth/sign-in/social", { provider, callbackURL: nextURL() });
+              const target = new URL(result.url);
+              if (target.protocol !== "https:") throw new Error();
+              location.href = target.href;
+            } catch { showError("Provider sign-in is currently unavailable. Please try again later."); }
+            finally { setBusy(false); }
+          };
+          providers.appendChild(button);
+        }
+      } catch { status.textContent = "Sign-in is currently unavailable. Please try again later."; }
+    }
+    loadCapabilities();
   </script>
 </body>
 </html>`;
