@@ -34,7 +34,6 @@ export function TeamPanel({
   const epoch = useRef(0);
   const refresh = useCallback(async () => {
     const request = ++epoch.current;
-    setTeams([]);
     setError("");
     try {
       const result = await api.listWorkspaces();
@@ -46,7 +45,10 @@ export function TeamPanel({
           : (result[0]?.id ?? ""),
       );
     } catch (error) {
-      if (request === epoch.current) setError(message(error));
+      if (request === epoch.current) {
+        setTeams([]);
+        setError(message(error));
+      }
     }
   }, [api]);
   useEffect(() => {
@@ -223,6 +225,21 @@ function TeamDetails({
       ++epoch.current;
     };
   }, [refresh]);
+  useEffect(() => {
+    // Keep an invitation in this membership's view while rechecking access,
+    // but hide shared results immediately until fresh authorization returns.
+    const onFocus = () => {
+      void refresh(activeQuery).catch((error) => {
+        if (!mounted.current) return;
+        setInvitation(null);
+        setPage(emptyPage);
+        setMembers([]);
+        setError(message(error));
+      });
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [activeQuery, refresh]);
   return (
     <div className="stack">
       <h3>{team.name}</h3>

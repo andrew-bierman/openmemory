@@ -70,6 +70,20 @@ test("accepted teammates see only explicitly shared versions and lose revoked ac
       .getByLabel("New invitation ID")
       .inputValue();
     const token = await secret.inputValue();
+    // Returning from an app used to deliver the invitation must preserve the
+    // one-time secret when the same membership is still authorized.
+    const focusedTeams = owner.page.waitForResponse(
+      (response) =>
+        response.url() === `${API}/v1/workspaces` &&
+        response.request().method() === "GET",
+    );
+    await owner.page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    expect((await focusedTeams).ok()).toBe(true);
+    await expect(secret).toHaveValue(token);
+    await expect(owner.page.getByLabel("New invitation ID")).toHaveValue(
+      invitationId,
+    );
+
     await owner.page
       .getByLabel("Your active memory version")
       .selectOption(memoryId);
