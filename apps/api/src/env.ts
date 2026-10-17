@@ -16,6 +16,8 @@ export type Env = {
   AI?: Ai;
   MEMORY_EXPORTS?: R2Bucket;
   OPENMEMORY_ANALYTICS?: AnalyticsEngineBinding;
+  MEMORY_EXTRACTION_QUEUE_NAME?: string;
+  SOURCE_INGESTION_QUEUE_NAME?: string;
   MEMORY_EXTRACTION_QUEUE?: Queue<MemoryExtractionMessage>;
   MEMORY_EXTRACTION_WORKFLOW?: WorkflowBinding<MemoryExtractionMessage>;
   SOURCE_INGESTION_QUEUE?: Queue<IngestionQueueMessage>;
