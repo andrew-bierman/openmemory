@@ -185,7 +185,23 @@ test("owner grants isolate selected versions and survive revocation, restore and
     ).toBeNull();
     expect((await call("share", freshIntent)).status).toBe(409);
     const generation = (await call<number>("generation")).body;
-    const newShare = (await call("share", { ...freshIntent, generation })).body;
+    // A repeated HTTP request captures today's generation. That must not turn
+    // yesterday's consumed intent into fresh permission after restore.
+    expect((await call("share", { ...freshIntent, generation })).status).toBe(
+      409,
+    );
+    await worker.stop();
+    worker = await start(state);
+    expect((await call("share", { ...freshIntent, generation })).status).toBe(
+      409,
+    );
+    const newShare = (
+      await call("share", {
+        ...freshIntent,
+        generation,
+        requestId: "explicit-after-restore",
+      })
+    ).body;
     expect(newShare.shareId).not.toBe(restoreShare.shareId);
     const changed = structuredClone(snapshot);
     const changedMemory = changed.memories.find((m) => m.id === fresh.id);
