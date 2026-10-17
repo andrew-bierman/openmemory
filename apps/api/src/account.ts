@@ -14,6 +14,12 @@ import {
   workspaceMember,
 } from "./db/schema";
 import type { Env } from "./env";
+import {
+  assertWorkspaceRequestOrigin,
+  createWorkspaceInvitation,
+  removeWorkspaceMembership,
+  WorkspaceAccessError,
+} from "./workspace-access";
 
 type AccountResult =
   | { status: 200; body: AccountResponse }
@@ -165,60 +171,22 @@ export async function inviteWorkspaceMember(
     return context.result;
   }
 
-  const email = normalizeEmail(input.email);
-  const role = input.role === "admin" ? "admin" : "member";
-  const now = new Date();
-  const [existingUser] = await context.db
-    .select({ id: authUser.id })
-    .from(authUser)
-    .where(eq(authUser.email, email))
-    .limit(1);
-  const [existingMember] = await context.db
-    .select()
-    .from(workspaceMember)
-    .where(
-      and(
-        eq(workspaceMember.workspaceId, context.workspace.id),
-        eq(workspaceMember.email, email),
-      ),
-    )
-    .limit(1);
-
-  if (existingMember) {
-    const [updated] = await context.db
-      .update(workspaceMember)
-      .set({
-        role,
-        status: existingUser ? "active" : "invited",
-        userId: existingUser?.id,
-        updatedAt: now,
-      })
-      .where(eq(workspaceMember.id, existingMember.id))
-      .returning();
+  try {
+    assertWorkspaceRequestOrigin(env, request);
     return {
-      status: 201,
-      body: serializeMember(updated),
-    } satisfies AccountResult;
+      status: 201 as const,
+      body: await createWorkspaceInvitation(
+        env,
+        context.user.id,
+        context.workspace.id,
+        input,
+      ),
+    };
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError)
+      return { status: error.status, body: { error: error.error } };
+    throw error;
   }
-
-  const [created] = await context.db
-    .insert(workspaceMember)
-    .values({
-      id: crypto.randomUUID(),
-      workspaceId: context.workspace.id,
-      userId: existingUser?.id,
-      email,
-      role,
-      status: existingUser ? "active" : "invited",
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
-
-  return {
-    status: 201,
-    body: serializeMember(created),
-  } satisfies AccountResult;
 }
 
 export async function removeWorkspaceMember(
@@ -227,41 +195,21 @@ export async function removeWorkspaceMember(
   memberId: string,
 ) {
   const context = await getAccountContext(env, request);
-  if (!context.ok) {
-    return context.result;
+  if (!context.ok) return context.result;
+  try {
+    assertWorkspaceRequestOrigin(env, request);
+    await removeWorkspaceMembership(
+      env,
+      context.user.id,
+      context.workspace.id,
+      memberId,
+    );
+    return { status: 200 as const, body: await readAccount(context) };
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError)
+      return { status: error.status, body: { error: error.error } };
+    throw error;
   }
-
-  const [member] = await context.db
-    .select()
-    .from(workspaceMember)
-    .where(
-      and(
-        eq(workspaceMember.id, memberId),
-        eq(workspaceMember.workspaceId, context.workspace.id),
-      ),
-    )
-    .limit(1);
-  if (!member) {
-    return {
-      status: 404,
-      body: { error: "not_found" },
-    } satisfies AccountResult;
-  }
-  if (member.role === "owner") {
-    return {
-      status: 403,
-      body: { error: "owner_member_required" },
-    } satisfies AccountResult;
-  }
-
-  await context.db
-    .delete(workspaceMember)
-    .where(eq(workspaceMember.id, memberId));
-
-  return {
-    status: 200,
-    body: await readAccount(context),
-  } satisfies AccountResult;
 }
 
 export async function deleteAccountControlPlane(
@@ -455,7 +403,7 @@ async function ensureOwnerMember(
     .where(
       and(
         eq(workspaceMember.workspaceId, workspaceId),
-        eq(workspaceMember.email, email),
+        eq(workspaceMember.userId, user.userId),
       ),
     )
     .limit(1);
@@ -466,6 +414,7 @@ async function ensureOwnerMember(
       .set({
         role: "owner",
         status: "active",
+        acceptedAt: now,
         userId: user.userId,
         updatedAt: now,
       })
@@ -480,6 +429,7 @@ async function ensureOwnerMember(
     email,
     role: "owner",
     status: "active",
+    acceptedAt: now,
     createdAt: now,
     updatedAt: now,
   });
