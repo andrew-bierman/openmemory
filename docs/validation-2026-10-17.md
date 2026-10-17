@@ -1,7 +1,7 @@
 # Local validation and tenant review — 2026-10-17
 
 Source candidate: `c85ed66f9b35588506e2e2550ee3705c5e4b4201`.
-Implementation commits: `f8f697f` (delayed ingestion guard), `988042d` (current OAuth grant enforcement, lookup index, tenant tests).
+Implementation commits: `f8f697f` (delayed ingestion guard), `988042d` (current OAuth grant enforcement, lookup index, tenant tests), `49649e9` (durable lifecycle/vector fencing), `db4a251` (access/refresh/code consent-generation binding).
 Branch: `codex/tenant-validation-20261017`.
 
 This pass strengthens local confidence; it does not certify broad hosted launch. No production mutation, credential grant, deployment, push, merge, tag, or publication was performed. The original checkout remained clean and unchanged.
@@ -33,10 +33,10 @@ Reviewed boundaries:
 
 Independent reviewers examined tenant boundaries, background/vector architecture, the fixes, integration assertions and migration. No additional blocking regression was found in the bounded patch. This was compound-engineering-style read/reproduce/fix/test and independent review, not a complete security audit or formal CE whole-repository review receipt.
 
-## Results
+## Initial qualification results (before lifecycle follow-up)
 
 - Initial exploratory integration: 16/16 passed in 56.75 seconds; the ingestion guard had already landed during setup, so this is not labeled untouched-main baseline. The earlier reported integration hang was not reproduced.
-- Final local unit + integration suite: **112/112 across 14 files**, 47.47 seconds. Live production test file explicitly excluded.
+- Initial complete local unit + integration suite: **112/112 across 14 files**, 47.47 seconds. Live production test file explicitly excluded.
 - Real-session/PKCE test rerun after index and config-path changes: passed in 2.82 seconds.
 - Headless Chromium local browser suite: **2/2**, 25.6 seconds, one worker, server reuse disabled. Screenshot artifacts retained.
 - MCP SDK smoke: exit 0, local streamable HTTP and configured request profiles. This does not constitute real Cursor/Claude/ChatGPT evidence.
@@ -65,15 +65,29 @@ Executions used a sanitized environment, low process priority, isolated HOME/XDG
 
 Local evidence root: `/Volumes/CrucialX10/andrewbierman/Code/openmemory-validation-artifacts-20261017/results/` (full test log, browser log, PKCE/index rerun, build log, benchmark JSONL, query plan and final check log). Screenshots remain under this checkout's `.tmp/screenshots/launch-readiness/`. Temporary browser config and runtime caches are in the sibling artifact directory.
 
-## Remaining release limits and next work
+## Lifecycle follow-up and final qualification
 
-- **In-flight deletion race:** the job guard prevents deliveries beginning after purge. An ingestion already past its initial job check can still race with purge. Generation fencing/cancellation is needed for a full concurrent-deletion guarantee.
-- **Re-consent/token lifecycle:** current-grant enforcement is not an irreversible token denylist. Same-second revoke/regrant can reactivate an older token, and later consent scope expansion can restore older token scopes. Use persisted grant generation or equivalent revocation semantics before promising permanent revocation across re-consent.
-- Graph edge creation accepts nonexistent/foreign-looking IDs into the caller's own graph. No cross-tenant disclosure was demonstrated; clarify/enforce endpoint existence if graph semantics require it.
-- Queue payload parsing and workflow-ID tenant namespacing deserve additional hardening; no cross-tenant read exploit was demonstrated here.
-- Drizzle's journal/snapshot still only covers initial migration 0000, while subsequent migrations are manual. Reconcile before relying on future db:generate output.
-- Live Workers AI/Vectorize traces, rerank posture, deployed binding/revision parity, and current operational evidence remain unqualified by emulator tests. Wrangler warns AI is remote-only and Vectorize lacks local parity; no production credentials were provisioned for this pass.
-- Real Cursor/Claude/ChatGPT OAuth and tool use remain pending. They require explicit authorization for a designated hosted test tenant, public PKCE clients, consent and disposable data cleanup. Generic SDK profiles do not replace them.
-- Main still points at c85ed66; these commits are local only. Refresh candidate-bound release evidence after approved review/integration of the fixes. Do not relabel old production evidence or change required gates to bypass them.
+The two remaining lifecycle defects were reproduced and fixed on this isolated branch:
 
-Recommended next step: review the two local fixes, address the remaining lifecycle guarantees before broad production claims, then approve narrowly scoped live/vendor qualification. Release/deploy/merge remains a separate approval.
+- Durable Object generation fencing now covers source/conversation chunks, graph edges, extraction, completion and failure. Purge/restore increments a persistent generation. Legacy deliveries belong to generation zero; stale work cannot alter a new job reusing the same ID. Completed-job retries no-op. Queue identifiers and generation values are validated; workflow IDs hash tenant, resource and generation.
+- Account deletion also persists a retired marker. Even an already-authenticated caller using a fresh or omitted generation cannot recreate that account's graph. Normal tenant purge remains reusable. The real SQLite DO fixture verifies fences, restore, retirement and tenant isolation across process restarts.
+- Vector IDs and tenant metadata partitions include generation after the initial generation; generation zero retains existing IDs. Indexing rehydrates canonical data and checks generation. A delayed upsert or cleanup cannot overwrite/delete a same-ID restored vector. Search and diagnostics use the current partition; repair cleanup passes its captured generation. Provider failures may leave old vectors physically stored, but these are excluded from current-generation retrieval. This is not a guarantee of immediate physical deletion across providers, crashes or in-flight R2 exports.
+- OAuth artifacts carry the original consent ID and persisted grant version. Migration `0005_oauth_grant_version.sql` backfills versions and rotates them on consent creation/scope changes. Supported provider hooks bind access tokens, refresh rotation and pending authorization codes before concurrent token generation. Old artifacts cannot acquire a new grant through same-second reconsent, scope shrink/re-expansion or delayed exchange. Real local PKCE/D1 tests cover native provider and app revocation, fresh rotation and two users using the same public client.
+
+Independent follow-up review found no remaining blocking defect in these changed paths after the repair-generation callsite fix. No complete security audit is claimed.
+
+Final combined qualification: **140 tests passed across 19 files, 53.33 seconds**, with the live-production test file excluded. This includes all 16 existing HTTP integration scenarios, the real DO restart fixture, generation-qualified vector tests, controlled ingestion race barriers, signed JWT tests and real PKCE/D1 exchanges. All six TypeScript projects passed; Biome checked 116 files without changes; `git diff --check` passed. Earlier build, SDK and scale results above remain separately labeled evidence from before this follow-up. Final headless Chromium browser rerun: **2/2 passed, 19.4 seconds**, one worker and server reuse disabled.
+
+Reproduction uses the same sequential Vitest command above, plus `node_modules/.bin/tsc -p <project>/tsconfig.json --noEmit --incremental false` for apps/api, apps/api/test, apps/web, packages/core, packages/client and packages/ui. Logs: `final-lifecycle-tests.log`, `final-lifecycle-types.log`, `final-lifecycle-lint.log`, `final-lifecycle-browser.log`. Regression evidence: `ingestion-races-red.log`, `ingestion-races-green.log`, `oauth-generation-red.txt`, `oauth-generation-green.txt`, `oauth-generation-integration.txt`, `oauth-migration-validation.txt`.
+
+## Remaining release gates and minimal plan
+
+1. Review/integrate the isolated branch; main remains at the source candidate. Apply D1 migrations 0004 and 0005 through the approved deployment process before deploying the auth changes. Existing unbound access tokens, refresh tokens and pending authorization codes intentionally fail closed and require reauthorization. DO lifecycle tables initialize lazily. No new Cloudflare service or metadata index is required.
+2. Authorize a designated hosted test account and disposable data for actual Cursor, Claude and ChatGPT OAuth/MCP checks. Approval must cover public PKCE-client registration, the requested OAuth scopes/consent in each vendor, tool writes and cleanup. Generic SDK profiles cannot replace this evidence. Do not create credentials or grant consent silently.
+3. Obtain approved production Workers AI/Vectorize traces and rerank-threshold review, and verify deployed revision/binding parity. Local provider doubles do not qualify semantic quality or hosted latency.
+4. Refresh `config/launch-evidence.json` against the exact integrated/deployed candidate; it still references July's 3e4b35f. Today's successful analytics-only scheduled CI is not a full candidate qualification. Broad release remains blocked until the required vendor/RAG evidence is complete. Social GitHub/Google login is deliberately disabled for alpha and is not automatically a gate.
+5. Obtain separate approval for production migration/deploy and release/tag/publish. None was performed here.
+
+Maintenance notes: graph edges can still reference nonexistent IDs within the caller's own graph; no cross-tenant disclosure was shown. Drizzle's journal/snapshot only covers initial migration 0000 while later migrations are manual; reconcile before future generated migrations.
+
+Optional team sharing remains **proposal only**, in the separate audit deliverable `team-sharing-proposal.md`. Current memories are private per user. The proposal recommends owner-controlled read-only selected-version references with explicitly accepted membership and a new shared-read OAuth scope, using existing Cloudflare services. Existing auto-active invitation rows and unrestricted personal graph expansion must not become implicit sharing authorization.
