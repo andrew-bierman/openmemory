@@ -2,9 +2,8 @@ import type {
   Account,
   AccountDeletionResult,
   OAuthConnection,
-  WorkspaceMember,
 } from "@openmemory/client";
-import { Badge, Button, Card, Input, Label, Select } from "@openmemory/ui";
+import { Badge, Button, Card, Input, Label } from "@openmemory/ui";
 import {
   Building2,
   KeyRound,
@@ -13,7 +12,7 @@ import {
   UserRound,
   UsersRound,
 } from "lucide-react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 export type AuthUser = {
   id: string;
@@ -66,13 +65,9 @@ export function AdminWorkspace({
   email,
   isLoading,
   lastAccountDeletion,
-  memberEmail,
-  memberRole,
   name,
   onDeleteAccount,
-  onInviteMember,
   onRevoke,
-  onRemoveMember,
   onSaveProfile,
   onRenameWorkspace,
   onSignIn,
@@ -85,8 +80,6 @@ export function AdminWorkspace({
   setDeleteConfirmEmail,
   setDeleteConfirmTenantId,
   setEmail,
-  setMemberEmail,
-  setMemberRole,
   setName,
   setPassword,
   setProfileName,
@@ -97,6 +90,7 @@ export function AdminWorkspace({
   token,
   usesLocalTenant,
   workspaceName,
+  teamPanel,
 }: Readonly<{
   account: Account | null;
   apiUrl: string;
@@ -106,13 +100,9 @@ export function AdminWorkspace({
   email: string;
   isLoading: boolean;
   lastAccountDeletion: AccountDeletionResult | null;
-  memberEmail: string;
-  memberRole: "admin" | "member";
   name: string;
   onDeleteAccount: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  onInviteMember: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onRevoke: (clientId: string) => Promise<void>;
-  onRemoveMember: (memberId: string) => Promise<void>;
   onSaveProfile: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onRenameWorkspace: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSignIn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -125,8 +115,6 @@ export function AdminWorkspace({
   setDeleteConfirmEmail: (value: string) => void;
   setDeleteConfirmTenantId: (value: string) => void;
   setEmail: (value: string) => void;
-  setMemberEmail: (value: string) => void;
-  setMemberRole: (value: "admin" | "member") => void;
   setName: (value: string) => void;
   setPassword: (value: string) => void;
   setProfileName: (value: string) => void;
@@ -137,11 +125,9 @@ export function AdminWorkspace({
   token: string;
   usesLocalTenant: boolean;
   workspaceName: string;
+  teamPanel: ReactNode;
 }>) {
   const baseUrl = cleanBaseUrl(apiUrl);
-  const ownerMember = account?.members.find(
-    (member) => member.role === "owner",
-  );
   const canDeleteAccount =
     Boolean(account && sessionUser) &&
     deleteConfirmEmail.trim().toLowerCase() ===
@@ -272,7 +258,7 @@ export function AdminWorkspace({
         <div className="panel-title">
           <div>
             <p className="eyebrow">Workspace</p>
-            <h2>Team and tenant</h2>
+            <h2>Personal workspace name</h2>
           </div>
           <Building2 aria-hidden="true" />
         </div>
@@ -312,64 +298,9 @@ export function AdminWorkspace({
               Save workspace
             </Button>
           </form>
-
-          <form className="stack" onSubmit={onInviteMember}>
-            <div className="settings-grid">
-              <div className="field">
-                <Label htmlFor="member-email">Member email</Label>
-                <Input
-                  disabled={!sessionUser}
-                  id="member-email"
-                  onChange={(event) => setMemberEmail(event.target.value)}
-                  placeholder="teammate@example.com"
-                  type="email"
-                  value={memberEmail}
-                />
-              </div>
-              <div className="field">
-                <Label htmlFor="member-role">Role</Label>
-                <Select
-                  disabled={!sessionUser}
-                  id="member-role"
-                  onChange={(event) =>
-                    setMemberRole(
-                      event.target.value === "admin" ? "admin" : "member",
-                    )
-                  }
-                  value={memberRole}
-                >
-                  <option value="member">Member</option>
-                  <option value="admin">Admin</option>
-                </Select>
-              </div>
-            </div>
-            <Button
-              disabled={isLoading || !sessionUser || !memberEmail.trim()}
-              type="submit"
-              variant="outline"
-            >
-              Invite member
-            </Button>
-          </form>
-        </div>
-
-        <div className="member-list">
-          {(account?.members ?? []).map((member) => (
-            <MemberRow
-              key={member.id}
-              member={member}
-              onRemove={onRemoveMember}
-              ownerEmail={ownerMember?.email ?? ""}
-            />
-          ))}
-          {!account ? (
-            <div className="empty-state compact">
-              <h3>No hosted workspace loaded</h3>
-              <p>Sign in to manage account-level workspace members.</p>
-            </div>
-          ) : null}
         </div>
       </section>
+      {teamPanel}
 
       <section className="admin-card">
         <div className="panel-title">
@@ -533,44 +464,6 @@ export function AdminWorkspace({
         </form>
       </section>
     </div>
-  );
-}
-
-function MemberRow({
-  member,
-  onRemove,
-  ownerEmail,
-}: Readonly<{
-  member: WorkspaceMember;
-  onRemove: (memberId: string) => Promise<void>;
-  ownerEmail: string;
-}>) {
-  const isOwner = member.role === "owner";
-  return (
-    <article className="member-row">
-      <div>
-        <strong>{member.email}</strong>
-        <small>
-          {isOwner ? `Owner ${ownerEmail ? `· ${ownerEmail}` : ""}` : member.id}
-        </small>
-      </div>
-      <div className="member-badges">
-        <Badge variant={isOwner ? "default" : "outline"}>{member.role}</Badge>
-        <Badge variant={member.status === "active" ? "default" : "outline"}>
-          {member.status}
-        </Badge>
-      </div>
-      <Button
-        disabled={isOwner}
-        onClick={() => void onRemove(member.id)}
-        size="sm"
-        type="button"
-        variant="outline"
-      >
-        <Trash2 aria-hidden="true" />
-        Remove
-      </Button>
-    </article>
   );
 }
 
