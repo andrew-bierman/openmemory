@@ -84,6 +84,11 @@ import {
   processSourceIngestionMessage,
   SOURCE_INGESTION_QUEUE_NAME,
 } from "./source-ingestion";
+import {
+  assertWorkspaceRequestOrigin,
+  WorkspaceAccessError,
+} from "./workspace-access";
+import { handleWorkspaceRequest, isWorkspaceRoute } from "./workspace-routes";
 
 export { MemoryGraph };
 
@@ -1378,19 +1383,26 @@ async function handleWorkerFetch(
       );
     } else if (isAuthRoute(pathname)) {
       response = await handleOpenMemoryAuthRequest(requestEnv, request);
+    } else if (isWorkspaceRoute(pathname)) {
+      response = await handleWorkspaceRequest(requestEnv, request);
     } else if (pathname === "/mcp") {
       response = await mcpHandler(request, requestEnv, ctx);
     } else {
+      if (pathname === "/v1/account" || pathname.startsWith("/v1/account/"))
+        assertWorkspaceRequestOrigin(requestEnv, request);
       response = await apiWorker.fetch(request);
     }
   } catch (error) {
     response = jsonResponse(
       {
-        error: "internal_error",
+        error:
+          error instanceof WorkspaceAccessError
+            ? error.error
+            : "internal_error",
         message: "OpenMemory could not complete the request.",
         requestId,
       },
-      { status: 500 },
+      { status: error instanceof WorkspaceAccessError ? error.status : 500 },
     );
     console.error(
       JSON.stringify({
@@ -1435,6 +1447,8 @@ async function withCors(
 ) {
   const resolved = await response;
   const headers = new Headers(resolved.headers);
+  if (new URL(request.url).pathname.startsWith("/v1/account"))
+    headers.set("cache-control", "private, no-store");
 
   for (const [key, value] of corsHeaders(request)) {
     headers.set(key, value);

@@ -407,7 +407,7 @@ describe("workspace invitation authority on actual SQLite", () => {
       { origin: "https://evil.example" },
       { "sec-fetch-site": "cross-site" },
       { origin: "null" },
-    ])
+    ] as Record<string, string>[])
       expect(() =>
         assertWorkspaceRequestOrigin(
           env,
