@@ -32,21 +32,27 @@
   "screenshotDirectory": ".tmp/screenshots/launch-readiness",
   "historicalEvidenceNotice": "The existing repository, runtime, benchmark and cleanup fields are historical records for their named commits/runs, not qualification of the current local candidate.",
   "currentLocalCandidate": {
-    "commit": "1a8e03376b0e03ac28582cca0f0b91627a5234ad",
+    "commit": "c8751124774905327676cf5b4d27a182255539a4",
     "status": "locally-qualified",
     "hostedStatus": "not-run",
     "releaseReady": false,
-    "qualificationManifest": "../openmemory-validation-artifacts-20261017/results/qualified-1a8e033-summary.json",
+    "qualificationManifest": "../openmemory-validation-artifacts-20261017/results/queue-routing-final-summary.json",
     "pending": [
       "Real Cursor, Claude and ChatGPT OAuth/MCP evidence",
       "Production semantic RAG trace and rerank threshold review",
       "Approved migration/deployment and exact-candidate hosted qualification"
     ],
     "checks": {
-      "testFiles": 24,
-      "testsPassed": 184,
-      "browserTestsPassed": 3,
-      "qualificationStepsPassed": 18
+      "testFiles": 25,
+      "testsPassed": 185,
+      "qualificationStepsPassed": 18,
+      "queueRoutingRegressionCases": 13
+    },
+    "priorBrowserEvidence": {
+      "candidate": "1a8e03376b0e03ac28582cca0f0b91627a5234ad",
+      "testsPassed": 3,
+      "rerun": false,
+      "reason": "No frontend changes; prior browser evidence retained explicitly as prior-candidate evidence."
     }
   },
   "maintenanceEvidence": {
