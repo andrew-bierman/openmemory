@@ -9,6 +9,10 @@ import {
   test,
 } from "vitest";
 import {
+  createAuthEmailWorker,
+  type EmailEnv,
+} from "../../auth-email/src/worker";
+import {
   createOpenMemoryAuth,
   handleOpenMemoryAuthRequest,
 } from "../src/better-auth";
@@ -106,6 +110,14 @@ beforeAll(async () => {
     // D1 exec executes each physical line; preserve trigger bodies on one line.
     await db.exec(sql.replace(/--[^\n]*/g, "").replace(/\n/g, " "));
   }
+  const mailBudgetSql = await readFile(
+    resolve(
+      import.meta.dirname,
+      "../../auth-email/migrations/0001_send_budget.sql",
+    ),
+    "utf8",
+  );
+  await db.exec(mailBudgetSql.replace(/\n/g, " "));
 }, 30_000);
 afterAll(async () => {
   await mf?.dispose();
@@ -123,6 +135,7 @@ beforeEach(async () => {
     "verification",
     "passwordless_otp",
     "passwordless_throttle",
+    "send_budget",
     "user",
   ]) {
     await db.prepare(`DELETE FROM ${table}`).run();
@@ -566,5 +579,100 @@ describe("passwordless authentication against real D1", () => {
         "SELECT count(*) AS n FROM user WHERE email='alice@example.test'",
       ),
     ).toEqual({ n: 1 });
+  });
+});
+
+describe("private Resend adapter with real D1 and passwordless auth", () => {
+  function mailEnv(): EmailEnv {
+    return {
+      RESEND_API_KEY: "synthetic-test-only-provider-key",
+      AUTH_EMAIL_FROM: "login@example.test",
+      AUTH_EMAIL_MODE: "staging",
+      AUTH_EMAIL_ALLOWED_RECIPIENTS: "alice@example.test",
+      AUTH_EMAIL_RUN_ID: "integration-run",
+      AUTH_EMAIL_RUN_EXPIRES_AT: new Date(Date.now() + 60_000).toISOString(),
+      SEND_BUDGET_DB: db,
+    };
+  }
+  test.each([
+    200, 503,
+  ])("real OTP boundary handles provider status %s", async (status) => {
+    let capturedCode = "";
+    const mail = createAuthEmailWorker({
+      fetch: async (_url, init) => {
+        const payload = JSON.parse(String(init?.body)) as {
+          text: string;
+          to: string[];
+        };
+        expect(payload.to).toEqual(["alice@example.test"]);
+        capturedCode = required(payload.text.match(/\b\d{6}\b/)?.[0]);
+        return Response.json(
+          { id: "00000000-0000-4000-8000-000000000001" },
+          { status },
+        );
+      },
+    });
+    const env = mailEnv();
+    const authOverrides = {
+      AUTH_EMAIL: { fetch: (req: Request) => mail.fetch(req, env) },
+    };
+    expect(
+      (await send("alice@example.test", { env: authOverrides })).status,
+    ).toBe(200);
+    expect(capturedCode).toHaveLength(6);
+    const login = await verify(capturedCode, "alice@example.test", {
+      env: authOverrides,
+    });
+    expect(login.status).toBe(status === 200 ? 200 : 400);
+    expect(
+      await scalar(
+        "SELECT attempts FROM send_budget WHERE run_id='integration-run'",
+      ),
+    ).toEqual({ attempts: 1 });
+    if (status !== 200)
+      expect(
+        await scalar("SELECT count(*) AS n FROM passwordless_otp"),
+      ).toEqual({ n: 0 });
+  });
+  test("D1 reserves at most twelve sends across concurrent adapter instances", async () => {
+    let sends = 0;
+    const env = mailEnv();
+    const results = await Promise.all(
+      Array.from({ length: 20 }, () => {
+        const adapter = createAuthEmailWorker({
+          fetch: async () => {
+            sends += 1;
+            return Response.json({
+              id: "00000000-0000-4000-8000-000000000001",
+            });
+          },
+        });
+        return adapter.fetch(
+          new Request("https://auth-email.internal/send", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              email: "alice@example.test",
+              otp: "123456",
+              type: "sign-in",
+              expiresIn: 300,
+            }),
+          }),
+          env,
+        );
+      }),
+    );
+    expect(results.filter((response) => response.status === 204)).toHaveLength(
+      12,
+    );
+    expect(results.filter((response) => response.status === 429)).toHaveLength(
+      8,
+    );
+    expect(sends).toBe(12);
+    expect(
+      await scalar(
+        "SELECT attempts FROM send_budget WHERE run_id='integration-run'",
+      ),
+    ).toEqual({ attempts: 12 });
   });
 });

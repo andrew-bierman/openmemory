@@ -20,6 +20,24 @@
     "deploy": {
       "dependsOn": ["check-types", "test"],
       "outputs": []
+    },
+    "@openmemory/api#test": {
+      "dependsOn": ["^check-types"],
+      "outputs": [],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/auth-email/**",
+        "$TURBO_ROOT$/scripts/staging-qualification.ts"
+      ]
+    },
+    "@openmemory/api#check-types": {
+      "dependsOn": ["^check-types"],
+      "outputs": [],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/apps/auth-email/**",
+        "$TURBO_ROOT$/scripts/staging-qualification.ts"
+      ]
     }
   }
 }

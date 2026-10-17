@@ -6,7 +6,7 @@ Better Auth and its OAuth provider remain the customer identity and MCP authoriz
 
 Provision users explicitly with their existing IDs and put normalized emails in OPENMEMORY_AUTH_ALLOWED_EMAILS. OTP never implicitly signs up a user. Empty admission configuration denies access. Google/GitHub buttons appear only when both provider values are configured; linking requires matching verified emails and is explicit.
 
-AUTH_EMAIL is an unconfigured service binding whose fetch(Request) receives JSON {email, otp, type: "sign-in", expiresIn: 300}. It must reliably send the email before returning a successful Response. No provider implementation or live credentials were created. Delivery is awaited; missing/failed delivery denies login. OTPs must never be logged.
+AUTH_EMAIL is an unconfigured service binding whose fetch(Request) receives JSON {email, otp, type: "sign-in", expiresIn: 300}. It must reliably send the email before returning a successful Response. A private Resend adapter is prepared in apps/auth-email with injected local tests. Andrew selected his existing Resend account; exact sender/domain and scoped key remain pending. No live credentials or delivery configuration were created. Delivery is awaited; missing/failed delivery denies login. OTPs must never be logged.
 
 Codes have six digits, five-minute expiry, HMAC-hashed storage and atomic D1 consumption. Send limits are 3/email and 10/IP per 15 minutes; verification limits 5/email and 30/IP per 5 minutes, plus five attempts per code. Counters are durable and atomic for HTTP and auth.api calls. Missing IP shares a conservative bucket; trust CF-Connecting-IP only behind Cloudflare's overwriting proxy.
 
@@ -27,7 +27,7 @@ Migration 0007 adds OTP/throttle tables only. No user IDs, memberships, grants, 
 
 Invitation-only app authentication can protect data without Access after route/session/token qualification. Login, assets, OAuth discovery and dynamic client registration remain public. Rate controls do not make ingress private or establish a spending cap. Access remains an optional internal ingress choice, not a prerequisite for customer auth.
 
-Remaining approvals: named email delivery provider/transport implementation, sender/domain verification and scoped service binding/secret; exact synthetic recipients and user/admission provisioning; named isolated staging resources and deployment/run budget; real OAuth grants where needed. Production cutover, credential deletion and teardown are separate actions. No real mail, deployment, Access activation or credentials are authorized by this local code change.
+Remaining approvals: existing Resend account scope, sender/domain verification and scoped service binding/secret; exact synthetic recipients and user/admission provisioning; named isolated staging resources and deployment/run budget; real OAuth grants where needed. Production cutover, credential deletion and teardown are separate actions. No real mail, deployment, Access activation or credentials are authorized by this local code change.
 
 ## Evidence and limits
 
