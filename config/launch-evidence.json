@@ -29,5 +29,18 @@
     "liveBenchmarkRecallMs": 2895.96,
     "liveBenchmarkThresholdMs": 12000
   },
-  "screenshotDirectory": ".tmp/screenshots/launch-readiness"
+  "screenshotDirectory": ".tmp/screenshots/launch-readiness",
+  "historicalEvidenceNotice": "The existing repository, runtime, benchmark and cleanup fields are historical records for their named commits/runs, not qualification of the current local candidate.",
+  "currentLocalCandidate": {
+    "commit": "8b4ebbeb7b2d4c768845694ebbe0b59b823491b5",
+    "status": "locally-qualified",
+    "hostedStatus": "not-run",
+    "releaseReady": false,
+    "qualificationManifest": "../openmemory-validation-artifacts-20261017/results/qualified-8b4ebbe-summary.json",
+    "pending": [
+      "Real Cursor, Claude and ChatGPT OAuth/MCP evidence",
+      "Production semantic RAG trace and rerank threshold review",
+      "Approved migration/deployment and exact-candidate hosted qualification"
+    ]
+  }
 }

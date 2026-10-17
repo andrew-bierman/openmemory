@@ -1,0 +1,105 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "openmemory-api",
+  "main": "apps/api/src/maintenance.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
+  "assets": {
+    "directory": "./apps/web/dist/client",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true,
+    "binding": "ASSETS"
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["MemoryGraph"]
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MEMORY_GRAPHS",
+        "class_name": "MemoryGraph"
+      }
+    ]
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "vectorize": [
+    {
+      "binding": "MEMORY_VECTORS",
+      "index_name": "openmemory-vectors"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MEMORY_EXPORTS",
+      "bucket_name": "openmemory-exports"
+    }
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "OPENMEMORY_ANALYTICS",
+      "dataset": "openmemory_events"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "MEMORY_EXTRACTION_QUEUE",
+        "queue": "openmemory-memory-extraction"
+      },
+      {
+        "binding": "SOURCE_INGESTION_QUEUE",
+        "queue": "openmemory-source-ingestion"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "openmemory-memory-extraction",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "openmemory-memory-extraction-dlq"
+      },
+      {
+        "queue": "openmemory-source-ingestion",
+        "max_batch_size": 4,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "openmemory-source-ingestion-dlq"
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "binding": "MEMORY_EXTRACTION_WORKFLOW",
+      "name": "openmemory-memory-extraction",
+      "class_name": "MemoryExtractionWorkflow"
+    },
+    {
+      "binding": "SOURCE_INGESTION_WORKFLOW",
+      "name": "openmemory-source-ingestion",
+      "class_name": "SourceIngestionWorkflow"
+    }
+  ],
+  "vars": {
+    "EMBEDDING_MODEL": "@cf/baai/bge-small-en-v1.5",
+    "OPENMEMORY_TRAFFIC_MODE": "closed"
+  },
+  "d1_databases": [
+    {
+      "binding": "AUTH_DB",
+      "database_name": "openmemory-auth",
+      "database_id": "c36373fd-bd51-4a56-9d8c-653a72d51fc9",
+      "migrations_dir": "apps/api/drizzle"
+    }
+  ]
+}

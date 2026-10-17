@@ -6,6 +6,21 @@ the current repo, CI, deployment, or runtime behavior proves them.
 
 ## Current Launch Posture
 
+**2026-10-17: not release-ready.** The locally qualified application candidate is
+`8b4ebbeb7b2d4c768845694ebbe0b59b823491b5`. Its external SSD manifest is
+`../openmemory-validation-artifacts-20261017/results/qualified-8b4ebbe-summary.json`: 175 tests in 22 files, three headless browser tests, build, six TypeScript checks, lint, SDK smoke, scale and security checks passed. It has not been deployed or tested against production. Subsequent maintenance integration has its own local evidence; it does not establish the unidentified old-source bridge.
+
+The historical CI/runtime/cleanup entries below remain evidence only for their
+named commits and runs. They must not be attributed to this candidate. Real
+Cursor, Claude and ChatGPT dogfood and production semantic-RAG/rerank reviews
+remain pending. Request-profile simulation is not vendor evidence.
+
+Read-only production inspection found migrations 0004–0006 unapplied, one
+missing-owner-membership workspace (not one total workspace), and two
+extraction DLQ messages. Primary queue backlog was zero at the snapshot; DLQ
+message age and exact deployed source/asset-routing parity remain unknown.
+No production mutation was performed.
+
 OpenMemory is close to an alpha open-source release aimed at technical early
 adopters who are comfortable with Cloudflare Workers, Durable Objects, D1,
 Vectorize, Workers AI, R2, OAuth, and MCP.
@@ -15,7 +30,7 @@ benchmarks, and alpha telemetry are covered; higher-volume production
 operations and vendor-specific MCP client dogfooding still need work before a
 larger hosted push.
 
-## Proven Today
+## Previously recorded capabilities and evidence
 
 - GitHub repo exists and CI runs on PRs and `main`.
 - Cloudflare Workers Builds deploys the monolithic Worker from root
@@ -163,20 +178,20 @@ larger hosted push.
   `3e4b35fa57c0dfb2d7cc45359858145dbf272813` has a green Cloudflare Workers
   Build:
   `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/9f6dc277-e53e-4b23-97d7-adbeb425518e`.
-- [x] Latest verified runtime candidate
+- [x] Historical verified runtime candidate
   `3e4b35fa57c0dfb2d7cc45359858145dbf272813` has green live smoke proving
   hosted auth, graph recall, readiness, R2 export, OAuth/MCP, hosted UI, remote
   Workers AI, Vectorize semantic recall, and conversation transcript ingestion:
   `https://github.com/andrew-bierman/openmemory/actions/runs/29666897021`.
-- [x] Remote D1 cleanup counters after current live smoke are zero:
+- [x] Remote D1 cleanup counters after the named historical live smoke are zero:
   `oauth_client=0`, `live_users=0`, `live_benchmark_users=0`.
-- [x] Latest full local release validation evidence passed on
+- [x] Historical full release validation evidence passed on
   `3e4b35fa57c0dfb2d7cc45359858145dbf272813` in
   `https://github.com/andrew-bierman/openmemory/actions/runs/29666687105`
   with `bun run release:validate`, including local recall MRR `1.0`, hit@3
   `1.0`, 220-memory graph recall `18.82ms`, 360-memory graph recall
   `21.28ms`, and 1,000-memory graph recall `39.67ms`.
-- [x] Latest hosted production graph benchmark evidence passed in
+- [x] Recorded hosted production graph benchmark evidence passed in
   `https://github.com/andrew-bierman/openmemory/actions/runs/33231544217`:
   trend summary analyzed 10 runs, latest recall latency `2895.96ms`, average
   recall latency `1221.60ms`, and a `12000ms` threshold. The artifact is 956
