@@ -1,3 +1,4 @@
+import type { ExecutionContext } from "@cloudflare/workers-types";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   ContextSchema,
@@ -6,7 +7,7 @@ import {
 } from "@openmemory/core";
 import { createMcpHandler } from "agents/mcp";
 import { verifyJwsAccessToken } from "better-auth/oauth2";
-import type { JSONWebKeySet } from "jose";
+import type { JSONWebKeySet, JWTPayload } from "jose";
 import * as z from "zod/v3";
 import {
   getGraph,
@@ -310,6 +311,13 @@ async function verifyMcpBearerToken(
         audience: `${resourceBaseURL}/mcp`,
       },
     });
+    // JWT access tokens are stateless in Better Auth. Signature validation alone
+    // cannot observe a disconnected client or deleted account.
+    if (!(await hasCurrentMcpGrant(env, payload))) {
+      return {
+        response: mcpUnauthorized(resourceBaseURL, "inactive OAuth grant"),
+      };
+    }
     const scopes = new Set(String(payload.scope ?? "").split(" "));
     const requiredScopes = await getRequiredMcpScopesForRequest(
       request.clone(),
@@ -337,6 +345,50 @@ async function verifyMcpBearerToken(
       ),
     };
   }
+}
+
+async function hasCurrentMcpGrant(env: Env, payload: JWTPayload) {
+  if (
+    !env.AUTH_DB ||
+    typeof payload.sub !== "string" ||
+    typeof payload.azp !== "string" ||
+    typeof payload.iat !== "number" ||
+    !Number.isFinite(payload.iat) ||
+    (payload.tenantId !== undefined && payload.tenantId !== payload.sub)
+  ) {
+    return false;
+  }
+
+  // Check the consenting user, not the client owner: public OAuth clients can
+  // legitimately be used by multiple users. Do not cache this revocation check.
+  const grant = await env.AUTH_DB.prepare(
+    `select c.disabled, g.scopes, g.created_at
+     from oauth_consent g
+     inner join oauth_client c on c.client_id = g.client_id
+     inner join user u on u.id = g.user_id
+     where g.user_id = ? and g.client_id = ? limit 1`,
+  )
+    .bind(payload.sub, payload.azp)
+    .first<{ disabled: number | null; scopes: string; created_at: number }>();
+  // Both timestamps have second precision. This rejects grants recreated later,
+  // but is not a token denylist: same-second revoke/regrant needs a generation
+  // marker to distinguish old tokens from newly issued ones.
+  if (!grant || grant.disabled || grant.created_at > payload.iat) {
+    return false;
+  }
+
+  let grantedScopes: unknown;
+  try {
+    grantedScopes = JSON.parse(grant.scopes);
+  } catch {
+    grantedScopes = grant.scopes.split(/\s+/);
+  }
+  if (!Array.isArray(grantedScopes)) return false;
+  const scopes = new Set(grantedScopes);
+  return String(payload.scope ?? "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((scope) => scopes.has(scope));
 }
 
 async function readJwks(env: Env, issuer: string): Promise<JSONWebKeySet> {
