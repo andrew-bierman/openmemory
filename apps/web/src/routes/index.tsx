@@ -243,10 +243,6 @@ function Home() {
     !isResolvingProductionApiUrl;
   const queryClient = useQueryClient();
   const apiBaseUrl = cleanBaseUrl(apiUrl);
-  const queryScope = useMemo(
-    () => [apiBaseUrl, usesLocalTenant ? tenantId : "session", token] as const,
-    [apiBaseUrl, tenantId, token, usesLocalTenant],
-  );
 
   const api = useMemo(
     () =>
@@ -263,6 +259,37 @@ function Home() {
     queryFn: () => getSession(apiBaseUrl),
   });
   const sessionUser = sessionQuery.data ?? null;
+  const identityScope = JSON.stringify([
+    apiBaseUrl,
+    sessionUser?.id ?? null,
+    usesLocalTenant ? tenantId : "session",
+    token,
+  ]);
+  const queryScope = useMemo(
+    () => [{ dashboardScope: identityScope }] as const,
+    [identityScope],
+  );
+  useEffect(() => {
+    // Queries have different prefixes (memory ID, recall query), so identify
+    // their common scope by its marker rather than a positional key index.
+    return () => {
+      const previousScope = {
+        predicate: (query: { queryKey: readonly unknown[] }) =>
+          query.queryKey[0] === "openmemory" &&
+          query.queryKey.some(
+            (part) =>
+              typeof part === "object" &&
+              part !== null &&
+              "dashboardScope" in part &&
+              part.dashboardScope === identityScope,
+          ),
+      };
+      // A cookie change may have started a new user's request under the old
+      // key. Discard that in-flight result and the old cache on identity change.
+      void queryClient.cancelQueries(previousScope);
+      queryClient.removeQueries(previousScope);
+    };
+  }, [identityScope, queryClient]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: A different signed-in identity must explicitly opt in again.
   useEffect(() => {
     setSharedReadAccess(false);
@@ -314,7 +341,7 @@ function Home() {
   });
   const accountQuery = useQuery<Account | null>({
     enabled: hasLoadedConnection && Boolean(sessionUser),
-    queryKey: ["openmemory", "account", ...queryScope, sessionUser?.id],
+    queryKey: ["openmemory", "account", ...queryScope],
     queryFn: () => api.getAccount().catch(() => null),
   });
   const contextQuery = useQuery({
