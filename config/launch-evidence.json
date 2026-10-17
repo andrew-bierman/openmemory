@@ -32,31 +32,31 @@
   "screenshotDirectory": ".tmp/screenshots/launch-readiness",
   "historicalEvidenceNotice": "The existing repository, runtime, benchmark and cleanup fields are historical records for their named commits/runs, not qualification of the current local candidate.",
   "currentLocalCandidate": {
-    "commit": "5afd7d6841eb242cfa73a478bec1ad433bd720da",
+    "commit": "24fa5b659d7ea04b0e2e4fbf4372c82a0f2a393a",
     "status": "locally-qualified",
     "hostedStatus": "not-run",
     "releaseReady": false,
-    "qualificationManifest": "../openmemory-validation-artifacts-20261017/results/passwordless-final-summary.json",
+    "qualificationManifest": "../openmemory-validation-artifacts-20261017/results/next-gate-final-summary.json",
     "pending": [
-      "Implement/configure approved real AUTH_EMAIL transport and sender; prove delivery and failure handling",
-      "Approve exact admission/provisioning list; prove existing users can access preserved identities before password cutover",
-      "Approve isolated staging resources, budget, additive migrations and deployment; qualify exact hosted candidate",
-      "Real Cursor, Claude and ChatGPT OAuth/MCP checks with explicitly approved grants",
-      "Production semantic RAG trace and rerank threshold review",
-      "Configure approved disposable passwordless fixtures for scheduled live jobs"
+      "Exact sender/domain and scoped sending-only key in existing selected Resend account",
+      "Approved controlled recipients, staging resources/configuration and deployment",
+      "Hosted private service-binding and real inbox/OTP qualification",
+      "Broader non-deleting harness coverage: browser, revocation/isolation, exports, PKCE and actual vendor checks",
+      "Existing-user passwordless migration proof before cutover",
+      "Real Cursor, Claude and ChatGPT OAuth/MCP evidence",
+      "Production semantic provider trace/quality and rerank posture evidence"
     ],
     "checks": {
-      "testFiles": 27,
-      "testsPassed": 209,
-      "browserTestsPassed": 3,
-      "typecheckProjectsPassed": 6,
+      "testFiles": 29,
+      "testsPassed": 264,
+      "typecheckProjectsPassed": 7,
       "retainedReviewFindings": 0
     },
-    "browserEvidence": {
+    "priorBrowserEvidence": {
       "candidate": "5afd7d6841eb242cfa73a478bec1ad433bd720da",
-      "testsPassed": 3,
-      "syntheticEmailTransport": true,
-      "realVendorEvidence": false
+      "passed": 3,
+      "rerun": false,
+      "reason": "No UI changes; retained as prior-candidate evidence only"
     }
   },
   "maintenanceEvidence": {
