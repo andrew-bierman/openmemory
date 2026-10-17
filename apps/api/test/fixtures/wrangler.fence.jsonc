@@ -1,0 +1,10 @@
+{
+  "name": "openmemory-ingestion-fence-test",
+  "main": "./ingestion-fence-worker.ts",
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [{ "name": "GRAPHS", "class_name": "MemoryGraph" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MemoryGraph"] }]
+}

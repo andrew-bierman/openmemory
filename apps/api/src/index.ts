@@ -35,6 +35,7 @@ import {
   resolveSessionTenant,
   resolveTenant,
 } from "./auth";
+import { parseWorkGeneration, workflowInstanceId } from "./background-work";
 import {
   handleOpenMemoryAuthRequest,
   isAuthRoute,
@@ -77,6 +78,7 @@ import {
 import {
   getGraphForTenant,
   type IngestionQueueMessage,
+  indexMemoryWithGeneration,
   ingestConversationTranscript,
   ingestSourceDocument,
   processSourceIngestionMessage,
@@ -380,11 +382,12 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       }
 
       const graph = getGraph(env, tenantId);
-      const purged = await graph.purgeTenantData();
+      const purged = await graph.purgeTenantData(true);
       const vectorIndex = await deleteTenantVectors(
         env,
         tenantId,
         purged.deletedMemoryIds,
+        purged.purgedGeneration,
       );
       const exports = await deleteTenantExports(env, tenantId);
       const deleted = await deleteAccountControlPlane(env, request, {
@@ -462,6 +465,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         env,
         tenantId,
         purged.deletedMemoryIds,
+        purged.purgedGeneration,
       );
       const exports = await deleteTenantExports(env, tenantId);
 
@@ -487,6 +491,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
+      const generation = await graph.getIngestionGeneration();
       const memory = await graph.createMemory(
         CreateMemorySchema.parse(
           enrichMemoryInput({
@@ -496,12 +501,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
             ...body,
           }),
         ),
+        generation,
       );
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
-      await indexMemory(env, tenantId, memory);
-      await graph.linkRelatedMemories(memory.id);
+      await indexMemoryWithGeneration(env, tenantId, graph, memory, generation);
+      await graph.linkRelatedMemories(memory.id, generation);
       await enqueueMemoryExtraction(env, {
         memoryId: memory.id,
+        generation,
         reason: "create",
         tenantId,
       });
@@ -517,6 +524,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
+      const generation = await graph.getIngestionGeneration();
       const memory = await graph.createMemory(
         CreateMemorySchema.parse(
           enrichMemoryInput({
@@ -526,12 +534,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
             ...body,
           }),
         ),
+        generation,
       );
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
-      await indexMemory(env, tenantId, memory);
-      const edges = await graph.linkRelatedMemories(memory.id);
+      await indexMemoryWithGeneration(env, tenantId, graph, memory, generation);
+      const edges = await graph.linkRelatedMemories(memory.id, generation);
       await enqueueMemoryExtraction(env, {
         memoryId: memory.id,
+        generation,
         reason: "create",
         tenantId,
       });
@@ -605,6 +615,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           tenantId,
           input,
           requestedAt: job.createdAt,
+          generation: job.generation,
         },
         { contentType: "json" },
       );
@@ -682,6 +693,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           tenantId,
           input,
           requestedAt: job.createdAt,
+          generation: job.generation,
         },
         { contentType: "json" },
       );
@@ -739,18 +751,21 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
+      const generation = await graph.getIngestionGeneration();
       const memory = await graph.updateMemory(
         params.id,
         UpdateMemorySchema.parse(enrichMemoryInput({ metadata: {}, ...body })),
+        generation,
       );
       if (!memory) {
         return status(404, { error: "not_found" as const });
       }
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
-      await indexMemory(env, tenantId, memory);
-      await graph.linkRelatedMemories(memory.id);
+      await indexMemoryWithGeneration(env, tenantId, graph, memory, generation);
+      await graph.linkRelatedMemories(memory.id, generation);
       await enqueueMemoryExtraction(env, {
         memoryId: memory.id,
+        generation,
         reason: "update",
         tenantId,
       });
@@ -1019,6 +1034,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           env,
           tenantId,
           restored.purged.deletedMemoryIds,
+          restored.purged.purgedGeneration,
         );
         const activeMemories = graphExport.data.memories.filter(
           (memory) => memory.status === "active" && memory.isLatest,
@@ -1061,11 +1077,13 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     }
 
     const tenantId = "tenantId" in tenant ? tenant.tenantId : "unknown";
+    const repairGeneration = await graph.getIngestionGeneration();
     const before = await graph.getIndexInventory();
     const staleVectors = await deleteTenantVectors(
       env,
       tenantId,
       before.purgeableMemoryIds,
+      repairGeneration,
     );
     const memories = await graph.listIndexableMemories();
     const indexResults = [];
@@ -1238,7 +1256,12 @@ async function startMemoryExtractionWorkflow(
 ) {
   try {
     await requestEnv.MEMORY_EXTRACTION_WORKFLOW?.create({
-      id: message.memoryId.slice(0, 100),
+      id: await workflowInstanceId(
+        "extract",
+        message.tenantId,
+        message.memoryId,
+        message.generation ?? 0,
+      ),
       params: message,
       retention: {
         successRetention: "7 days",
@@ -1256,12 +1279,22 @@ function parseSourceIngestionMessage(value: unknown): IngestionQueueMessage {
   if (!isRecord(value)) {
     throw new Error("Invalid source ingestion queue message.");
   }
+  if (
+    typeof value.sourceId !== "string" ||
+    !value.sourceId ||
+    typeof value.tenantId !== "string" ||
+    !normalizeTenantId(value.tenantId)
+  ) {
+    throw new Error("Source ingestion identifiers are required.");
+  }
+  const generation = parseWorkGeneration(value.generation);
   if (value.kind === "conversation") {
     return {
       kind: "conversation",
       version: 1,
-      sourceId: String(value.sourceId),
-      tenantId: String(value.tenantId),
+      sourceId: value.sourceId,
+      tenantId: value.tenantId,
+      generation,
       input: IngestConversationSchema.parse(value.input),
       requestedAt:
         typeof value.requestedAt === "string"
@@ -1272,8 +1305,9 @@ function parseSourceIngestionMessage(value: unknown): IngestionQueueMessage {
   return {
     kind: "source",
     version: 1,
-    sourceId: String(value.sourceId),
-    tenantId: String(value.tenantId),
+    sourceId: value.sourceId,
+    tenantId: value.tenantId,
+    generation,
     input: IngestSourceSchema.parse(value.input),
     requestedAt:
       typeof value.requestedAt === "string"
@@ -1291,10 +1325,19 @@ async function startSourceIngestionWorkflow(
   message: IngestionQueueMessage,
 ) {
   const graph = getGraphForTenant(requestEnv, message.tenantId);
-  await graph.startIngestionJob(message.sourceId);
+  const job = await graph.startIngestionJob(
+    message.sourceId,
+    message.generation ?? 0,
+  );
+  if (!job) return;
   try {
     await requestEnv.SOURCE_INGESTION_WORKFLOW?.create({
-      id: message.sourceId.slice(0, 100),
+      id: await workflowInstanceId(
+        "ingest",
+        message.tenantId,
+        message.sourceId,
+        message.generation ?? 0,
+      ),
       params: message,
       retention: {
         successRetention: "7 days",
