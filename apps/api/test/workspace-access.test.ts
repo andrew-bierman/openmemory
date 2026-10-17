@@ -40,6 +40,186 @@ function database(migrate = true) {
 }
 
 describe("accepted workspace membership", () => {
+  test("migration adds only a missing live owner's membership and account repair keeps its identity", async () => {
+    const db = database(false);
+    db.exec("DELETE FROM workspace_member WHERE user_id='owner'");
+    const legacy = db.prepare("SELECT * FROM workspace_member").all();
+    db.exec(
+      readFileSync(
+        new URL("../drizzle/0006_team_accounts.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    const { env } = fixture(db);
+    const access = await getWorkspaceAccess(env, "owner", "team");
+    expect(access).toMatchObject({
+      workspaceId: "team",
+      ownerUserId: "owner",
+      role: "owner",
+    });
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS n FROM workspace_member WHERE workspace_id='team' AND accepted_at IS NOT NULL",
+        )
+        .get()?.n,
+    ).toBe(1);
+    expect(await getWorkspaceAccess(env, "member", "team")).toBeUndefined();
+    expect(
+      db
+        .prepare(
+          "SELECT id,user_id,email FROM workspace_member WHERE id='legacy-instance'",
+        )
+        .get(),
+    ).toMatchObject({
+      id: legacy[0].id,
+      user_id: legacy[0].user_id,
+      email: legacy[0].email,
+    });
+    for (let i = 0; i < 2; i++) {
+      expect(
+        (
+          await getAccount(
+            env,
+            new Request("https://memory.example/v1/account"),
+          )
+        ).status,
+      ).toBe(200);
+      expect(await getWorkspaceAccess(env, "owner", "team")).toEqual(access);
+    }
+    expect(db.prepare("SELECT count(*) AS n FROM user").get()?.n).toBe(4);
+    expect(
+      db.prepare("SELECT count(*) AS n FROM workspace_member").get()?.n,
+    ).toBe(2);
+    db.close();
+  });
+  test("migration does not fabricate acceptance for missing or deleted owners", async () => {
+    const db = database(false);
+    db.exec(
+      "PRAGMA foreign_keys=OFF; INSERT INTO workspace VALUES('orphan','missing-user','Orphan',1,1); INSERT INTO workspace_member VALUES('orphan-member','orphan','missing-user','ghost@example.com','owner','active',1,1); INSERT INTO workspace VALUES('empty-orphan','missing-user','Empty orphan',1,1); PRAGMA foreign_keys=ON",
+    );
+    db.exec(
+      "INSERT INTO workspace VALUES('deleted-owner-team','other','Deleted owner',1,1); DELETE FROM user WHERE id='other'",
+    );
+    db.exec(
+      readFileSync(
+        new URL("../drizzle/0006_team_accounts.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    const { env } = fixture(db);
+    expect(
+      db
+        .prepare(
+          "SELECT accepted_at FROM workspace_member WHERE id='orphan-member'",
+        )
+        .get()?.accepted_at,
+    ).toBeNull();
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS n FROM workspace_member WHERE workspace_id='empty-orphan'",
+        )
+        .get()?.n,
+    ).toBe(0);
+    expect(
+      db
+        .prepare(
+          "SELECT count(*) AS n FROM workspace WHERE id='deleted-owner-team'",
+        )
+        .get()?.n,
+    ).toBe(0);
+    for (const workspaceId of [
+      "orphan",
+      "empty-orphan",
+      "deleted-owner-team",
+    ]) {
+      expect(
+        await getWorkspaceAccess(env, "missing-user", workspaceId),
+      ).toBeUndefined();
+      expect(
+        await getWorkspaceAccess(env, "owner", workspaceId),
+      ).toBeUndefined();
+    }
+    expect(await getWorkspaceAccess(env, "owner", "team")).toMatchObject({
+      memberId: "owner-instance",
+    });
+    db.close();
+  });
+  test("missing owner repair cannot overwrite an existing member with a colliding email", async () => {
+    const db = database(false);
+    db.exec(
+      "DELETE FROM workspace_member WHERE user_id='owner'; UPDATE workspace_member SET email='owner@example.com' WHERE id='legacy-instance'",
+    );
+    db.exec(
+      readFileSync(
+        new URL("../drizzle/0006_team_accounts.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    const { env } = fixture(db);
+    expect(
+      db
+        .prepare("SELECT id,user_id,email,accepted_at FROM workspace_member")
+        .all(),
+    ).toEqual([
+      {
+        id: "legacy-instance",
+        user_id: "member",
+        email: "owner@example.com",
+        accepted_at: null,
+      },
+    ]);
+    expect(await getWorkspaceAccess(env, "owner", "team")).toBeUndefined();
+    expect(await getWorkspaceAccess(env, "member", "team")).toBeUndefined();
+    db.close();
+  });
+  test("runtime missing-owner repair still creates a membership for a valid unconflicted owner", async () => {
+    const { env, sqlite } = fixture();
+    sqlite.exec("DELETE FROM workspace_member WHERE user_id='owner'");
+    expect(
+      (await getAccount(env, new Request("https://memory.example/v1/account")))
+        .status,
+    ).toBe(200);
+    const access = await getWorkspaceAccess(env, "owner", "team");
+    expect(access).toMatchObject({ ownerUserId: "owner", role: "owner" });
+    expect(await getWorkspaceAccess(env, "member", "team")).toBeUndefined();
+    expect(
+      (await getAccount(env, new Request("https://memory.example/v1/account")))
+        .status,
+    ).toBe(200);
+    expect(await getWorkspaceAccess(env, "owner", "team")).toEqual(access);
+    sqlite.close();
+  });
+  test("account repair cannot activate an owner blocked by a mixed-case historical email collision", async () => {
+    const db = database(false);
+    db.exec(
+      "DELETE FROM workspace_member WHERE user_id='owner'; UPDATE workspace_member SET email='Owner@Example.com' WHERE id='legacy-instance'",
+    );
+    db.exec(
+      readFileSync(
+        new URL("../drizzle/0006_team_accounts.sql", import.meta.url),
+        "utf8",
+      ),
+    );
+    const { env } = fixture(db);
+    const before = db
+      .prepare("SELECT * FROM workspace_member ORDER BY id")
+      .all();
+    expect(await getWorkspaceAccess(env, "owner", "team")).toBeUndefined();
+    await expect(
+      getAccount(env, new Request("https://memory.example/v1/account")),
+    ).rejects.toMatchObject({
+      status: 409,
+      error: "owner_membership_conflict",
+    });
+    expect(await getWorkspaceAccess(env, "owner", "team")).toBeUndefined();
+    expect(await getWorkspaceAccess(env, "member", "team")).toBeUndefined();
+    expect(
+      db.prepare("SELECT * FROM workspace_member ORDER BY id").all(),
+    ).toEqual(before);
+    db.close();
+  });
   test("migration preserves duplicate legacy rows and owner repair retains one canonical membership", async () => {
     const db = database(false);
     db.exec(
