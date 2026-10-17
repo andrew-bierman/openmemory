@@ -123,6 +123,7 @@ export const oauthRefreshToken = sqliteTable("oauth_refresh_token", {
 export const oauthConsent = sqliteTable(
   "oauth_consent",
   {
+    grantVersion: text("grant_version").notNull().default(""),
     id: text("id").primaryKey(),
     clientId: text("client_id").notNull(),
     userId: text("user_id").notNull(),
