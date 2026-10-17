@@ -155,6 +155,53 @@ test("accepted teammates see only explicitly shared versions and lose revoked ac
       { headers },
     );
     expect(await privateMemories.text()).toContain(privateText);
+    // A changed session must not reuse the previous person's private cache while
+    // the new identity's real memory request is still in flight.
+    await expect(
+      owner.page.getByLabel("Your active memory version"),
+    ).toContainText(privateText);
+    const ownerCookies = await owner.context.cookies();
+    let releaseMemories!: () => void;
+    let memoryRequested = false;
+    const memoryBarrier = new Promise<void>((resolve) => {
+      releaseMemories = resolve;
+    });
+
+    const memoryUrl = `${API}/v1/memories?*`;
+    await owner.page.route(memoryUrl, async (route) => {
+      memoryRequested = true;
+      await memoryBarrier;
+      await route.continue();
+    });
+    try {
+      const changed = await owner.context.request.post(
+        `${API}/api/auth/sign-in/email`,
+        {
+          headers,
+          data: { email: member.email, password: "Team-test-password-123" },
+        },
+      );
+      expect(changed.ok(), await changed.text()).toBe(true);
+      await owner.page
+        .getByRole("button", { name: "Refresh", exact: true })
+        .click();
+      await expect.poll(() => memoryRequested).toBe(true);
+      await expect(owner.page.locator(".account-summary")).toContainText(
+        member.email.toLowerCase(),
+      );
+      await expect(owner.page.getByLabel("Team sharing")).toBeVisible();
+      await expect(
+        owner.page.getByLabel("Your active memory version"),
+      ).toBeVisible();
+      await expect(
+        owner.page.getByLabel("Your active memory version"),
+      ).not.toContainText(privateText);
+    } finally {
+      releaseMemories();
+      await owner.page.unrouteAll({ behavior: "wait" });
+      await owner.context.clearCookies();
+      await owner.context.addCookies(ownerCookies);
+    }
   } finally {
     for (const { context, email, tenantId } of accounts) {
       const response = await context.request.delete(`${API}/v1/account`, {
