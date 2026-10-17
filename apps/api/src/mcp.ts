@@ -20,14 +20,36 @@ import type { Env } from "./env";
 import { getRequiredMcpScopesForRequest } from "./mcp-scopes";
 import type { MemoryGraph } from "./memory-graph";
 import { buildRecallContext } from "./recall";
+import { listSharedMemories, readSharedMemory } from "./workspace-sharing";
 
-export function createOpenMemoryMcpHandler(): (
+export function createOpenMemoryMcpHandler() {
+  const handler = createAuthenticatedMcpHandler();
+  return async (request: Request, env: Env, ctx: ExecutionContext) => {
+    const response = await handler(request, env, ctx);
+    const headers = new Headers(response.headers);
+    headers.set("cache-control", "private, no-store");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  };
+}
+
+function createAuthenticatedMcpHandler(): (
   request: Request,
   env: Env,
   ctx: ExecutionContext,
 ) => Promise<Response> {
   return async (request: Request, env: Env, ctx: ExecutionContext) => {
-    if (!isLocalDevelopmentRequest(request)) {
+    const authorization = request.headers.get("authorization");
+    const localApiKey =
+      env.OPENMEMORY_API_TOKEN &&
+      authorization === `Bearer ${env.OPENMEMORY_API_TOKEN}`;
+    if (
+      !isLocalDevelopmentRequest(request) ||
+      (authorization && !localApiKey)
+    ) {
       const authBaseURL = resolveAuthBaseUrl(env, request);
       const resourceBaseURL = resolveResourceBaseUrl(authBaseURL);
       const jwt = await verifyMcpBearerToken(
@@ -56,6 +78,7 @@ export function createOpenMemoryMcpHandler(): (
 
       return handleMcpRequest(withTenantHeader(request, tenantId), env, ctx, {
         allowHeaderTenant: true,
+        authenticatedUserId: jwt.payload.sub,
       });
     }
 
@@ -69,9 +92,13 @@ async function handleMcpRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
-  options: { allowHeaderTenant: boolean } = { allowHeaderTenant: false },
+  options: { allowHeaderTenant: boolean; authenticatedUserId?: string } = {
+    allowHeaderTenant: false,
+  },
 ): Promise<Response> {
-  const auth = resolveAuth(env, request.headers);
+  const auth = options.authenticatedUserId
+    ? { ok: true as const }
+    : resolveAuth(env, request.headers);
   if (!auth.ok) {
     return json({ error: auth.error, message: auth.message }, 401);
   }
@@ -89,6 +116,54 @@ async function handleMcpRequest(
     name: "openmemory",
     version: "0.1.0-alpha",
   });
+
+  const workspaceId = z.string().min(1).max(128);
+  const page = {
+    limit: z.number().int().min(1).max(25).optional(),
+    cursor: z.string().max(1024).optional(),
+  };
+  async function sharedResult(read: (actorId: string) => Promise<unknown>) {
+    if (!options.authenticatedUserId)
+      return {
+        ...textTool("Shared memories require OAuth authorization."),
+        isError: true,
+      };
+    try {
+      const result = await read(options.authenticatedUserId);
+      if (!result)
+        return { ...textTool("Shared memory unavailable."), isError: true };
+      return textTool(JSON.stringify(result));
+    } catch {
+      return { ...textTool("Shared memory unavailable."), isError: true };
+    }
+  }
+  server.tool(
+    "shared_list",
+    "List explicitly shared read-only memories in an accepted workspace. Personal memories are excluded.",
+    { workspaceId, ...page },
+    async ({ workspaceId, ...input }) =>
+      sharedResult((actorId) =>
+        listSharedMemories(env, actorId, workspaceId, input),
+      ),
+  );
+  server.tool(
+    "shared_read",
+    "Read a currently authorized shared memory by share ID.",
+    { workspaceId, shareId: z.string().min(1).max(128) },
+    async ({ workspaceId, shareId }) =>
+      sharedResult((actorId) =>
+        readSharedMemory(env, actorId, workspaceId, shareId),
+      ),
+  );
+  server.tool(
+    "shared_search",
+    "Search explicitly shared memories using page-local lexical matching. Follow nextCursor for more results.",
+    { workspaceId, q: z.string().min(1).max(500), ...page },
+    async ({ workspaceId, ...input }) =>
+      sharedResult((actorId) =>
+        listSharedMemories(env, actorId, workspaceId, input),
+      ),
+  );
 
   server.tool(
     "remember",

@@ -230,9 +230,16 @@ export async function listSharedMemories(
     last && processed < rows.length
       ? btoa(JSON.stringify([workspaceId, last.created_at, last.share_id]))
       : undefined;
+  if (terms.length)
+    fresh.sort((a, b) => lexicalScore(b, terms) - lexicalScore(a, terms));
   return { items: fresh, nextCursor, ranking: "page-local" as const };
 }
 function matches(item: SharedMemory, terms: string[]) {
   const text = `${item.content} ${item.tags.join(" ")}`.toLocaleLowerCase();
   return terms.every((term) => text.includes(term));
+}
+
+function lexicalScore(item: SharedMemory, terms: string[]) {
+  const text = `${item.content} ${item.tags.join(" ")}`.toLocaleLowerCase();
+  return terms.reduce((score, term) => score + text.split(term).length - 1, 0);
 }

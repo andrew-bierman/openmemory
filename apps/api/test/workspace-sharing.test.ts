@@ -57,7 +57,9 @@ function fixture() {
   const graph = {
     getIngestionGeneration: vi.fn(async () => 0),
     createMemoryShare: vi.fn(async () => projection),
-    readMemoryShare: vi.fn(async () => (revoked ? undefined : projection)),
+    readMemoryShare: vi.fn(async (_shareId?: string, _workspaceId?: string) =>
+      revoked ? undefined : projection,
+    ),
     revokeMemoryShare: vi.fn(async () => {
       revoked = true;
       return { revoked: true };
@@ -196,4 +198,39 @@ test("directory failures fail closed; revocation stays effective despite cleanup
     revokeSharedMemory(f.env, "owner", "team", "share"),
   ).rejects.toThrow();
   expect(await f.graph.readMemoryShare()).toBeUndefined();
+});
+
+test("shared search ranks only authorized page entries by matching term frequency", async () => {
+  const f = fixture();
+  const rows = ["low", "high", "hidden"].map((id) => ({
+    share_id: id,
+    memory_id: id,
+    workspace_id: "team",
+    owner_user_id: "owner",
+    created_at: 1,
+  }));
+  f.db.prepare.mockImplementation(() => ({
+    bind: vi.fn(() => ({
+      first: async () => rows[0],
+      all: async () => ({ results: rows }),
+      run: async () => ({ success: true, meta: { changes: 1 } }),
+    })),
+  }));
+  f.graph.readMemoryShare.mockImplementation(async (shareId) =>
+    shareId === "hidden"
+      ? undefined
+      : {
+          ...f.projection,
+          shareId: shareId ?? "",
+          memoryId: shareId ?? "",
+          tags: [],
+          content: shareId === "high" ? "launch launch plan" : "launch plan",
+        },
+  );
+  const result = await listSharedMemories(f.env, "reader", "team", {
+    q: "launch",
+    limit: 2,
+  });
+  expect(result.items.map((item) => item.shareId)).toEqual(["high", "low"]);
+  expect(result.nextCursor).toBeTruthy();
 });

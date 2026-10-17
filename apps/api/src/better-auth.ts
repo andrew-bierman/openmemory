@@ -74,6 +74,7 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
           "offline_access",
           "memory:read",
           "memory:write",
+          "memory:shared:read",
         ],
         validAudiences: [baseURL, `${baseURL}/mcp`],
         allowDynamicClientRegistration: true,
@@ -129,7 +130,13 @@ export function handleOpenMemoryAuthRequest(env: Env, request: Request) {
         authorization_servers: [
           `${authBaseUrl}/.well-known/oauth-authorization-server/api/auth`,
         ],
-        scopes_supported: ["openid", "profile", "memory:read", "memory:write"],
+        scopes_supported: [
+          "openid",
+          "profile",
+          "memory:read",
+          "memory:write",
+          "memory:shared:read",
+        ],
         bearer_methods_supported: ["header"],
       },
       200,
