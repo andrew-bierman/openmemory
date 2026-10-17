@@ -625,7 +625,12 @@ export function createOpenMemoryClient(
     inviteWorkspaceMember: (input: {
       email: string;
       role?: "admin" | "member";
-    }) => unwrap<WorkspaceMember>(client.v1.account.members.post(input)),
+    }) =>
+      teamRequest<WorkspaceMember & TeamInvitation>(
+        "/v1/account/members",
+        "POST",
+        input,
+      ),
     removeWorkspaceMember: (memberId: string) =>
       unwrap<Account>(client.v1.account.members({ memberId }).delete()),
     listOAuthConnections: () =>
