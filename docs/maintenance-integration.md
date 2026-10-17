@@ -30,3 +30,17 @@ Pause provider queue delivery before closure and check backlog age, retry budget
 Record a native recovery bookmark and verify the migration ledger and invariants within the approved window. Deploy the candidate closed, verify bindings/assets and invariants, and reopen only after explicit approval. A schema/data change may make old-code rollback unsafe; remain closed and use a compatible forward fix or separately reviewed coordinated recovery. D1 recovery does not atomically restore Durable Objects and can revive grants.
 
 No deployment, migration, queue pause, workflow termination, hosted test write, credential creation or vendor grant is performed by the local tests.
+
+## Isolated queue names
+
+For an isolated deployment, set `MEMORY_EXTRACTION_QUEUE_NAME` and
+`SOURCE_INGESTION_QUEUE_NAME` to the exact physical queue names in that
+deployment's producer/consumer bindings. Unset variables preserve the production
+defaults `openmemory-memory-extraction` and `openmemory-source-ingestion`.
+Names must be nonempty and distinct. Unknown queues throw before any handler or
+acknowledgement, allowing the configured queue retry/DLQ policy to apply.
+Setting the variables does not create queues or change bindings.
+
+The local workerd regression invokes the actual queue entry point with production
+and isolated names, invalid configuration, and downstream workflow failure.
+Hosted candidate validation and real vendor evidence remain pending.
