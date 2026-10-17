@@ -81,6 +81,7 @@ import {
   getSourceIngestSummary,
   getTypeDistribution,
 } from "../dashboard-model";
+import { TeamPanel } from "../team-components";
 import { Route as rootRoute } from "./__root";
 
 const INITIAL_ACTIVITY_NOW = new Date("2026-01-07T00:00:00.000Z");
@@ -198,8 +199,7 @@ function Home() {
   const [profileName, setProfileName] = useState("");
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [deleteConfirmTenantId, setDeleteConfirmTenantId] = useState("");
-  const [memberEmail, setMemberEmail] = useState("");
-  const [memberRole, setMemberRole] = useState<"admin" | "member">("member");
+  const [sharedReadAccess, setSharedReadAccess] = useState(false);
   const [oauthClientName, setOauthClientName] = useState(
     "OpenMemory MCP Client",
   );
@@ -263,6 +263,10 @@ function Home() {
     queryFn: () => getSession(apiBaseUrl),
   });
   const sessionUser = sessionQuery.data ?? null;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: A different signed-in identity must explicitly opt in again.
+  useEffect(() => {
+    setSharedReadAccess(false);
+  }, [sessionUser?.id]);
   const memoriesQuery = useQuery({
     enabled: hasLoadedConnection,
     queryKey: ["openmemory", "memories", ...queryScope],
@@ -294,12 +298,12 @@ function Home() {
     queryFn: () => api.getNeighbors(memoryId ?? ""),
   });
   const oauthConnectionsQuery = useQuery({
-    enabled: hasLoadedConnection && !usesLocalTenant && Boolean(sessionUser),
+    enabled: hasLoadedConnection && Boolean(sessionUser),
     queryKey: ["openmemory", "oauth-connections", ...queryScope],
     queryFn: () => api.listOAuthConnections().catch(() => []),
   });
   const oauthClientsQuery = useQuery({
-    enabled: hasLoadedConnection && !usesLocalTenant && Boolean(sessionUser),
+    enabled: hasLoadedConnection && Boolean(sessionUser),
     queryKey: ["openmemory", "oauth-clients", ...queryScope],
     queryFn: () => api.listOAuthClients().catch(() => []),
   });
@@ -309,8 +313,8 @@ function Home() {
     queryFn: () => api.getReadiness().catch(() => null),
   });
   const accountQuery = useQuery<Account | null>({
-    enabled: hasLoadedConnection && !usesLocalTenant,
-    queryKey: ["openmemory", "account", ...queryScope],
+    enabled: hasLoadedConnection && Boolean(sessionUser),
+    queryKey: ["openmemory", "account", ...queryScope, sessionUser?.id],
     queryFn: () => api.getAccount().catch(() => null),
   });
   const contextQuery = useQuery({
@@ -627,21 +631,6 @@ function Home() {
     onMutate: () => setError(null),
     onSuccess: invalidateDashboard,
   });
-  const inviteMemberMutation = useMutation({
-    mutationFn: api.inviteWorkspaceMember,
-    onError: (caught) => setError(formatError(caught)),
-    onMutate: () => setError(null),
-    onSuccess: async () => {
-      setMemberEmail("");
-      await invalidateDashboard();
-    },
-  });
-  const removeMemberMutation = useMutation({
-    mutationFn: api.removeWorkspaceMember,
-    onError: (caught) => setError(formatError(caught)),
-    onMutate: () => setError(null),
-    onSuccess: invalidateDashboard,
-  });
   const deleteAccountMutation = useMutation({
     mutationFn: api.deleteAccount,
     onError: (caught) => setError(formatError(caught)),
@@ -723,8 +712,6 @@ function Home() {
     deleteOAuthClientMutation.isPending ||
     renameWorkspaceMutation.isPending ||
     updateProfileMutation.isPending ||
-    inviteMemberMutation.isPending ||
-    removeMemberMutation.isPending ||
     deleteAccountMutation.isPending ||
     exportGraphMutation.isPending ||
     importPreviewMutation.isPending ||
@@ -827,6 +814,13 @@ function Home() {
     await createOAuthClientMutation.mutateAsync({
       name: oauthClientName.trim() || "OpenMemory MCP Client",
       redirectUris: parseRedirectUris(oauthRedirectUris),
+      scopes: [
+        "openid",
+        "profile",
+        "memory:read",
+        "memory:write",
+        ...(sharedReadAccess ? ["memory:shared:read"] : []),
+      ],
     });
   }
 
@@ -852,23 +846,6 @@ function Home() {
     }
 
     await updateProfileMutation.mutateAsync(nextName);
-  }
-
-  async function inviteCurrentMember(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const emailToInvite = memberEmail.trim();
-    if (!emailToInvite) {
-      return;
-    }
-
-    await inviteMemberMutation.mutateAsync({
-      email: emailToInvite,
-      role: memberRole,
-    });
-  }
-
-  async function removeCurrentMember(memberId: string) {
-    await removeMemberMutation.mutateAsync(memberId);
   }
 
   async function deleteCurrentAccount(event: FormEvent<HTMLFormElement>) {
@@ -1287,7 +1264,9 @@ function Home() {
             ) : view === "mcp" ? (
               <McpSetup
                 apiUrl={apiUrl}
-                canManageClients={!usesLocalTenant && Boolean(sessionUser)}
+                canManageClients={Boolean(sessionUser)}
+                sharedReadAccess={sharedReadAccess}
+                onSharedReadAccessChange={setSharedReadAccess}
                 clientName={oauthClientName}
                 clients={oauthClients}
                 connections={oauthConnections}
@@ -1310,6 +1289,16 @@ function Home() {
               />
             ) : view === "admin" ? (
               <AdminWorkspace
+                teamPanel={
+                  account && sessionUser ? (
+                    <TeamPanel
+                      key={`${apiBaseUrl}:${sessionUser.id}`}
+                      api={api}
+                      userId={sessionUser.id}
+                      memories={memories}
+                    />
+                  ) : null
+                }
                 account={account}
                 apiUrl={apiUrl}
                 connections={oauthConnections}
@@ -1318,13 +1307,9 @@ function Home() {
                 email={email}
                 isLoading={isLoading}
                 lastAccountDeletion={lastAccountDeletion}
-                memberEmail={memberEmail}
-                memberRole={memberRole}
                 name={name}
                 onDeleteAccount={deleteCurrentAccount}
-                onInviteMember={inviteCurrentMember}
                 onRevoke={revokeOAuthConnection}
-                onRemoveMember={removeCurrentMember}
                 onSaveProfile={saveCurrentProfile}
                 onRenameWorkspace={renameCurrentWorkspace}
                 onSignIn={signIn}
@@ -1337,8 +1322,6 @@ function Home() {
                 setDeleteConfirmEmail={setDeleteConfirmEmail}
                 setDeleteConfirmTenantId={setDeleteConfirmTenantId}
                 setEmail={setEmail}
-                setMemberEmail={setMemberEmail}
-                setMemberRole={setMemberRole}
                 setName={setName}
                 setPassword={setPassword}
                 setProfileName={setProfileName}
@@ -2302,6 +2285,8 @@ function MemoryMeta({ memory }: Readonly<{ memory: Memory }>) {
 }
 
 function McpSetup({
+  sharedReadAccess,
+  onSharedReadAccessChange,
   apiUrl,
   canManageClients,
   clientName,
@@ -2317,6 +2302,8 @@ function McpSetup({
   redirectUris,
 }: Readonly<{
   apiUrl: string;
+  sharedReadAccess: boolean;
+  onSharedReadAccessChange: (value: boolean) => void;
   canManageClients: boolean;
   clientName: string;
   clients: OAuthClientRegistration[];
@@ -2340,7 +2327,13 @@ function McpSetup({
     url: mcpUrl,
     authorizationServer: authServerMetadataUrl,
     protectedResource: protectedResourceMetadataUrl,
-    scopes: ["openid", "profile", "memory:read", "memory:write"],
+    scopes: [
+      "openid",
+      "profile",
+      "memory:read",
+      "memory:write",
+      ...(sharedReadAccess ? ["memory:shared:read"] : []),
+    ],
   };
   return (
     <div className="stack">
@@ -2384,6 +2377,22 @@ function McpSetup({
         </div>
       </div>
       <form className="settings-grid" onSubmit={onCreateClient}>
+        <label className="field settings-grid-wide">
+          <span>
+            <input
+              type="checkbox"
+              checked={sharedReadAccess}
+              onChange={(event) =>
+                onSharedReadAccessChange(event.target.checked)
+              }
+            />{" "}
+            Allow reading accepted teams’ shared memories
+          </span>
+          <small>
+            Optional memory:shared:read scope. The client still needs your OAuth
+            consent; membership and share revocation remain enforced.
+          </small>
+        </label>
         <div className="field">
           <Label htmlFor="oauthClientName">Client name</Label>
           <Input
