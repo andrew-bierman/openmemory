@@ -1827,6 +1827,205 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   expect(readiness.rerank.status).toBe("disabled");
 }, 45_000);
 
+test("team REST requires accepted membership and revokes selected-version access", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await worker.fetch("/api/auth/sign-up/email", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email, password: "password1234" }),
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const request = (path: string, method = "GET", body?: unknown) =>
+      worker.fetch(path, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const account = await getJson<AccountResponse>(
+      await request("/v1/account"),
+    );
+    return { email, cookie, request, account };
+  };
+  const owner = await signup("Owner"),
+    member = await signup("Member"),
+    outsider = await signup("Outsider");
+  const team = `/v1/workspaces/${owner.account.workspace.id}`;
+  expect(
+    (
+      await worker.fetch(`${team}/shares`, {
+        headers: tenantHeaders(owner.account.user.id),
+      })
+    ).status,
+  ).toBe(401);
+  expect(
+    (await owner.request(`${team}/shares`)).headers.get("cache-control"),
+  ).toContain("no-store");
+  expect(
+    (
+      await worker.fetch(`${team}/members`, {
+        headers: { cookie: owner.cookie, origin: "https://evil.example" },
+      })
+    ).status,
+  ).toBe(403);
+  const invite = async () =>
+    getJson<{ invitationId: string; token: string }>(
+      await owner.request(`${team}/invitations`, "POST", {
+        email: member.email,
+        role: "member",
+      }),
+    );
+  const first = await invite();
+  expect((await member.request(`${team}/shares`)).status).toBe(404);
+  expect(
+    (
+      await outsider.request(
+        `/v1/workspace-invitations/${first.invitationId}/accept`,
+        "POST",
+        { token: first.token },
+      )
+    ).status,
+  ).toBeGreaterThanOrEqual(400);
+  const accepted = await getJson<{ memberId: string }>(
+    await member.request(
+      `/v1/workspace-invitations/${first.invitationId}/accept`,
+      "POST",
+      { token: first.token },
+    ),
+  );
+  expect(
+    (
+      await member.request(
+        `/v1/workspace-invitations/${first.invitationId}/accept`,
+        "POST",
+        { token: first.token },
+      )
+    ).status,
+  ).toBeGreaterThanOrEqual(400);
+  const selected = await getJson<MemoryResponse>(
+    await member.request("/v1/memories", "POST", {
+      content: "Shared architecture selected version",
+      tags: ["team"],
+      metadata: { secret: "private metadata" },
+    }),
+  );
+  const privateMemory = await getJson<MemoryResponse>(
+    await member.request("/v1/memories", "POST", {
+      content: "Private neighbor must never leak",
+    }),
+  );
+  const intent = { memoryId: selected.id, requestId: crypto.randomUUID() };
+  const shared = await getJson<{ shareId: string }>(
+    await member.request(`${team}/shares`, "POST", intent),
+  );
+  const retry = await getJson<{ shareId: string }>(
+    await member.request(`${team}/shares`, "POST", intent),
+  );
+  expect(retry.shareId).toBe(shared.shareId);
+  const read = await getJson<Record<string, unknown>>(
+    await owner.request(`${team}/shares/${shared.shareId}`),
+  );
+  expect(Object.keys(read).sort()).toEqual(
+    [
+      "shareId",
+      "workspaceId",
+      "ownerUserId",
+      "memoryId",
+      "content",
+      "type",
+      "tags",
+    ].sort(),
+  );
+  expect(read.content).toBe("Shared architecture selected version");
+  const page = await getJson<{ items: unknown[] }>(
+    await owner.request(`${team}/search`, "POST", { q: "architecture" }),
+  );
+  expect(page.items).toEqual([read]);
+  expect((await owner.request(`/v1/memories/${selected.id}`)).status).toBe(404);
+  expect((await owner.request(`/v1/memories/${privateMemory.id}`)).status).toBe(
+    404,
+  );
+  expect(
+    (await outsider.request(`${team}/shares/${shared.shareId}`)).status,
+  ).toBe(404);
+  expect(
+    (
+      await owner.request(`${team}/shares`, "POST", {
+        memoryId: selected.id,
+        requestId: crypto.randomUUID(),
+      })
+    ).status,
+  ).toBe(409);
+  await expectOk(
+    await owner.request(`${team}/shares/${shared.shareId}`, "DELETE"),
+  );
+  await expectOk(await owner.request(`${team}/shares/${shared.shareId}`)); // Team owner cannot revoke someone else's grant.
+  expect(
+    (
+      await member.request(`${team}/invitations`, "POST", {
+        email: outsider.email,
+      })
+    ).status,
+  ).toBe(403);
+  await expectOk(
+    await owner.request(`${team}/members/${accepted.memberId}`, "DELETE"),
+  );
+  expect((await owner.request(`${team}/shares/${shared.shareId}`)).status).toBe(
+    404,
+  );
+  expect((await member.request(`${team}/shares`)).status).toBe(404);
+  const second = await invite();
+  const rejoined = await getJson<{ memberId: string }>(
+    await member.request(
+      `/v1/workspace-invitations/${second.invitationId}/accept`,
+      "POST",
+      { token: second.token },
+    ),
+  );
+  expect(rejoined.memberId).not.toBe(accepted.memberId);
+  expect((await owner.request(`${team}/shares/${shared.shareId}`)).status).toBe(
+    404,
+  );
+  const fresh = await getJson<{ shareId: string }>(
+    await member.request(`${team}/shares`, "POST", {
+      memoryId: selected.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  await expectOk(await owner.request(`${team}/shares/${fresh.shareId}`));
+  await expectOk(
+    await member.request(`${team}/shares/${fresh.shareId}`, "DELETE"),
+  );
+  expect((await owner.request(`${team}/shares/${fresh.shareId}`)).status).toBe(
+    404,
+  );
+  expect(
+    (
+      await owner.request(team, "DELETE", {
+        confirmWorkspaceId: owner.account.workspace.id,
+        confirmName: "wrong",
+      })
+    ).status,
+  ).toBeGreaterThanOrEqual(400);
+  await expectOk(
+    await owner.request(team, "DELETE", {
+      confirmWorkspaceId: owner.account.workspace.id,
+      confirmName: owner.account.workspace.name,
+    }),
+  );
+  expect((await member.request(`${team}/shares`)).status).toBe(404);
+  await expectOk(await member.request(`/v1/memories/${privateMemory.id}`));
+  const replacement = await getJson<AccountResponse>(
+    await owner.request("/v1/account"),
+  );
+  expect(replacement.workspace.id).not.toBe(owner.account.workspace.id);
+});
+
 test("worker API manages account workspace and team members", async () => {
   const worker = await startWorker({
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",

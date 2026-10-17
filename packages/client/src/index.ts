@@ -121,6 +121,42 @@ export type WorkspaceMember = {
   updatedAt: string;
 };
 
+export type TeamWorkspace = {
+  id: string;
+  name: string;
+  ownerUserId: string;
+  memberId: string;
+  role: "owner" | "admin" | "member";
+};
+export type TeamMember = {
+  id: string;
+  userId: string | null;
+  name: string | null;
+  email?: string;
+  role: "owner" | "admin" | "member";
+  status: string;
+  acceptedAt: number | null;
+};
+export type TeamInvitation = {
+  invitationId: string;
+  token: string;
+  expiresAt: string;
+};
+export type SharedMemory = {
+  shareId: string;
+  workspaceId: string;
+  ownerUserId: string;
+  memoryId: string;
+  content: string;
+  type: string;
+  tags: string[];
+};
+export type SharedMemoryPage = {
+  items: SharedMemory[];
+  nextCursor?: string;
+  ranking: "page-local";
+};
+
 export type GraphExportResult = {
   key: string;
   bytes: number;
@@ -455,8 +491,117 @@ export function createOpenMemoryClient(
     headers: requestHeaders,
   }) as unknown as EdenClient;
 
+  async function teamRequest<T>(
+    path: string,
+    method = "GET",
+    body?: unknown,
+  ): Promise<T> {
+    const response = await credentialedFetch(new URL(path, baseUrl), {
+      method,
+      headers: { "content-type": "application/json" },
+      cache: "no-store",
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+    const data = await response.json();
+    if (!response.ok)
+      throw new OpenMemoryApiError(
+        typeof data === "object" &&
+          data !== null &&
+          "error" in data &&
+          typeof data.error === "string"
+          ? data.error
+          : "Team request failed",
+        response.status,
+      );
+    return data as T;
+  }
+  const teamPath = (workspaceId: string) =>
+    `/v1/workspaces/${encodeURIComponent(workspaceId)}`;
+  const pageQuery = (input: { limit?: number; cursor?: string } = {}) => {
+    const params = new URLSearchParams();
+    if (input.limit !== undefined) params.set("limit", String(input.limit));
+    if (input.cursor) params.set("cursor", input.cursor);
+    return params.size ? `?${params}` : "";
+  };
   return {
     eden: client,
+    listWorkspaces: () => teamRequest<TeamWorkspace[]>("/v1/workspaces"),
+    listTeamMembers: (workspaceId: string) =>
+      teamRequest<TeamMember[]>(`${teamPath(workspaceId)}/members`),
+    inviteTeamMember: (
+      workspaceId: string,
+      input: { email: string; role: "admin" | "member" },
+    ) =>
+      teamRequest<TeamInvitation>(
+        `${teamPath(workspaceId)}/invitations`,
+        "POST",
+        input,
+      ),
+    acceptTeamInvitation: (invitationId: string, token: string) =>
+      teamRequest<{ workspaceId: string; memberId: string }>(
+        `/v1/workspace-invitations/${encodeURIComponent(invitationId)}/accept`,
+        "POST",
+        { token },
+      ),
+    revokeTeamInvitation: (workspaceId: string, invitationId: string) =>
+      teamRequest<{ revoked: true }>(
+        `${teamPath(workspaceId)}/invitations/${encodeURIComponent(invitationId)}`,
+        "DELETE",
+      ),
+    setTeamMemberRole: (
+      workspaceId: string,
+      memberId: string,
+      role: "admin" | "member",
+    ) =>
+      teamRequest<{ updated: true }>(
+        `${teamPath(workspaceId)}/members/${encodeURIComponent(memberId)}`,
+        "PATCH",
+        { role },
+      ),
+    removeTeamMember: (workspaceId: string, memberId: string) =>
+      teamRequest<{ removed: true }>(
+        `${teamPath(workspaceId)}/members/${encodeURIComponent(memberId)}`,
+        "DELETE",
+      ),
+    deleteWorkspace: (workspaceId: string, confirmName: string) =>
+      teamRequest<{ deleted: true }>(teamPath(workspaceId), "DELETE", {
+        confirmWorkspaceId: workspaceId,
+        confirmName,
+      }),
+    shareMemory: (
+      workspaceId: string,
+      input: { memoryId: string; requestId: string },
+    ) =>
+      teamRequest<SharedMemory>(
+        `${teamPath(workspaceId)}/shares`,
+        "POST",
+        input,
+      ),
+    revokeSharedMemory: (workspaceId: string, shareId: string) =>
+      teamRequest<{ revoked: true }>(
+        `${teamPath(workspaceId)}/shares/${encodeURIComponent(shareId)}`,
+        "DELETE",
+      ),
+    listSharedMemories: (
+      workspaceId: string,
+      input: { limit?: number; cursor?: string } = {},
+    ) =>
+      teamRequest<SharedMemoryPage>(
+        `${teamPath(workspaceId)}/shares${pageQuery(input)}`,
+      ),
+    readSharedMemory: (workspaceId: string, shareId: string) =>
+      teamRequest<SharedMemory>(
+        `${teamPath(workspaceId)}/shares/${encodeURIComponent(shareId)}`,
+      ),
+    searchSharedMemories: (
+      workspaceId: string,
+      input: { q: string; limit?: number; cursor?: string },
+    ) =>
+      teamRequest<SharedMemoryPage>(
+        `${teamPath(workspaceId)}/search`,
+        "POST",
+        input,
+      ),
     createMemory: (input: CreateMemoryInput) =>
       unwrap<Memory>(client.v1.memories.post(input)),
     forgetMemory: (id: string) =>
