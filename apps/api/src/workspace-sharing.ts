@@ -38,7 +38,6 @@ function ownerGraph(env: Env, ownerId: string) {
   return env.MEMORY_GRAPHS.get(env.MEMORY_GRAPHS.idFromName(tenantId));
 }
 
-// Directory rows only locate the authoritative owner. They never authorize content.
 async function authorizeRow(env: Env, actorId: string, row: DirectoryRow) {
   const reader = await getWorkspaceAccess(env, actorId, row.workspace_id);
   const owner = await getWorkspaceAccess(
@@ -133,7 +132,6 @@ export async function revokeSharedMemory(
   workspaceId: string,
   shareId: string,
 ) {
-  // Always use the authenticated owner's DO; knowing someone else's share ID confers nothing.
   await ownerGraph(env, actorId).revokeMemoryShare(shareId, workspaceId);
   await database(env)
     .prepare(
