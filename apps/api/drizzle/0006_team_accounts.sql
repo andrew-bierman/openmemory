@@ -2,9 +2,17 @@ ALTER TABLE workspace_member ADD COLUMN accepted_at integer;
 -- Preserve historical owner rows; only one deterministic identity gains acceptance.
 UPDATE workspace_member SET accepted_at=created_at, role='owner', status='active'
 WHERE user_id=(SELECT owner_user_id FROM workspace WHERE id=workspace_id)
+AND EXISTS(SELECT 1 FROM user u WHERE u.id=workspace_member.user_id)
 AND id=(SELECT min(m.id) FROM workspace_member m WHERE m.workspace_id=workspace_member.workspace_id AND m.user_id=workspace_member.user_id);
 UPDATE workspace_member SET status='invited', role=CASE WHEN role='admin' THEN 'admin' ELSE 'member' END
 WHERE accepted_at IS NULL;
+-- Add an owner membership only from a live designated owner, never an email match.
+-- Conflicting historical emails remain untouched and require reviewed repair.
+INSERT INTO workspace_member(id,workspace_id,user_id,email,role,status,created_at,updated_at,accepted_at)
+SELECT lower(hex(randomblob(16))),w.id,u.id,lower(u.email),'owner','active',unixepoch(),unixepoch(),unixepoch()
+FROM workspace w JOIN user u ON u.id=w.owner_user_id
+WHERE NOT EXISTS(SELECT 1 FROM workspace_member m WHERE m.workspace_id=w.id AND m.user_id=u.id)
+AND NOT EXISTS(SELECT 1 FROM workspace_member m WHERE m.workspace_id=w.id AND lower(m.email)=lower(u.email));
 CREATE UNIQUE INDEX workspace_member_user_idx ON workspace_member(workspace_id,user_id) WHERE accepted_at IS NOT NULL;
 CREATE TABLE workspace_invitation (
  id text PRIMARY KEY NOT NULL,

@@ -395,7 +395,6 @@ async function ensureOwnerMember(
   workspaceId: string,
   user: { email: string; name: string; userId: string },
 ) {
-  const email = normalizeEmail(user.email);
   const now = new Date();
   const [existing] = await db
     .select()
@@ -427,17 +426,19 @@ async function ensureOwnerMember(
     return;
   }
 
-  await db.insert(workspaceMember).values({
-    id: crypto.randomUUID(),
-    workspaceId,
-    userId: user.userId,
-    email,
-    role: "owner",
-    status: "active",
-    acceptedAt: now,
-    createdAt: now,
-    updatedAt: now,
-  });
+  // Match migration repair atomically: never bypass a historical email collision.
+  const inserted = await db.run(sql`
+    INSERT INTO workspace_member
+      (id,workspace_id,user_id,email,role,status,created_at,updated_at,accepted_at)
+    SELECT ${crypto.randomUUID()},w.id,u.id,lower(u.email),'owner','active',unixepoch(),unixepoch(),unixepoch()
+    FROM workspace w JOIN user u ON u.id=w.owner_user_id
+    WHERE w.id=${workspaceId} AND u.id=${user.userId}
+      AND NOT EXISTS(SELECT 1 FROM workspace_member m WHERE m.workspace_id=w.id AND m.user_id=u.id)
+      AND NOT EXISTS(SELECT 1 FROM workspace_member m WHERE m.workspace_id=w.id AND lower(m.email)=lower(u.email))
+  `);
+  if (!inserted.meta.changes) {
+    throw new WorkspaceAccessError(409, "owner_membership_conflict");
+  }
 }
 
 async function readAccount(context: Extract<AccountContext, { ok: true }>) {
