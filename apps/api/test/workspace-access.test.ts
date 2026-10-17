@@ -1,6 +1,13 @@
 import { existsSync, readFileSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { getAccount } from "../src/account";
+
+vi.mock("../src/better-auth", () => ({
+  resolveOpenMemorySession: vi.fn(async () => ({
+    user: { id: "owner", email: "owner@example.com", name: "Owner" },
+  })),
+}));
 
 function database(migrate = true) {
   const db = new DatabaseSync(":memory:");
@@ -33,11 +40,16 @@ function database(migrate = true) {
 }
 
 describe("accepted workspace membership", () => {
-  test("duplicate legacy owner rows converge without losing users or private data", () => {
+  test("migration preserves duplicate legacy rows and owner repair retains one canonical membership", async () => {
     const db = database(false);
     db.exec(
-      "INSERT INTO workspace_member VALUES('duplicate-owner','team','owner','old-owner@example.com','owner','active',1,1)",
+      "INSERT INTO workspace_member VALUES('duplicate-owner','team','owner','old-owner@example.com','owner','active',2,3)",
     );
+    const before = db
+      .prepare(
+        "SELECT id,workspace_id,user_id,email,created_at,updated_at FROM workspace_member ORDER BY id",
+      )
+      .all();
     db.exec(
       readFileSync(
         new URL("../drizzle/0006_team_accounts.sql", import.meta.url),
@@ -47,14 +59,62 @@ describe("accepted workspace membership", () => {
     expect(
       db
         .prepare(
-          "SELECT count(*) AS n FROM workspace_member WHERE user_id='owner' AND accepted_at IS NOT NULL",
+          "SELECT id,workspace_id,user_id,email,created_at,updated_at FROM workspace_member ORDER BY id",
         )
-        .get()?.n,
-    ).toBe(1);
+        .all(),
+    ).toEqual(before);
+    const { env } = fixture(db);
+    const accessBefore = await getWorkspaceAccess(env, "owner", "team");
+    expect(accessBefore).toMatchObject({
+      memberId: "duplicate-owner",
+      role: "owner",
+    });
+    const canonicalAcceptedAt = db
+      .prepare(
+        "SELECT accepted_at FROM workspace_member WHERE id='duplicate-owner'",
+      )
+      .get()?.accepted_at;
+    for (let iteration = 0; iteration < 3; iteration++) {
+      expect(
+        (
+          await getAccount(
+            env,
+            new Request("https://memory.example/v1/account"),
+          )
+        ).status,
+      ).toBe(200);
+      expect(await getWorkspaceAccess(env, "owner", "team")).toEqual(
+        accessBefore,
+      );
+    }
     expect(
-      db.prepare("SELECT id FROM workspace_member WHERE user_id='owner'").get()
-        ?.id,
-    ).toBe("duplicate-owner");
+      db
+        .prepare(
+          "SELECT id FROM workspace_member WHERE accepted_at IS NOT NULL AND user_id='owner'",
+        )
+        .all(),
+    ).toEqual([{ id: "duplicate-owner" }]);
+    expect(
+      db
+        .prepare(
+          "SELECT accepted_at FROM workspace_member WHERE id='duplicate-owner'",
+        )
+        .get()?.accepted_at,
+    ).toBe(canonicalAcceptedAt);
+    expect(
+      db
+        .prepare(
+          "SELECT id,workspace_id,user_id,email,created_at FROM workspace_member ORDER BY id",
+        )
+        .all(),
+    ).toEqual(before.map(({ updated_at, ...row }) => row));
+    expect(
+      db
+        .prepare(
+          "SELECT status,accepted_at FROM workspace_member WHERE id='owner-instance'",
+        )
+        .get(),
+    ).toMatchObject({ status: "invited", accepted_at: null });
     expect(db.prepare("SELECT count(*) AS n FROM user").get()?.n).toBe(4);
     db.close();
   });
@@ -88,8 +148,7 @@ import {
   revokeWorkspaceInvitation,
 } from "../src/workspace-access";
 
-function fixture() {
-  const sqlite = database();
+function fixture(sqlite = database()) {
   function prepare(sql: string) {
     let args: (string | number | null)[] = [];
     const statement = {
@@ -99,6 +158,12 @@ function fixture() {
       },
       async first() {
         return sqlite.prepare(sql).get(...args) ?? null;
+      },
+      async raw() {
+        return sqlite
+          .prepare(sql)
+          .all(...args)
+          .map((row) => Object.values(row));
       },
       async all() {
         return { results: sqlite.prepare(sql).all(...args) };

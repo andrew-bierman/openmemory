@@ -1,9 +1,8 @@
 ALTER TABLE workspace_member ADD COLUMN accepted_at integer;
--- Old email-based owner repair could create duplicate identities after an email change.
-DELETE FROM workspace_member WHERE user_id=(SELECT owner_user_id FROM workspace WHERE id=workspace_id)
-AND id<>(SELECT min(m.id) FROM workspace_member m WHERE m.workspace_id=workspace_member.workspace_id AND m.user_id=workspace_member.user_id);
+-- Preserve historical owner rows; only one deterministic identity gains acceptance.
 UPDATE workspace_member SET accepted_at=created_at, role='owner', status='active'
-WHERE user_id=(SELECT owner_user_id FROM workspace WHERE id=workspace_id);
+WHERE user_id=(SELECT owner_user_id FROM workspace WHERE id=workspace_id)
+AND id=(SELECT min(m.id) FROM workspace_member m WHERE m.workspace_id=workspace_member.workspace_id AND m.user_id=workspace_member.user_id);
 UPDATE workspace_member SET status='invited', role=CASE WHEN role='admin' THEN 'admin' ELSE 'member' END
 WHERE accepted_at IS NULL;
 CREATE UNIQUE INDEX workspace_member_user_idx ON workspace_member(workspace_id,user_id) WHERE accepted_at IS NOT NULL;
