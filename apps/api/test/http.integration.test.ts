@@ -1401,77 +1401,102 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
         token_endpoint_auth_method: "none",
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
-        scope: "openid profile memory:read memory:write",
+        scope: "openid profile offline_access memory:read memory:write",
       }),
     }),
   );
-  const codeVerifier = `openmemory-${crypto.randomUUID()}-${crypto.randomUUID()}`;
-  const codeChallenge = await pkceChallenge(codeVerifier);
-  const authorization = await getRedirectUrl(
-    await worker.fetch(
-      `/api/auth/oauth2/authorize?${new URLSearchParams({
-        response_type: "code",
-        resource: `${authOrigin}/mcp`,
-        client_id: oauthClient.client_id,
-        redirect_uri: "http://127.0.0.1/callback",
-        scope: "openid profile memory:read memory:write",
-        state: "oauth-smoke",
-        prompt: "consent",
-        code_challenge: codeChallenge,
-        code_challenge_method: "S256",
-      })}`,
-      {
-        headers: { cookie, accept: "application/json" },
-        redirect: "manual",
-      },
-    ),
-  );
-  const callback =
-    authorization.pathname === "/consent"
-      ? new URL(
-          (
-            await getJson<OAuthRedirectResponse>(
-              await worker.fetch("/api/auth/oauth2/consent", {
-                method: "POST",
-                headers: {
-                  cookie,
-                  "content-type": "application/json",
-                  accept: "application/json",
-                },
-                body: JSON.stringify({
-                  accept: true,
-                  scope: "openid profile memory:read memory:write",
-                  oauth_query: authorization.search.slice(1),
+  async function issueCode(consentingCookie = cookie) {
+    const codeVerifier = `openmemory-${crypto.randomUUID()}-${crypto.randomUUID()}`;
+    const codeChallenge = await pkceChallenge(codeVerifier);
+    const authorization = await getRedirectUrl(
+      await worker.fetch(
+        `/api/auth/oauth2/authorize?${new URLSearchParams({
+          response_type: "code",
+          resource: `${authOrigin}/mcp`,
+          client_id: oauthClient.client_id,
+          redirect_uri: "http://127.0.0.1/callback",
+          scope: "openid profile offline_access memory:read memory:write",
+          state: "oauth-smoke",
+          prompt: "consent",
+          code_challenge: codeChallenge,
+          code_challenge_method: "S256",
+        })}`,
+        {
+          headers: { cookie: consentingCookie, accept: "application/json" },
+          redirect: "manual",
+        },
+      ),
+    );
+    const callback =
+      authorization.pathname === "/consent"
+        ? new URL(
+            (
+              await getJson<OAuthRedirectResponse>(
+                await worker.fetch("/api/auth/oauth2/consent", {
+                  method: "POST",
+                  headers: {
+                    cookie: consentingCookie,
+                    "content-type": "application/json",
+                    accept: "application/json",
+                  },
+                  body: JSON.stringify({
+                    accept: true,
+                    scope:
+                      "openid profile offline_access memory:read memory:write",
+                    oauth_query: authorization.search.slice(1),
+                  }),
                 }),
-              }),
-            )
-          ).url,
-        )
-      : authorization;
-  expect(callback.searchParams.get("state")).toBe("oauth-smoke");
-  const code = callback.searchParams.get("code");
-  expect(code, callback.toString()).toBeTruthy();
+              )
+            ).url,
+          )
+        : authorization;
+    expect(callback.searchParams.get("state")).toBe("oauth-smoke");
+    const code = callback.searchParams.get("code");
+    expect(code, callback.toString()).toBeTruthy();
 
-  const tokenResponse = await worker.fetch("/api/auth/oauth2/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "authorization_code",
-      client_id: oauthClient.client_id,
-      code: code ?? "",
-      redirect_uri: "http://127.0.0.1/callback",
-      code_verifier: codeVerifier,
-      resource: `${authOrigin}/mcp`,
-    }),
-  });
-  expect(tokenResponse.status).toBe(200);
-  const issuedToken = (await tokenResponse.json()) as { access_token: string };
-  expect(typeof issuedToken.access_token).toBe("string");
-  const callWithIssuedToken = () =>
+    return () =>
+      worker.fetch("/api/auth/oauth2/token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          client_id: oauthClient.client_id,
+          code: code ?? "",
+          redirect_uri: "http://127.0.0.1/callback",
+          code_verifier: codeVerifier,
+          resource: `${authOrigin}/mcp`,
+        }),
+      });
+  }
+  async function issueToken(consentingCookie = cookie) {
+    const exchange = await issueCode(consentingCookie);
+    const tokenResponse = await exchange();
+    expect(tokenResponse.status).toBe(200);
+    return (await tokenResponse.json()) as {
+      access_token: string;
+      refresh_token?: string;
+    };
+  }
+  const issuedToken = await issueToken();
+  const delayedExchange = await issueCode();
+  function refresh(token: string | undefined) {
+    expect(typeof token).toBe("string");
+    return worker.fetch("/api/auth/oauth2/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: oauthClient.client_id,
+        refresh_token: token ?? "",
+        resource: `${authOrigin}/mcp`,
+      }),
+    });
+  }
+  const callWithIssuedToken = (bearer = issuedToken.access_token) =>
     worker.fetch("/mcp", {
       method: "POST",
       headers: {
-        authorization: `Bearer ${issuedToken.access_token}`,
+        authorization: `Bearer ${bearer}`,
         "content-type": "application/json",
         accept: "application/json, text/event-stream",
         "x-openmemory-user-id": "must-not-override-oauth",
@@ -1522,6 +1547,68 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   expect(afterRevoke.map((connection) => connection.clientId)).not.toContain(
     oauthClient.client_id,
   );
+
+  expect((await refresh(issuedToken.refresh_token)).status).toBe(400);
+  const reconsented = await issueToken();
+  expect((await delayedExchange()).status).toBe(400);
+  expect((await refresh(issuedToken.refresh_token)).status).toBe(400);
+  expect((await callWithIssuedToken(reconsented.access_token)).status).toBe(
+    200,
+  );
+  expect((await callWithIssuedToken()).status).toBe(401);
+  const grants = await getJson<Array<{ id: string; clientId: string }>>(
+    await worker.fetch("/api/auth/oauth2/get-consents", {
+      headers: { cookie },
+    }),
+  );
+  const grant = grants.find((item) => item.clientId === oauthClient.client_id);
+  expect(grant).toBeDefined();
+  for (const scopes of [
+    ["memory:read"],
+    ["openid", "profile", "memory:read", "memory:write"],
+  ]) {
+    const updated = await worker.fetch("/api/auth/oauth2/update-consent", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: grant?.id, update: { scopes } }),
+    });
+    expect(updated.status).toBe(200);
+    expect((await callWithIssuedToken(reconsented.access_token)).status).toBe(
+      401,
+    );
+  }
+  expect((await refresh(reconsented.refresh_token)).status).toBe(400);
+  const afterScopeChange = await issueToken();
+  expect(
+    (await callWithIssuedToken(afterScopeChange.access_token)).status,
+  ).toBe(200);
+  const providerDeleted = await worker.fetch(
+    "/api/auth/oauth2/delete-consent",
+    {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: grant?.id }),
+    },
+  );
+  expect(providerDeleted.status).toBe(200);
+  expect(
+    (await callWithIssuedToken(afterScopeChange.access_token)).status,
+  ).toBe(401);
+  const afterProviderDelete = await issueToken();
+  expect((await refresh(afterScopeChange.refresh_token)).status).toBe(400);
+  const validRefresh = await refresh(afterProviderDelete.refresh_token);
+  expect(validRefresh.status).toBe(200);
+  const rotated = (await validRefresh.json()) as {
+    access_token: string;
+    refresh_token: string;
+  };
+  expect((await callWithIssuedToken(rotated.access_token)).status).toBe(200);
+  expect(
+    (await callWithIssuedToken(afterProviderDelete.access_token)).status,
+  ).toBe(200);
+  expect(
+    (await callWithIssuedToken(afterScopeChange.access_token)).status,
+  ).toBe(401);
 
   const unauthenticatedClients = await worker.fetch("/v1/oauth/clients");
   expect(unauthenticatedClients.status).toBe(401);
@@ -1591,6 +1678,23 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   });
   await expectOk(secondSignUp);
   const secondCookie = getCookieHeader(secondSignUp);
+  const otherUserToken = await issueToken(secondCookie);
+  expect((await callWithIssuedToken(otherUserToken.access_token)).status).toBe(
+    200,
+  );
+  const disconnectFirstUser = await worker.fetch(
+    `/v1/oauth/connections/${oauthClient.client_id}`,
+    {
+      method: "DELETE",
+      headers: { cookie },
+    },
+  );
+  expect(disconnectFirstUser.status).toBe(200);
+  expect((await callWithIssuedToken(rotated.access_token)).status).toBe(401);
+  expect((await callWithIssuedToken(otherUserToken.access_token)).status).toBe(
+    200,
+  );
+
   const otherUserClients = await getJson<OAuthManagedClientResponse[]>(
     await worker.fetch("/v1/oauth/clients", {
       headers: { cookie: secondCookie },

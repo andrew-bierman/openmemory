@@ -24,6 +24,8 @@ beforeAll(async () => {
 async function token(overrides: Record<string, unknown> = {}) {
   return new SignJWT({
     tenantId: subject,
+    grantId: "grant-A",
+    grantVersion: "version-A",
     azp: clientId,
     scope: "memory:read",
     ...overrides,
@@ -39,6 +41,8 @@ async function token(overrides: Record<string, unknown> = {}) {
 
 function fixture() {
   const state = {
+    grantId: "grant-A",
+    grantVersion: "version-A",
     userExists: true,
     clientExists: true,
     disabled: false,
@@ -73,6 +77,8 @@ function fixture() {
                 )
                   return null;
                 return {
+                  id: state.grantId,
+                  grant_version: state.grantVersion,
                   disabled: Number(state.disabled),
                   scopes: state.scopes,
                   created_at: state.createdAt,
@@ -134,6 +140,45 @@ describe("MCP live grant enforcement", () => {
       f.state.scopes = JSON.stringify(["memory:write"]);
     expect((await f.request(await token())).status).toBe(401);
     expect(f.getGraph).not.toHaveBeenCalled();
+  });
+
+  test("old token stays revoked after same-second reconsent", async () => {
+    const f = fixture();
+    f.state.createdAt = issuedAt;
+    const oldToken = await token();
+    expect((await f.request(oldToken)).status).toBe(200);
+    f.state.grantId = "grant-B";
+    f.state.grantVersion = "version-B";
+    expect((await f.request(oldToken)).status).toBe(401);
+    expect(
+      (
+        await f.request(
+          await token({ grantId: "grant-B", grantVersion: "version-B" }),
+        )
+      ).status,
+    ).toBe(200);
+  });
+
+  test("scope reexpansion does not reactivate an old token", async () => {
+    const f = fixture();
+    const oldToken = await token();
+    f.state.scopes = "memory:write";
+    f.state.grantVersion = "version-B";
+    expect((await f.request(oldToken)).status).toBe(401);
+    f.state.scopes = "memory:read memory:write";
+    f.state.grantVersion = "version-C";
+    expect((await f.request(oldToken)).status).toBe(401);
+  });
+
+  test("legacy tokens without a grant binding fail closed", async () => {
+    const f = fixture();
+    expect(
+      (
+        await f.request(
+          await token({ grantId: undefined, grantVersion: undefined }),
+        )
+      ).status,
+    ).toBe(401);
   });
 
   test("accepts current consent stored as OAuth space-delimited scopes", async () => {

@@ -352,6 +352,9 @@ async function hasCurrentMcpGrant(env: Env, payload: JWTPayload) {
     !env.AUTH_DB ||
     typeof payload.sub !== "string" ||
     typeof payload.azp !== "string" ||
+    typeof payload.grantId !== "string" ||
+    typeof payload.grantVersion !== "string" ||
+    !payload.grantVersion ||
     typeof payload.iat !== "number" ||
     !Number.isFinite(payload.iat) ||
     (payload.tenantId !== undefined && payload.tenantId !== payload.sub)
@@ -362,18 +365,27 @@ async function hasCurrentMcpGrant(env: Env, payload: JWTPayload) {
   // Check the consenting user, not the client owner: public OAuth clients can
   // legitimately be used by multiple users. Do not cache this revocation check.
   const grant = await env.AUTH_DB.prepare(
-    `select c.disabled, g.scopes, g.created_at
+    `select g.id, g.grant_version, c.disabled, g.scopes, g.created_at
      from oauth_consent g
      inner join oauth_client c on c.client_id = g.client_id
      inner join user u on u.id = g.user_id
      where g.user_id = ? and g.client_id = ? limit 1`,
   )
     .bind(payload.sub, payload.azp)
-    .first<{ disabled: number | null; scopes: string; created_at: number }>();
-  // Both timestamps have second precision. This rejects grants recreated later,
-  // but is not a token denylist: same-second revoke/regrant needs a generation
-  // marker to distinguish old tokens from newly issued ones.
-  if (!grant || grant.disabled || grant.created_at > payload.iat) {
+    .first<{
+      id: string;
+      grant_version: string;
+      disabled: number | null;
+      scopes: string;
+      created_at: number;
+    }>();
+  if (
+    !grant ||
+    grant.disabled ||
+    grant.id !== payload.grantId ||
+    grant.grant_version !== payload.grantVersion ||
+    grant.created_at > payload.iat
+  ) {
     return false;
   }
 

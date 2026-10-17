@@ -21,6 +21,10 @@ import {
   oauthRefreshToken,
 } from "./db/schema";
 import type { Env } from "./env";
+import {
+  bindAuthorizationCode,
+  createGrantClaimsResolver,
+} from "./oauth-grant";
 
 const AUTH_BASE_PATH = "/api/auth";
 const DEFAULT_LOCAL_AUTH_URL = "http://127.0.0.1:8787";
@@ -29,6 +33,7 @@ const memoryDb: MemoryDB = {};
 export function createOpenMemoryAuth(env: Env, request: Request) {
   const baseURL = resolveAuthBaseUrl(env, request);
   const socialProviders = createSocialProviders(env);
+  const resolveGrantClaims = createGrantClaimsResolver(env, request);
 
   return betterAuth({
     appName: "OpenMemory",
@@ -37,6 +42,18 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
     secret: env.BETTER_AUTH_SECRET ?? "openmemory-local-dev-secret-change-me",
     database: createAuthDatabase(env),
     trustedOrigins: [baseURL],
+    databaseHooks: {
+      verification: {
+        create: {
+          before: async (verification) => ({
+            data: {
+              ...verification,
+              value: await bindAuthorizationCode(env, verification.value),
+            },
+          }),
+        },
+      },
+    },
     emailAndPassword: {
       enabled: true,
     },
@@ -68,9 +85,13 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
           refreshToken: "om_rt_",
           clientSecret: "om_cs_",
         },
-        customAccessTokenClaims: ({ user }) => ({
-          tenantId: user?.id,
-        }),
+        customAccessTokenClaims: ({ user }) =>
+          new URL(request.url).pathname.endsWith("/oauth2/token")
+            ? resolveGrantClaims.claims(user?.id)
+            : { tenantId: user?.id },
+        customTokenResponseFields: ({ user, grantType, verificationValue }) =>
+          resolveGrantClaims.prepare(user?.id, grantType, verificationValue),
+        generateRefreshToken: () => resolveGrantClaims.generateRefreshToken(),
         customIdTokenClaims: ({ user }) => ({
           "https://openmemory.dev/tenant_id": user.id,
         }),
