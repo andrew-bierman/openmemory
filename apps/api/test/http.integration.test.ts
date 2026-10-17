@@ -283,7 +283,7 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     },
     rerank: {
       configured: false,
-      workersAiConfigured: true,
+      workersAiConfigured: false,
       timeoutMs: 900,
       status: "disabled",
     },
@@ -390,21 +390,21 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(repair).toMatchObject({
     attempted: 2,
     expectedVectors: 2,
-    failed: 2,
+    failed: 0,
     indexed: 0,
     purgeableMemories: 1,
-    skipped: 0,
+    skipped: 2,
     semanticIndex: {
       expectedVectors: 2,
       staleVectorCandidates: 1,
-      status: "unchecked",
+      status: "unconfigured",
     },
     staleVectors: {
       attempted: 1,
-      vectorizeConfigured: true,
+      vectorizeConfigured: false,
     },
     tenantId: tenantA,
-    vectorizeConfigured: true,
+    vectorizeConfigured: false,
   });
 
   const mismatchPurge = await worker.fetch("/v1/tenant", {
@@ -1370,13 +1370,12 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   workers.push(worker);
 
   const email = `session-${crypto.randomUUID()}@example.com`;
-  const signUp = await worker.fetch("/api/auth/sign-up/email", {
+  const signUp = await worker.fetch("/api/__test/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: "Session User",
       email,
-      password: "password1234",
     }),
   });
   await expectOk(signUp);
@@ -1667,13 +1666,12 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     }),
   );
 
-  const secondSignUp = await worker.fetch("/api/auth/sign-up/email", {
+  const secondSignUp = await worker.fetch("/api/__test/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: "Other Session User",
       email: `other-${crypto.randomUUID()}@example.com`,
-      password: "password1234",
     }),
   });
   await expectOk(secondSignUp);
@@ -1825,6 +1823,32 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   });
   expect(readiness.bindings.authDb).toBe(true);
   expect(readiness.rerank.status).toBe("disabled");
+  const otherSession = await getJson<SessionResponse>(
+    await worker.fetch("/api/auth/get-session", {
+      headers: { cookie: secondCookie },
+    }),
+  );
+  await expectOk(
+    await worker.fetch("/api/__test/remove-invite", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: otherSession.user.email }),
+    }),
+  );
+  expect((await callWithIssuedToken(otherUserToken.access_token)).status).toBe(
+    401,
+  );
+  expect(
+    await (
+      await worker.fetch("/api/auth/get-session", {
+        headers: { cookie: secondCookie },
+      })
+    ).json(),
+  ).toBeNull();
+  expect(
+    (await worker.fetch("/v1/memories", { headers: { cookie: secondCookie } }))
+      .status,
+  ).toBe(401);
 }, 45_000);
 
 test("shared MCP requires explicit PKCE scope and current team grants", async () => {
@@ -1862,10 +1886,9 @@ test("shared MCP requires explicit PKCE scope and current team grants", async ()
     });
   const signup = async (name: string) => {
     const email = `${name}-${crypto.randomUUID()}@example.com`;
-    const response = await request("/api/auth/sign-up/email", "", "POST", {
+    const response = await request("/api/__test/session", "", "POST", {
       name,
       email,
-      password: "password1234",
     });
     await expectOk(response);
     const cookie = getCookieHeader(response);
@@ -2062,13 +2085,12 @@ test("shared pages bound results and continue without dropping authorized record
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
   });
   workers.push(worker);
-  const signup = await worker.fetch("/api/auth/sign-up/email", {
+  const signup = await worker.fetch("/api/__test/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: "Pagination",
       email: `pagination-${crypto.randomUUID()}@example.com`,
-      password: "password1234",
     }),
   });
   await expectOk(signup);
@@ -2134,10 +2156,10 @@ test("team REST requires accepted membership and revokes selected-version access
   workers.push(worker);
   const signup = async (name: string) => {
     const email = `${name}-${crypto.randomUUID()}@example.com`;
-    const response = await worker.fetch("/api/auth/sign-up/email", {
+    const response = await worker.fetch("/api/__test/session", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name, email, password: "password1234" }),
+      body: JSON.stringify({ name, email }),
     });
     await expectOk(response);
     const cookie = getCookieHeader(response);
@@ -2354,13 +2376,12 @@ test("worker API manages account workspace and team members", async () => {
   workers.push(worker);
 
   const email = `workspace-${crypto.randomUUID()}@example.com`;
-  const signUp = await worker.fetch("/api/auth/sign-up/email", {
+  const signUp = await worker.fetch("/api/__test/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: "Workspace Owner",
       email,
-      password: "password1234",
     }),
   });
   await expectOk(signUp);
@@ -3244,6 +3265,7 @@ async function startWorkerOnce(env: Record<string, string>) {
     wranglerBin,
     [
       "dev",
+      "test/fixtures/session-worker.js",
       "--local",
       "--ip",
       "127.0.0.1",

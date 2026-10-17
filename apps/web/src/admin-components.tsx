@@ -62,26 +62,18 @@ export function AdminWorkspace({
   connections,
   deleteConfirmEmail,
   deleteConfirmTenantId,
-  email,
   isLoading,
   lastAccountDeletion,
-  name,
   onDeleteAccount,
   onRevoke,
   onSaveProfile,
   onRenameWorkspace,
-  onSignIn,
   onSignOut,
-  onSignUp,
-  password,
   profileName,
   sessionUser,
   setApiUrl,
   setDeleteConfirmEmail,
   setDeleteConfirmTenantId,
-  setEmail,
-  setName,
-  setPassword,
   setProfileName,
   setTenantId,
   setToken,
@@ -97,26 +89,18 @@ export function AdminWorkspace({
   connections: OAuthConnection[];
   deleteConfirmEmail: string;
   deleteConfirmTenantId: string;
-  email: string;
   isLoading: boolean;
   lastAccountDeletion: AccountDeletionResult | null;
-  name: string;
   onDeleteAccount: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onRevoke: (clientId: string) => Promise<void>;
   onSaveProfile: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onRenameWorkspace: (event: FormEvent<HTMLFormElement>) => Promise<void>;
-  onSignIn: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onSignOut: () => Promise<void>;
-  onSignUp: () => Promise<void>;
-  password: string;
   profileName: string;
   sessionUser: AuthUser | null;
   setApiUrl: (value: string) => void;
   setDeleteConfirmEmail: (value: string) => void;
   setDeleteConfirmTenantId: (value: string) => void;
-  setEmail: (value: string) => void;
-  setName: (value: string) => void;
-  setPassword: (value: string) => void;
   setProfileName: (value: string) => void;
   setTenantId: (value: string) => void;
   setToken: (value: string) => void;
@@ -159,60 +143,22 @@ export function AdminWorkspace({
             </small>
           </span>
         </div>
-        <form className="stack" onSubmit={onSignIn}>
-          <div className="settings-grid">
-            <div className="field">
-              <Label htmlFor="admin-name">Name</Label>
-              <Input
-                id="admin-name"
-                onChange={(event) => setName(event.target.value)}
-                value={name}
-              />
-            </div>
-            <div className="field">
-              <Label htmlFor="admin-email">Email</Label>
-              <Input
-                id="admin-email"
-                onChange={(event) => setEmail(event.target.value)}
-                type="email"
-                value={email}
-              />
-            </div>
-            <div className="field settings-grid-wide">
-              <Label htmlFor="admin-password">Password</Label>
-              <Input
-                id="admin-password"
-                minLength={8}
-                onChange={(event) => setPassword(event.target.value)}
-                type="password"
-                value={password}
-              />
-            </div>
-          </div>
-          <div className="row">
-            <Button disabled={isLoading || !email || !password} type="submit">
-              Sign in
-            </Button>
+        <div className="stack">
+          {sessionUser ? (
             <Button
-              disabled={isLoading || !email || !password}
-              onClick={() => void onSignUp()}
+              disabled={isLoading}
+              onClick={() => void onSignOut()}
               type="button"
-              variant="outline"
             >
-              Create account
+              Sign out
             </Button>
-            {sessionUser ? (
-              <Button
-                disabled={isLoading}
-                onClick={() => void onSignOut()}
-                type="button"
-                variant="outline"
-              >
-                Sign out
-              </Button>
-            ) : null}
-          </div>
-        </form>
+          ) : (
+            <>
+              <p>Sign in with a code sent to your invited email address.</p>
+              <a href={`${baseUrl}/login`}>Sign in to OpenMemory</a>
+            </>
+          )}
+        </div>
       </section>
 
       <section className="admin-card">

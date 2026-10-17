@@ -96,8 +96,19 @@ function fixture() {
   const getGraph = vi.fn(() => ({}));
   const env = {
     BETTER_AUTH_URL: origin,
+    OPENMEMORY_AUTH_ALLOWED_EMAILS: "member@example.test",
     AUTH_DB: {
       prepare(sql: string) {
+        if (sql.includes("SELECT email, email_verified")) {
+          return {
+            bind: () => ({
+              first: async () =>
+                state.userExists
+                  ? { email: "member@example.test", email_verified: 1 }
+                  : null,
+            }),
+          };
+        }
         if (sql.includes("from jwks")) {
           return {
             all: async () => ({

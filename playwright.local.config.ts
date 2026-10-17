@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const persistTo = `.tmp/playwright-state-${Date.now()}`;
+
 export default defineConfig({
   testDir: "apps/web/e2e",
   fullyParallel: false,
@@ -13,15 +15,15 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: "bun run db:migrate:local && bun run dev:api",
+      command: `bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --local --persist-to ${persistTo} && bun run --cwd apps/api wrangler dev test/fixtures/session-worker.js --local --persist-to ${persistTo} --port 54150`,
       url: "http://127.0.0.1:54150",
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       command: "bun run dev:web",
       url: "http://127.0.0.1:54152",
-      reuseExistingServer: true,
+      reuseExistingServer: false,
       timeout: 60_000,
     },
   ],
