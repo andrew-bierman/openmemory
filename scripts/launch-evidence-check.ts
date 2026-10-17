@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 type LaunchEvidence = {
+  currentLocalCandidate: { commit: string };
   benchmarkEvidence: {
     liveBenchmarkRun: string;
     releaseValidationCommit: string;
@@ -28,6 +29,12 @@ assertEvidence(evidence);
 
 const launchReadiness = await readFile(launchReadinessPath, "utf8");
 const releaseQualification = await readFile(releaseQualificationPath, "utf8");
+
+assertIncludes(
+  launchReadiness,
+  evidence.currentLocalCandidate.commit,
+  "docs/launch-readiness.md must mention the exact local candidate commit.",
+);
 
 assertIncludes(
   launchReadiness,
@@ -85,10 +92,10 @@ for (const [name, count] of Object.entries(
 }
 
 console.log(
-  `Launch evidence is documented for repo ${evidence.documentedRepositoryGate.commit.slice(
+  `Local candidate ${evidence.currentLocalCandidate.commit.slice(0, 7)} is documented. Historical launch evidence is documented for repo ${evidence.documentedRepositoryGate.commit.slice(
     0,
     7,
-  )} and runtime ${evidence.latestVerifiedRuntimeCandidate.commit.slice(0, 7)}.`,
+  )} and runtime ${evidence.latestVerifiedRuntimeCandidate.commit.slice(0, 7)}. This documentation check does not pass pending vendor or hosted release gates.`,
 );
 
 function assertEvidence(value: unknown): asserts value is LaunchEvidence {
@@ -97,6 +104,10 @@ function assertEvidence(value: unknown): asserts value is LaunchEvidence {
     "Launch evidence must be an object.",
   );
   const evidence = value as Partial<LaunchEvidence>;
+  assert(
+    /^[0-9a-f]{40}$/.test(String(evidence.currentLocalCandidate?.commit)),
+    "currentLocalCandidate.commit must be a full Git SHA.",
+  );
   assert(
     typeof evidence.documentedRepositoryGate === "object" &&
       evidence.documentedRepositoryGate !== null,

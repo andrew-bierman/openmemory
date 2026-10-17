@@ -155,7 +155,7 @@ The workflow uploads the generated `.tmp/benchmark-reports/*.jsonl` files as a
 `benchmark-reports` artifact so release reviewers can compare graph latency and
 recall-quality evidence across candidate commits.
 
-The latest recorded release gate for
+The historical recorded release gate for
 `3e4b35fa57c0dfb2d7cc45359858145dbf272813` passed in
 `https://github.com/andrew-bierman/openmemory/actions/runs/29666687105` with
 recall MRR `1.0`, Hit@3 `1.0`, 220-memory graph recall `18.82ms`,
@@ -245,3 +245,13 @@ Do not publish a release as broadly production-ready while launch readiness
 still has unchecked operational controls, async ingestion, extraction workers,
 real Cursor, Claude, and ChatGPT vendor dogfooding, enabled hosted social OAuth
 dogfooding, or graph/RAG production review.
+
+## Local candidate evidence (2026-10-17)
+
+`config/launch-evidence.json.currentLocalCandidate` records the exact locally
+qualified application commit and its external SSD manifest. Historical GitHub
+CI, runtime, benchmark and cleanup fields remain unchanged and apply only to
+their named commits/runs. A successful launch-evidence checker establishes
+documentation consistency, not permission to release or proof that pending
+vendor/hosted gates passed. Maintenance integration is locally qualified
+separately; deployment and hosted writes require scoped approval.
