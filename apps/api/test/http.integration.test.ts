@@ -2369,6 +2369,145 @@ test("team REST requires accepted membership and revokes selected-version access
   expect(replacement.workspace.id).not.toBe(owner.account.workspace.id);
 });
 
+test("accepted shared reads stay read-only and sharer account deletion preserves other tenants", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await worker.fetch("/api/__test/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const request = (path: string, method = "GET", body?: unknown) =>
+      worker.fetch(path, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const account = await getJson<AccountResponse>(
+      await request("/v1/account"),
+    );
+    return { email, request, account };
+  };
+  const owner = await signup("SurvivingOwner");
+  const member = await signup("DepartingSharer");
+  const outsider = await signup("UnrelatedTenant");
+  const team = `/v1/workspaces/${owner.account.workspace.id}`;
+  const invitation = await getJson<{ invitationId: string; token: string }>(
+    await owner.request(`${team}/invitations`, "POST", { email: member.email }),
+  );
+  await expectOk(
+    await member.request(
+      `/v1/workspace-invitations/${invitation.invitationId}/accept`,
+      "POST",
+      { token: invitation.token },
+    ),
+  );
+  const selected = await getJson<MemoryResponse>(
+    await member.request("/v1/memories", "POST", {
+      content: "Departure canary selected memory",
+      metadata: { secret: "private-canary" },
+    }),
+  );
+  const survivor = await getJson<MemoryResponse>(
+    await outsider.request("/v1/memories", "POST", {
+      content: "Unrelated tenant survives account deletion",
+    }),
+  );
+  const shared = await getJson<{ shareId: string }>(
+    await member.request(`${team}/shares`, "POST", {
+      memoryId: selected.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const sharedPath = `${team}/shares/${shared.shareId}`;
+  expect(
+    await getJson<Record<string, unknown>>(await owner.request(sharedPath)),
+  ).toMatchObject({
+    content: selected.content,
+    ownerUserId: member.account.user.id,
+  });
+  for (const method of ["PATCH", "DELETE"]) {
+    expect(
+      (
+        await owner.request(
+          `/v1/memories/${selected.id}`,
+          method,
+          method === "PATCH" ? { content: "Unauthorized replacement" } : {},
+        )
+      ).status,
+    ).toBe(404);
+  }
+  expect(
+    await getJson<SearchResponse[]>(
+      await owner.request("/v1/search", "POST", { q: "Departure canary" }),
+    ),
+  ).toEqual([]);
+  expect(
+    await getJson<GraphExportResponse>(
+      await owner.request("/v1/exports", "POST"),
+    ),
+  ).toMatchObject({ memoryCount: 0 });
+  expect(
+    await getJson<MemoryResponse>(
+      await member.request(`/v1/memories/${selected.id}`),
+    ),
+  ).toMatchObject({ content: selected.content, status: "active" });
+  expect(
+    (
+      await getJson<{ items: Array<{ shareId: string }> }>(
+        await owner.request(`${team}/shares`),
+      )
+    ).items,
+  ).toEqual([expect.objectContaining({ shareId: shared.shareId })]);
+  expect(
+    (
+      await getJson<{ items: Array<{ shareId: string }> }>(
+        await owner.request(`${team}/search`, "POST", {
+          q: "Departure canary",
+        }),
+      )
+    ).items,
+  ).toEqual([expect.objectContaining({ shareId: shared.shareId })]);
+  const deletion = await getJson<AccountDeletionResponse>(
+    await member.request("/v1/account", "DELETE", {
+      confirmEmail: member.email,
+      confirmTenantId: member.account.workspace.tenantId,
+    }),
+  );
+  expect(deletion.controlPlane.userDeleted).toBe(true);
+  expect(deletion.graph.memoriesDeleted).toBe(1);
+  expect((await member.request("/v1/account")).status).toBe(401);
+  expect((await owner.request(sharedPath)).status).toBe(404);
+  expect(
+    (await getJson<{ items: unknown[] }>(await owner.request(`${team}/shares`)))
+      .items,
+  ).toEqual([]);
+  expect(
+    (
+      await getJson<{ items: unknown[] }>(
+        await owner.request(`${team}/search`, "POST", {
+          q: "Departure canary",
+        }),
+      )
+    ).items,
+  ).toEqual([]);
+  expect(
+    (await getJson<AccountResponse>(await owner.request("/v1/account")))
+      .workspace.id,
+  ).toBe(owner.account.workspace.id);
+  expect(
+    await getJson<MemoryResponse>(
+      await outsider.request(`/v1/memories/${survivor.id}`),
+    ),
+  ).toMatchObject({ content: survivor.content, status: "active" });
+}, 45_000);
+
 test("worker API manages account workspace and team members", async () => {
   const worker = await startWorker({
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
