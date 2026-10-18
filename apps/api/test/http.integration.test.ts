@@ -2149,6 +2149,198 @@ test("shared pages bound results and continue without dropping authorized record
   );
 }, 30_000);
 
+test("shared pagination crosses stale directory pages and account cleanup revokes every grant", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+    OPENMEMORY_RATE_LIMIT_PER_MINUTE: "10000",
+  });
+  workers.push(worker);
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await worker.fetch("/api/__test/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const request = (path: string, method = "GET", body?: unknown) =>
+      worker.fetch(path, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    return {
+      email,
+      request,
+      account: await getJson<AccountResponse>(await request("/v1/account")),
+    };
+  };
+  const reader = await signup("PageReader");
+  const sharer = await signup("PageSharer");
+  const outsider = await signup("PageOutsider");
+  const team = `/v1/workspaces/${reader.account.workspace.id}`;
+  const path = `${team}/shares`;
+  const directoryCount = async (owner: string, workspace: string) =>
+    getJson<{ count: number }>(
+      await worker.fetch(
+        `/api/__test/share-directory-count?${new URLSearchParams({ owner, workspace })}`,
+      ),
+    );
+
+  const invitation = await getJson<{ invitationId: string; token: string }>(
+    await reader.request(`${team}/invitations`, "POST", {
+      email: sharer.email,
+    }),
+  );
+  await expectOk(
+    await sharer.request(
+      `/v1/workspace-invitations/${invitation.invitationId}/accept`,
+      "POST",
+      { token: invitation.token },
+    ),
+  );
+  type Item = { shareId: string; memoryId: string; content: string };
+  type Page = { items: Item[]; nextCursor?: string };
+  const expected = new Set<string>();
+  for (let index = 0; index < 127; index++) {
+    const memory = await getJson<MemoryResponse>(
+      await sharer.request("/v1/memories", "POST", {
+        content: `Boundary canary ${index}`,
+      }),
+    );
+    const share = await getJson<Item>(
+      await sharer.request(path, "POST", {
+        memoryId: memory.id,
+        requestId: crypto.randomUUID(),
+      }),
+    );
+    expected.add(share.shareId);
+  }
+  const collect = async (search = false) => {
+    const items: Item[] = [];
+    const cursors = new Set<string>();
+    const sizes: number[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await getJson<Page>(
+        search
+          ? await reader.request(`${team}/search`, "POST", {
+              q: "Boundary canary",
+              ...(cursor ? { cursor } : {}),
+            })
+          : await reader.request(
+              `${path}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+            ),
+      );
+      expect(page.items.length).toBeLessThanOrEqual(25);
+      items.push(...page.items);
+      sizes.push(page.items.length);
+      cursor = page.nextCursor;
+      if (cursor) {
+        expect(cursors.has(cursor)).toBe(false);
+        cursors.add(cursor);
+      }
+      expect(sizes.length).toBeLessThanOrEqual(10);
+    } while (cursor);
+    expect(new Set(items.map((item) => item.shareId)).size).toBe(items.length);
+    return { items, sizes };
+  };
+  // Discover the real database order; UUIDs and second-resolution timestamps
+  // must not make the stale prefix depend on creation order or wall-clock sleeps.
+  const before = await collect();
+  expect(before.items).toHaveLength(127);
+  expect(new Set(before.items.map((item) => item.shareId))).toEqual(expected);
+  expect(before.sizes).toEqual([25, 25, 25, 25, 25, 2]);
+  expect(
+    await directoryCount(sharer.account.user.id, reader.account.workspace.id),
+  ).toEqual({ count: 127 });
+  const stale = before.items.slice(0, 101);
+  const live = before.items.slice(101);
+  for (const item of stale) {
+    await expectOk(
+      await sharer.request(`/v1/memories/${item.memoryId}`, "DELETE", {}),
+    );
+    expect((await reader.request(`${path}/${item.shareId}`)).status).toBe(404);
+  }
+  expect(
+    await directoryCount(sharer.account.user.id, reader.account.workspace.id),
+  ).toEqual({ count: 127 });
+  const remaining = new Set(live.map((item) => item.shareId));
+  for (const search of [false, true]) {
+    const after = await collect(search);
+    expect(after.sizes).toEqual([0, 25, 1]);
+    expect(new Set(after.items.map((item) => item.shareId))).toEqual(remaining);
+  }
+  const survivor = await getJson<MemoryResponse>(
+    await outsider.request("/v1/memories", "POST", {
+      content: "Unrelated pagination tenant",
+    }),
+  );
+  const otherPath = `/v1/workspaces/${outsider.account.workspace.id}/shares`;
+  const otherShare = await getJson<Item>(
+    await outsider.request(otherPath, "POST", {
+      memoryId: survivor.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const oldPage = await getJson<Page>(await reader.request(path));
+  expect(oldPage.nextCursor).toBeTruthy();
+  const deleted = await getJson<AccountDeletionResponse>(
+    await sharer.request("/v1/account", "DELETE", {
+      confirmEmail: sharer.email,
+      confirmTenantId: sharer.account.workspace.tenantId,
+    }),
+  );
+  expect(deleted.controlPlane.userDeleted).toBe(true);
+  expect(
+    await directoryCount(sharer.account.user.id, reader.account.workspace.id),
+  ).toEqual({ count: 0 });
+  expect(
+    await directoryCount(
+      outsider.account.user.id,
+      outsider.account.workspace.id,
+    ),
+  ).toEqual({ count: 1 });
+  expect(deleted.graph.memoriesDeleted).toBe(127);
+  expect((await sharer.request("/v1/account")).status).toBe(401);
+  for (const item of before.items) {
+    expect((await reader.request(`${path}/${item.shareId}`)).status).toBe(404);
+  }
+  for (const search of [false, true]) {
+    expect(await collect(search)).toEqual({ items: [], sizes: [0] });
+  }
+  expect(
+    await getJson<Page>(
+      await reader.request(
+        `${path}?cursor=${encodeURIComponent(oldPage.nextCursor ?? "")}`,
+      ),
+    ),
+  ).toMatchObject({ items: [] });
+  expect(
+    (await getJson<AccountResponse>(await reader.request("/v1/account")))
+      .workspace.id,
+  ).toBe(reader.account.workspace.id);
+  expect(
+    await getJson<MemoryResponse>(
+      await outsider.request(`/v1/memories/${survivor.id}`),
+    ),
+  ).toMatchObject({ content: survivor.content, status: "active" });
+  expect(
+    (await getJson<Page>(await outsider.request(otherPath))).items,
+  ).toEqual([
+    expect.objectContaining({
+      shareId: otherShare.shareId,
+      content: survivor.content,
+    }),
+  ]);
+  expect(
+    await getJson<Item>(
+      await outsider.request(`${otherPath}/${otherShare.shareId}`),
+    ),
+  ).toMatchObject({ content: survivor.content });
+}, 90_000);
+
 test("team REST requires accepted membership and revokes selected-version access", async () => {
   const worker = await startWorker({
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
