@@ -29,6 +29,14 @@ export default {
     const url = new URL(request.url);
     if (!["127.0.0.1", "localhost", "openmemory.test"].includes(url.hostname))
       return new Response(null, { status: 404 });
+    if (url.pathname === "/api/__test/share-directory-count") {
+      const row = await env.AUTH_DB.prepare(
+        "SELECT count(*) AS count FROM workspace_share_directory WHERE owner_user_id=? AND workspace_id=?",
+      )
+        .bind(url.searchParams.get("owner"), url.searchParams.get("workspace"))
+        .first();
+      return Response.json(row);
+    }
     if (url.pathname === "/api/__test/otp")
       return Response.json({ otp: mailbox.get(url.searchParams.get("email")) });
     if (url.pathname === "/api/__test/remove-invite") {
