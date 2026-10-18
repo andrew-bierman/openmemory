@@ -29,6 +29,26 @@ export default {
     const url = new URL(request.url);
     if (!["127.0.0.1", "localhost", "openmemory.test"].includes(url.hostname))
       return new Response(null, { status: 404 });
+    if (url.pathname === "/api/__test/block-share-delete") {
+      // A real D1 abort after the owner DO has committed revocation.
+      await env.AUTH_DB.prepare(
+        "CREATE TABLE IF NOT EXISTS fixture_blocked_share (share_id TEXT PRIMARY KEY)",
+      ).run();
+      await env.AUTH_DB.prepare(
+        "CREATE TRIGGER IF NOT EXISTS fixture_abort_share_delete BEFORE DELETE ON workspace_share_directory WHEN EXISTS (SELECT 1 FROM fixture_blocked_share WHERE share_id=OLD.share_id) BEGIN SELECT RAISE(ABORT, 'fixture_share_delete_failure'); END",
+      ).run();
+      if (request.method === "DELETE") {
+        await env.AUTH_DB.prepare("DELETE FROM fixture_blocked_share").run();
+      } else {
+        const { shareId } = await request.json();
+        await env.AUTH_DB.prepare(
+          "INSERT INTO fixture_blocked_share VALUES (?)",
+        )
+          .bind(shareId)
+          .run();
+      }
+      return Response.json({ ok: true });
+    }
     if (url.pathname === "/api/__test/share-directory-count") {
       const row = await env.AUTH_DB.prepare(
         "SELECT count(*) AS count FROM workspace_share_directory WHERE owner_user_id=? AND workspace_id=?",
