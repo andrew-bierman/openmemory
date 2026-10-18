@@ -2700,6 +2700,155 @@ test("accepted shared reads stay read-only and sharer account deletion preserves
   ).toMatchObject({ content: survivor.content, status: "active" });
 }, 45_000);
 
+test("failed share directory cleanup denies access and a retry completes revocation", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await worker.fetch("/api/__test/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const request = (path: string, method = "GET", body?: unknown) =>
+      worker.fetch(path, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    return {
+      email,
+      request,
+      account: await getJson<AccountResponse>(await request("/v1/account")),
+    };
+  };
+  const owner = await signup("RetryOwner"),
+    reader = await signup("RetryReader"),
+    outsider = await signup("RetryOutsider");
+  const team = `/v1/workspaces/${owner.account.workspace.id}`;
+  const path = `${team}/shares`;
+  const invitation = await getJson<{ invitationId: string; token: string }>(
+    await owner.request(`${team}/invitations`, "POST", { email: reader.email }),
+  );
+  await expectOk(
+    await reader.request(
+      `/v1/workspace-invitations/${invitation.invitationId}/accept`,
+      "POST",
+      { token: invitation.token },
+    ),
+  );
+  const memory = await getJson<MemoryResponse>(
+    await owner.request("/v1/memories", "POST", {
+      content: "Revocation retry canary",
+    }),
+  );
+  const share = await getJson<{ shareId: string }>(
+    await owner.request(path, "POST", {
+      memoryId: memory.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const sharedPath = `${path}/${share.shareId}`;
+  const survivor = await getJson<MemoryResponse>(
+    await outsider.request("/v1/memories", "POST", {
+      content: "Unrelated retry tenant",
+    }),
+  );
+  const otherPath = `/v1/workspaces/${outsider.account.workspace.id}/shares`;
+  const otherShare = await getJson<{ shareId: string }>(
+    await outsider.request(otherPath, "POST", {
+      memoryId: survivor.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const directoryCount = async () =>
+    getJson<{ count: number }>(
+      await worker.fetch(
+        `/api/__test/share-directory-count?${new URLSearchParams({ owner: owner.account.user.id, workspace: owner.account.workspace.id })}`,
+      ),
+    );
+  expect(
+    await getJson<{ content: string }>(await reader.request(sharedPath)),
+  ).toMatchObject({ content: memory.content });
+  expect(await directoryCount()).toEqual({ count: 1 });
+  await expectOk(
+    await worker.fetch("/api/__test/block-share-delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shareId: share.shareId }),
+    }),
+  );
+  const failed = await owner.request(sharedPath, "DELETE");
+  expect(failed.status).toBe(503);
+  expect(await failed.json()).toEqual({ error: "workspace_unavailable" });
+  // The failure is not atomic: the authoritative DO grant is already revoked,
+  // while D1 still has the directory row. That row must never authorize reads.
+  expect(await directoryCount()).toEqual({ count: 1 });
+  const assertDenied = async () => {
+    expect((await reader.request(sharedPath)).status).toBe(404);
+    expect(
+      (await getJson<{ items: unknown[] }>(await reader.request(path))).items,
+    ).toEqual([]);
+    expect(
+      (
+        await getJson<{ items: unknown[] }>(
+          await reader.request(`${team}/search`, "POST", {
+            q: "Revocation retry",
+          }),
+        )
+      ).items,
+    ).toEqual([]);
+  };
+  await assertDenied();
+  expect(
+    await getJson<{ content: string }>(
+      await outsider.request(`${otherPath}/${otherShare.shareId}`),
+    ),
+  ).toMatchObject({ content: survivor.content });
+  await expectOk(
+    await worker.fetch("/api/__test/block-share-delete", { method: "DELETE" }),
+  );
+  expect(
+    await getJson<{ revoked: boolean }>(
+      await owner.request(sharedPath, "DELETE"),
+    ),
+  ).toEqual({ revoked: true });
+  expect(await directoryCount()).toEqual({ count: 0 });
+  await assertDenied();
+  expect(
+    await getJson<{ revoked: boolean }>(
+      await owner.request(sharedPath, "DELETE"),
+    ),
+  ).toEqual({ revoked: true });
+  await assertDenied();
+  expect(
+    await getJson<MemoryResponse>(
+      await owner.request(`/v1/memories/${memory.id}`),
+    ),
+  ).toMatchObject({ content: memory.content, status: "active" });
+  expect(
+    await getJson<MemoryResponse>(
+      await outsider.request(`/v1/memories/${survivor.id}`),
+    ),
+  ).toMatchObject({ content: survivor.content, status: "active" });
+  expect(
+    (
+      await getJson<{ items: Array<{ shareId: string }> }>(
+        await outsider.request(otherPath),
+      )
+    ).items,
+  ).toEqual([expect.objectContaining({ shareId: otherShare.shareId })]);
+  expect(
+    await getJson<{ content: string }>(
+      await outsider.request(`${otherPath}/${otherShare.shareId}`),
+    ),
+  ).toMatchObject({ content: survivor.content });
+}, 45_000);
+
 test("worker API manages account workspace and team members", async () => {
   const worker = await startWorker({
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
