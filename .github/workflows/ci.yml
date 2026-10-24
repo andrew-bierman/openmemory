@@ -23,7 +23,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node LTS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24.22.1"
       - name: Setup Bun
@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node LTS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24.22.1"
       - name: Setup Bun
@@ -75,7 +75,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node LTS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24.22.1"
       - name: Setup Bun
@@ -98,7 +98,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node LTS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24.22.1"
       - name: Setup Bun
@@ -146,7 +146,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Setup Node LTS
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: "24.22.1"
       - name: Setup Bun
