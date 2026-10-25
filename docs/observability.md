@@ -57,6 +57,25 @@ The workflow thresholds are:
   request volume
 - alert on any source ingestion or memory extraction worker failure in 5 minutes
 
+The hosted synthetic graph benchmark's `12000ms` per-run ceiling detects gross
+regressions in a bounded fixture. It is not the production latency target or a
+p95 measurement. The route p95 alert remains `2000ms` over 10 minutes; passing
+the fixture ceiling does not satisfy or suppress that alert. Release review
+must inspect representative route latency distributions separately, including
+sample counts and the observation window. An individual fixture run above
+2 seconds neither proves a p95 breach nor establishes acceptable production
+performance.
+
+Rerank result metadata retains `status: applied | empty | fallback | skipped`.
+Fallbacks include a bounded `reason: timeout | provider_error | invalid_output`;
+context-level `rerank.reason` exposes that reason. Only a valid empty `ids` array
+is `empty`. A nonempty array with no known candidate IDs is `invalid_output`;
+mixed known/unknown IDs retain only known, unique IDs. Every attempted outcome
+retains the configured model; errors and prompts are not exposed. A timeout
+bounds response waiting but does not cancel the provider's underlying work.
+Optional AI reranking remains disabled unless a model is explicitly configured;
+these local failure tests do not qualify provider cost, quality, or latency.
+
 Graph/RAG production launch review is tracked separately from alerting in
 `config/rag-production-review.json`. Before broad hosted launch, update hosted
 graph benchmark trend, semantic RAG trace review, and rerank threshold review

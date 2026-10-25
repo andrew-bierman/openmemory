@@ -1,3 +1,4 @@
+import { parseWorkGeneration } from "./background-work";
 import type { Env } from "./env";
 import { extractMemorySignals } from "./memory-signals";
 
@@ -5,6 +6,7 @@ export const MEMORY_EXTRACTION_QUEUE_NAME = "openmemory-memory-extraction";
 
 export type MemoryExtractionMessage = {
   version: 1;
+  generation?: number;
   memoryId: string;
   tenantId: string;
   requestedAt: string;
@@ -42,6 +44,15 @@ export async function processMemoryExtractionMessage(
   const graph = env.MEMORY_GRAPHS.get(
     env.MEMORY_GRAPHS.idFromName(message.tenantId),
   );
+  const generation = parseWorkGeneration(message.generation);
+  if ((await graph.getIngestionGeneration()) !== generation) {
+    return {
+      applied: false,
+      edgeCount: 0,
+      memoryId: message.memoryId,
+      reason: "not_found" as const,
+    };
+  }
   const memory = await graph.getMemory(message.memoryId);
   if (!memory) {
     return {
@@ -53,7 +64,24 @@ export async function processMemoryExtractionMessage(
   }
 
   const signals = extractMemorySignals(memory.content);
-  const result = await graph.applyExtractedSignals(message.memoryId, signals);
+  let result: Awaited<ReturnType<typeof graph.applyExtractedSignals>>;
+  try {
+    result = await graph.applyExtractedSignals(
+      message.memoryId,
+      signals,
+      generation,
+    );
+  } catch (error) {
+    if ((await graph.getIngestionGeneration()) !== generation) {
+      return {
+        applied: false,
+        edgeCount: 0,
+        memoryId: message.memoryId,
+        reason: "not_found" as const,
+      };
+    }
+    throw error;
+  }
   return {
     applied: result.applied,
     edgeCount: result.edges.length,
@@ -71,6 +99,7 @@ export function parseMemoryExtractionMessage(
   }
   return {
     version: 1,
+    generation: parseWorkGeneration(value.generation),
     memoryId: String(value.memoryId),
     tenantId: String(value.tenantId),
     requestedAt:

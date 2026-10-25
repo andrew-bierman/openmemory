@@ -155,7 +155,7 @@ The workflow uploads the generated `.tmp/benchmark-reports/*.jsonl` files as a
 `benchmark-reports` artifact so release reviewers can compare graph latency and
 recall-quality evidence across candidate commits.
 
-The latest recorded release gate for
+The historical recorded release gate for
 `3e4b35fa57c0dfb2d7cc45359858145dbf272813` passed in
 `https://github.com/andrew-bierman/openmemory/actions/runs/29666687105` with
 recall MRR `1.0`, Hit@3 `1.0`, 220-memory graph recall `18.82ms`,
@@ -208,7 +208,14 @@ The latest Hosted graph benchmark trend evidence for
 `https://github.com/andrew-bierman/openmemory/actions/runs/33231544217`. Its
 trend summary analyzed 10 unique runs, ignored 495 duplicate artifact rows, and
 reported latest recall latency `2895.96ms`, average recall latency `1221.60ms`,
-and a `12000ms` threshold.
+and a `12000ms` threshold. That threshold is a per-run synthetic fixture
+regression ceiling, not the user-facing latency target. The production route
+p95 alert remains `2000ms` over 10 minutes (see `docs/observability.md`). Neither
+the fixture mean nor its latest sample measures p95. Before broad launch,
+review route-level p95, sample counts, and the observation window independently;
+a passing benchmark does not waive a production latency breach. Keep optional
+AI reranking disabled until its quality, added latency, timeout/failure rates,
+and cost evidence have been reviewed.
 
 To generate the same summary from local JSONL files:
 
@@ -245,3 +252,13 @@ Do not publish a release as broadly production-ready while launch readiness
 still has unchecked operational controls, async ingestion, extraction workers,
 real Cursor, Claude, and ChatGPT vendor dogfooding, enabled hosted social OAuth
 dogfooding, or graph/RAG production review.
+
+## Local candidate evidence (2026-10-17)
+
+`config/launch-evidence.json.currentLocalCandidate` records the exact locally
+qualified application commit and its external SSD manifest. Historical GitHub
+CI, runtime, benchmark and cleanup fields remain unchanged and apply only to
+their named commits/runs. A successful launch-evidence checker establishes
+documentation consistency, not permission to release or proof that pending
+vendor/hosted gates passed. Maintenance integration is locally qualified
+separately; deployment and hosted writes require scoped approval.

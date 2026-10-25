@@ -2,6 +2,28 @@ import { describe, expect, test } from "vitest";
 import { createOpenMemoryClient } from ".";
 
 describe("OpenMemory client", () => {
+  test("legacy invitation client exposes the one-time acceptance capability", async () => {
+    const api = createOpenMemoryClient("https://api.openmemory.test", {
+      fetch: fakeFetch(async () =>
+        Response.json({
+          id: "invite",
+          email: "member@example.com",
+          role: "member",
+          status: "invited",
+          invitationId: "invite",
+          token: "test-capability",
+          expiresAt: "2026-10-24T00:00:00Z",
+        }),
+      ),
+    });
+    const invite = await api.inviteWorkspaceMember({
+      email: "member@example.com",
+    });
+    expect(invite.invitationId).toBe("invite");
+    expect(invite.token).toBe("test-capability");
+    expect(invite.expiresAt).toBe("2026-10-24T00:00:00Z");
+  });
+
   test("sends tenant, bearer, and credential options through Eden fetch", async () => {
     const requests: Array<{
       url: string;
@@ -221,3 +243,22 @@ function fakeFetch(
 ) {
   return Object.assign(handler, { preconnect: fetch.preconnect });
 }
+
+test("team client uses explicit session endpoints and preserves share intent", async () => {
+  const requests: Request[] = [];
+  const api = createOpenMemoryClient("https://api.openmemory.test", {
+    fetch: fakeFetch(async (input, init) => {
+      requests.push(new Request(input, init));
+      return Response.json({});
+    }),
+  });
+  await api.listWorkspaces();
+  await api.shareMemory("team", { memoryId: "own", requestId: "intent" });
+  expect(requests[0].url).toBe("https://api.openmemory.test/v1/workspaces");
+  expect(await requests[1].json()).toEqual({
+    memoryId: "own",
+    requestId: "intent",
+  });
+  expect(requests[1].credentials).toBe("include");
+  expect(requests[1].headers.get("x-openmemory-user-id")).toBeNull();
+});

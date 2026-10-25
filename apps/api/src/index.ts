@@ -35,6 +35,7 @@ import {
   resolveSessionTenant,
   resolveTenant,
 } from "./auth";
+import { parseWorkGeneration, workflowInstanceId } from "./background-work";
 import {
   handleOpenMemoryAuthRequest,
   isAuthRoute,
@@ -53,7 +54,6 @@ import { createOpenMemoryMcpHandler } from "./mcp";
 import { MemoryGraph } from "./memory-graph";
 import { enrichMemoryInput } from "./memory-signals";
 import {
-  type CreateOAuthClientInput,
   createOAuthClient,
   disableOAuthClient,
   listOAuthClients,
@@ -77,11 +77,17 @@ import {
 import {
   getGraphForTenant,
   type IngestionQueueMessage,
+  indexMemoryWithGeneration,
   ingestConversationTranscript,
   ingestSourceDocument,
   processSourceIngestionMessage,
   SOURCE_INGESTION_QUEUE_NAME,
 } from "./source-ingestion";
+import {
+  assertWorkspaceRequestOrigin,
+  WorkspaceAccessError,
+} from "./workspace-access";
+import { handleWorkspaceRequest, isWorkspaceRoute } from "./workspace-routes";
 
 export { MemoryGraph };
 
@@ -380,11 +386,12 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
       }
 
       const graph = getGraph(env, tenantId);
-      const purged = await graph.purgeTenantData();
+      const purged = await graph.purgeTenantData(true);
       const vectorIndex = await deleteTenantVectors(
         env,
         tenantId,
         purged.deletedMemoryIds,
+        purged.purgedGeneration,
       );
       const exports = await deleteTenantExports(env, tenantId);
       const deleted = await deleteAccountControlPlane(env, request, {
@@ -462,6 +469,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         env,
         tenantId,
         purged.deletedMemoryIds,
+        purged.purgedGeneration,
       );
       const exports = await deleteTenantExports(env, tenantId);
 
@@ -487,6 +495,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
+      const generation = await graph.getIngestionGeneration();
       const memory = await graph.createMemory(
         CreateMemorySchema.parse(
           enrichMemoryInput({
@@ -496,12 +505,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
             ...body,
           }),
         ),
+        generation,
       );
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
-      await indexMemory(env, tenantId, memory);
-      await graph.linkRelatedMemories(memory.id);
+      await indexMemoryWithGeneration(env, tenantId, graph, memory, generation);
+      await graph.linkRelatedMemories(memory.id, generation);
       await enqueueMemoryExtraction(env, {
         memoryId: memory.id,
+        generation,
         reason: "create",
         tenantId,
       });
@@ -517,6 +528,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
+      const generation = await graph.getIngestionGeneration();
       const memory = await graph.createMemory(
         CreateMemorySchema.parse(
           enrichMemoryInput({
@@ -526,12 +538,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
             ...body,
           }),
         ),
+        generation,
       );
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
-      await indexMemory(env, tenantId, memory);
-      const edges = await graph.linkRelatedMemories(memory.id);
+      await indexMemoryWithGeneration(env, tenantId, graph, memory, generation);
+      const edges = await graph.linkRelatedMemories(memory.id, generation);
       await enqueueMemoryExtraction(env, {
         memoryId: memory.id,
+        generation,
         reason: "create",
         tenantId,
       });
@@ -595,7 +609,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         input,
         metadata: {
           strategy: "queue-workflow-source-ingestion-v1",
-          queue: SOURCE_INGESTION_QUEUE_NAME,
+          queue: env.SOURCE_INGESTION_QUEUE_NAME ?? SOURCE_INGESTION_QUEUE_NAME,
         },
       });
       await env.SOURCE_INGESTION_QUEUE.send(
@@ -605,6 +619,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           tenantId,
           input,
           requestedAt: job.createdAt,
+          generation: job.generation,
         },
         { contentType: "json" },
       );
@@ -671,7 +686,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           kind: "conversation",
           conversationId: input.conversationId,
           strategy: "queue-workflow-conversation-ingestion-v1",
-          queue: SOURCE_INGESTION_QUEUE_NAME,
+          queue: env.SOURCE_INGESTION_QUEUE_NAME ?? SOURCE_INGESTION_QUEUE_NAME,
         },
       });
       await env.SOURCE_INGESTION_QUEUE.send(
@@ -682,6 +697,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           tenantId,
           input,
           requestedAt: job.createdAt,
+          generation: job.generation,
         },
         { contentType: "json" },
       );
@@ -739,18 +755,21 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
         return status(errorStatus(tenantError(tenant)), tenant);
       }
 
+      const generation = await graph.getIngestionGeneration();
       const memory = await graph.updateMemory(
         params.id,
         UpdateMemorySchema.parse(enrichMemoryInput({ metadata: {}, ...body })),
+        generation,
       );
       if (!memory) {
         return status(404, { error: "not_found" as const });
       }
       const tenantId = "tenantId" in tenant ? tenant.tenantId : "";
-      await indexMemory(env, tenantId, memory);
-      await graph.linkRelatedMemories(memory.id);
+      await indexMemoryWithGeneration(env, tenantId, graph, memory, generation);
+      await graph.linkRelatedMemories(memory.id, generation);
       await enqueueMemoryExtraction(env, {
         memoryId: memory.id,
+        generation,
         reason: "update",
         tenantId,
       });
@@ -842,14 +861,14 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     const result = await listOAuthClients(env, request);
     return status(result.status, result.body);
   })
-  .post("/v1/oauth/clients", async ({ body, request, status }) => {
-    const result = await createOAuthClient(
-      env,
-      request,
-      body as CreateOAuthClientInput,
-    );
-    return status(result.status, result.body);
-  })
+  .post(
+    "/v1/oauth/clients",
+    async ({ request, status }) => {
+      const result = await createOAuthClient(env, request);
+      return status(result.status, result.body);
+    },
+    { parse: "none" },
+  )
   .delete(
     "/v1/oauth/clients/:clientId",
     async ({ params, request, status }) => {
@@ -1019,6 +1038,7 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
           env,
           tenantId,
           restored.purged.deletedMemoryIds,
+          restored.purged.purgedGeneration,
         );
         const activeMemories = graphExport.data.memories.filter(
           (memory) => memory.status === "active" && memory.isLatest,
@@ -1061,11 +1081,13 @@ export const app = new Elysia({ adapter: CloudflareAdapter })
     }
 
     const tenantId = "tenantId" in tenant ? tenant.tenantId : "unknown";
+    const repairGeneration = await graph.getIngestionGeneration();
     const before = await graph.getIndexInventory();
     const staleVectors = await deleteTenantVectors(
       env,
       tenantId,
       before.purgeableMemoryIds,
+      repairGeneration,
     );
     const memories = await graph.listIndexableMemories();
     const indexResults = [];
@@ -1162,13 +1184,21 @@ export default {
     ctx.waitUntil(runScheduledHealthMonitor(requestEnv));
   },
   queue(batch: MessageBatch<unknown>, requestEnv: Env) {
-    if (batch.queue === MEMORY_EXTRACTION_QUEUE_NAME) {
+    const extractionQueue =
+      requestEnv.MEMORY_EXTRACTION_QUEUE_NAME ?? MEMORY_EXTRACTION_QUEUE_NAME;
+    const sourceQueue =
+      requestEnv.SOURCE_INGESTION_QUEUE_NAME ?? SOURCE_INGESTION_QUEUE_NAME;
+    if (!extractionQueue || !sourceQueue || extractionQueue === sourceQueue) {
+      throw new Error("Queue names must be nonempty and distinct.");
+    }
+    if (batch.queue === extractionQueue) {
       return handleMemoryExtractionQueue(batch, requestEnv);
     }
-    if (batch.queue === SOURCE_INGESTION_QUEUE_NAME) {
+    if (batch.queue === sourceQueue) {
       return handleSourceIngestionQueue(batch, requestEnv);
     }
-    return handleSourceIngestionQueue(batch, requestEnv);
+    // Reject misconfigured delivery so the queue's retry/DLQ policy applies.
+    throw new Error("Unrecognized queue name.");
   },
 } satisfies ExportedHandler<Env>;
 
@@ -1238,7 +1268,12 @@ async function startMemoryExtractionWorkflow(
 ) {
   try {
     await requestEnv.MEMORY_EXTRACTION_WORKFLOW?.create({
-      id: message.memoryId.slice(0, 100),
+      id: await workflowInstanceId(
+        "extract",
+        message.tenantId,
+        message.memoryId,
+        message.generation ?? 0,
+      ),
       params: message,
       retention: {
         successRetention: "7 days",
@@ -1256,12 +1291,22 @@ function parseSourceIngestionMessage(value: unknown): IngestionQueueMessage {
   if (!isRecord(value)) {
     throw new Error("Invalid source ingestion queue message.");
   }
+  if (
+    typeof value.sourceId !== "string" ||
+    !value.sourceId ||
+    typeof value.tenantId !== "string" ||
+    !normalizeTenantId(value.tenantId)
+  ) {
+    throw new Error("Source ingestion identifiers are required.");
+  }
+  const generation = parseWorkGeneration(value.generation);
   if (value.kind === "conversation") {
     return {
       kind: "conversation",
       version: 1,
-      sourceId: String(value.sourceId),
-      tenantId: String(value.tenantId),
+      sourceId: value.sourceId,
+      tenantId: value.tenantId,
+      generation,
       input: IngestConversationSchema.parse(value.input),
       requestedAt:
         typeof value.requestedAt === "string"
@@ -1272,8 +1317,9 @@ function parseSourceIngestionMessage(value: unknown): IngestionQueueMessage {
   return {
     kind: "source",
     version: 1,
-    sourceId: String(value.sourceId),
-    tenantId: String(value.tenantId),
+    sourceId: value.sourceId,
+    tenantId: value.tenantId,
+    generation,
     input: IngestSourceSchema.parse(value.input),
     requestedAt:
       typeof value.requestedAt === "string"
@@ -1291,10 +1337,19 @@ async function startSourceIngestionWorkflow(
   message: IngestionQueueMessage,
 ) {
   const graph = getGraphForTenant(requestEnv, message.tenantId);
-  await graph.startIngestionJob(message.sourceId);
+  const job = await graph.startIngestionJob(
+    message.sourceId,
+    message.generation ?? 0,
+  );
+  if (!job) return;
   try {
     await requestEnv.SOURCE_INGESTION_WORKFLOW?.create({
-      id: message.sourceId.slice(0, 100),
+      id: await workflowInstanceId(
+        "ingest",
+        message.tenantId,
+        message.sourceId,
+        message.generation ?? 0,
+      ),
       params: message,
       retention: {
         successRetention: "7 days",
@@ -1335,19 +1390,26 @@ async function handleWorkerFetch(
       );
     } else if (isAuthRoute(pathname)) {
       response = await handleOpenMemoryAuthRequest(requestEnv, request);
+    } else if (isWorkspaceRoute(pathname)) {
+      response = await handleWorkspaceRequest(requestEnv, request);
     } else if (pathname === "/mcp") {
       response = await mcpHandler(request, requestEnv, ctx);
     } else {
+      if (pathname === "/v1/account" || pathname.startsWith("/v1/account/"))
+        assertWorkspaceRequestOrigin(requestEnv, request);
       response = await apiWorker.fetch(request);
     }
   } catch (error) {
     response = jsonResponse(
       {
-        error: "internal_error",
+        error:
+          error instanceof WorkspaceAccessError
+            ? error.error
+            : "internal_error",
         message: "OpenMemory could not complete the request.",
         requestId,
       },
-      { status: 500 },
+      { status: error instanceof WorkspaceAccessError ? error.status : 500 },
     );
     console.error(
       JSON.stringify({
@@ -1392,6 +1454,8 @@ async function withCors(
 ) {
   const resolved = await response;
   const headers = new Headers(resolved.headers);
+  if (new URL(request.url).pathname.startsWith("/v1/account"))
+    headers.set("cache-control", "private, no-store");
 
   for (const [key, value] of corsHeaders(request)) {
     headers.set(key, value);
@@ -1466,33 +1530,117 @@ const LOGIN_HTML = `<!doctype html>
   <style>${PAGE_STYLE}</style>
 </head>
 <body>
-  <header><h1>OpenMemory</h1><a href="/"><button class="ghost">Dashboard</button></a></header>
+  <header><h1>OpenMemory</h1><a href="/">Dashboard</a></header>
   <main>
-    <div class="panel auth-card">
+    <div class="panel auth-card stack">
+      <h2>Sign in</h2>
+      <p>Use your invited email address. No password needed.</p>
+      <div id="error" role="alert" class="error hidden"></div>
+      <p id="status" role="status">Checking sign-in availability…</p>
       <form id="authForm" class="stack">
-        <h2>Account</h2>
-        <div id="error" class="error hidden"></div>
-        <div><label for="name">Name</label><input id="name" autocomplete="name" value="OpenMemory User" /></div>
         <div><label for="email">Email</label><input id="email" autocomplete="email" required type="email" /></div>
-        <div><label for="password">Password</label><input id="password" autocomplete="current-password" minlength="8" required type="password" /></div>
-        <div class="row"><button id="signIn" type="submit">Sign in</button><button id="signUp" class="secondary" type="button">Create account</button></div>
+        <button id="sendCode" disabled type="submit">Send sign-in code</button>
       </form>
+      <form id="verifyForm" class="stack" hidden>
+        <div><label for="otp">Email code</label><input id="otp" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" minlength="6" required /></div>
+        <button id="verifyCode" disabled type="submit">Verify and sign in</button>
+      </form>
+      <div id="providers" class="stack"></div>
     </div>
   </main>
   <script>
     const form = document.querySelector("#authForm");
+    const verifyForm = document.querySelector("#verifyForm");
+    const email = document.querySelector("#email");
+    const otp = document.querySelector("#otp");
+    const sendCode = document.querySelector("#sendCode");
+    const verifyCode = document.querySelector("#verifyCode");
     const error = document.querySelector("#error");
-    function showError(message) { error.textContent = message; error.classList.remove("hidden"); }
-    async function auth(path) {
-      error.classList.add("hidden");
-      const body = { email: email.value, password: password.value, name: name.value || email.value };
-      const response = await fetch(path, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      if (!response.ok) throw new Error(await response.text());
-      const next = new URLSearchParams(location.search).get("redirect") || "/";
-      location.href = next;
+    const status = document.querySelector("#status");
+    const providers = document.querySelector("#providers");
+    let sentEmail = "";
+    let emailEnabled = false;
+    let busy = false;
+    function nextURL() {
+      try {
+        const next = new URL(new URLSearchParams(location.search).get("redirect") || "/", location.origin);
+        if (next.origin === location.origin && !next.username && !next.password) return next.href;
+      } catch {}
+      return location.origin + "/";
     }
-    form.onsubmit = (event) => { event.preventDefault(); auth("/api/auth/sign-in/email").catch((caught) => showError(caught.message)); };
-    signUp.onclick = () => auth("/api/auth/sign-up/email").catch((caught) => showError(caught.message));
+    function showError(message) { error.textContent = message; error.classList.remove("hidden"); }
+    function setBusy(value) {
+      busy = value;
+      sendCode.disabled = value || !emailEnabled;
+      verifyCode.disabled = value || !emailEnabled || !sentEmail;
+      email.disabled = value;
+    }
+    async function auth(path, body) {
+      const response = await fetch(path, { method: "POST", credentials: "include", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error("Sign-in could not be completed. Check your code or try again later.");
+      return response.json();
+    }
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      if (busy || !emailEnabled) return;
+      setBusy(true);
+      error.classList.add("hidden");
+      sentEmail = "";
+      otp.value = "";
+      verifyForm.hidden = true;
+      try {
+        const requestedEmail = email.value.trim();
+        await auth("/api/auth/email-otp/send-verification-otp", { email: requestedEmail, type: "sign-in" });
+        sentEmail = requestedEmail;
+        status.textContent = "If this address is eligible, a sign-in code has been sent. Check your inbox. Codes expire shortly.";
+        verifyForm.hidden = false;
+        sendCode.textContent = "Send another code";
+      } catch { showError("Unable to send a sign-in code. Please try again later."); }
+      finally { setBusy(false); }
+    };
+    email.oninput = () => { sentEmail = ""; otp.value = ""; verifyForm.hidden = true; setBusy(false); };
+    verifyForm.onsubmit = async (event) => {
+      event.preventDefault();
+      if (busy || !emailEnabled || !sentEmail) return;
+      setBusy(true);
+      error.classList.add("hidden");
+      try {
+        await auth("/api/auth/sign-in/email-otp", { email: sentEmail, otp: otp.value });
+        otp.value = "";
+        location.href = nextURL();
+      } catch { otp.value = ""; showError("Sign-in could not be completed. Check your code or request another."); }
+      finally { setBusy(false); }
+    };
+    async function loadCapabilities() {
+      try {
+        const response = await fetch("/api/auth/capabilities", { credentials: "include" });
+        if (!response.ok) throw new Error();
+        const capabilities = await response.json();
+        emailEnabled = capabilities.emailOTP === true;
+        setBusy(false);
+        status.textContent = emailEnabled ? "Private beta: sign-in is available to invited accounts." : "Email sign-in is currently unavailable. Contact your administrator.";
+        for (const provider of ["google", "github"]) {
+          if (!Array.isArray(capabilities.socialProviders) || !capabilities.socialProviders.includes(provider)) continue;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = provider === "google" ? "Continue with Google" : "Continue with GitHub";
+          button.onclick = async () => {
+            if (busy) return;
+            setBusy(true);
+            error.classList.add("hidden");
+            try {
+              const result = await auth("/api/auth/sign-in/social", { provider, callbackURL: nextURL() });
+              const target = new URL(result.url);
+              if (target.protocol !== "https:") throw new Error();
+              location.href = target.href;
+            } catch { showError("Provider sign-in is currently unavailable. Please try again later."); }
+            finally { setBusy(false); }
+          };
+          providers.appendChild(button);
+        }
+      } catch { status.textContent = "Sign-in is currently unavailable. Please try again later."; }
+    }
+    loadCapabilities();
   </script>
 </body>
 </html>`;

@@ -1,0 +1,25 @@
+{
+  "name": "om-qual-20261017-auth-email",
+  "account_id": "REPLACE_WITH_APPROVED_ACCOUNT",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-10-17",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "observability": { "enabled": false },
+  "vars": {
+    "AUTH_EMAIL_MODE": "staging",
+    "AUTH_EMAIL_FROM": "REPLACE_WITH_VERIFIED_SENDER",
+    "AUTH_EMAIL_ALLOWED_RECIPIENTS": "REPLACE_WITH_EXACT_APPROVED_RECIPIENTS",
+    "AUTH_EMAIL_RUN_ID": "REPLACE_WITH_APPROVED_RUN_ID",
+    "AUTH_EMAIL_RUN_EXPIRES_AT": "REPLACE_WITH_APPROVED_ISO_CUTOFF"
+  },
+  "d1_databases": [
+    {
+      "binding": "SEND_BUDGET_DB",
+      "database_name": "om-qual-20261017-email-budget",
+      "database_id": "REPLACE_WITH_APPROVED_DATABASE_UUID",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

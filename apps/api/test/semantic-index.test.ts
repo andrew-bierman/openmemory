@@ -60,6 +60,7 @@ describe("semantic index provider contracts", () => {
         values: [0.1, 0.2, 0.3],
         metadata: {
           tenantId: "tenant-a",
+          generation: 0,
           memoryId: "mem_1",
           source: "api",
           status: "active",
@@ -228,6 +229,20 @@ function fakeEnv({
   vectorUpsert?: ReturnType<typeof vi.fn>;
 } = {}) {
   return {
+    MEMORY_GRAPHS: {
+      idFromName: (id: string) => id,
+      get: () => ({
+        getIngestionGeneration: async () => 0,
+        getMemory: async (id: string) => ({
+          id,
+          content: "Graph memory uses Vectorize.",
+          source: "api",
+          tags: ["graph"],
+          status: "active",
+          isLatest: true,
+        }),
+      }),
+    },
     EMBEDDING_MODEL: "@cf/test/embedding",
     AI: {
       run: aiRun,

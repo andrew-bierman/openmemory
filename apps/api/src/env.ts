@@ -12,10 +12,14 @@ import type { IngestionQueueMessage } from "./source-ingestion";
 export type Env = {
   MEMORY_GRAPHS: MemoryGraphNamespace;
   AUTH_DB?: D1Database;
+  OPENMEMORY_AUTH_ALLOWED_EMAILS?: string;
+  AUTH_EMAIL?: { fetch(request: Request): Promise<Response> };
   MEMORY_VECTORS?: VectorizeIndex;
   AI?: Ai;
   MEMORY_EXPORTS?: R2Bucket;
   OPENMEMORY_ANALYTICS?: AnalyticsEngineBinding;
+  MEMORY_EXTRACTION_QUEUE_NAME?: string;
+  SOURCE_INGESTION_QUEUE_NAME?: string;
   MEMORY_EXTRACTION_QUEUE?: Queue<MemoryExtractionMessage>;
   MEMORY_EXTRACTION_WORKFLOW?: WorkflowBinding<MemoryExtractionMessage>;
   SOURCE_INGESTION_QUEUE?: Queue<IngestionQueueMessage>;

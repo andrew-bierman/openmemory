@@ -227,15 +227,19 @@ test("local dashboard renders TanStack table, charts, and graph explorer", async
     page.getByText("Header tenant for local development"),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Team and tenant" }),
+    page.getByRole("heading", { name: "Personal workspace name" }),
   ).toBeVisible();
   await expect(page.getByLabel("Workspace name")).toHaveValue(
     "Local workspace",
   );
   await expect(page.getByLabel("Display name")).toBeDisabled();
-  await expect(page.getByLabel("Member email")).toBeDisabled();
-  await expect(page.getByLabel("Role")).toBeDisabled();
-  await expect(page.getByText("No hosted workspace loaded")).toBeVisible();
+  await expect(page.getByLabel("Team sharing")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Create invitation" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Share selected version read-only" }),
+  ).toHaveCount(0);
   await page.screenshot({
     fullPage: true,
     path: `${screenshotDir}/03-admin-local-mode.png`,

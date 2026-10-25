@@ -9,15 +9,26 @@ test("local OAuth callback verifier exchanges MCP bearer token through browser r
 }) => {
   const screenshotDir = ".tmp/screenshots/launch-readiness";
   const email = `ui-oauth-callback-${crypto.randomUUID()}@example.com`;
-  const password = "password1234";
   await mkdir(screenshotDir, { recursive: true });
 
+  const provisioned = await page.request.post(`${API_URL}/api/__test/session`, {
+    headers: { origin: API_URL },
+    data: { name: "OAuth Callback E2E", email },
+  });
+  expect(provisioned.ok(), await provisioned.text()).toBe(true);
+  await page.context().clearCookies();
   await page.goto(`${API_URL}/login`);
-  await expect(page.getByRole("heading", { name: "OpenMemory" })).toBeVisible();
-  await page.locator("#name").fill("OAuth Callback E2E");
+  await expect(page.locator("#password")).toHaveCount(0);
   await page.locator("#email").fill(email);
-  await page.locator("#password").fill(password);
-  await page.getByRole("button", { name: "Create account" }).click();
+  await page.getByRole("button", { name: "Send sign-in code" }).click();
+  await expect(page.locator("#verifyForm")).toBeVisible();
+  const captured = await (
+    await page.request.get(
+      `${API_URL}/api/__test/otp?email=${encodeURIComponent(email)}`,
+    )
+  ).json();
+  await page.locator("#otp").fill(captured.otp);
+  await page.getByRole("button", { name: "Verify and sign in" }).click();
   await expect(page).toHaveURL(/\/(\?view=recall)?$/);
 
   const account = (await expectOkJson(

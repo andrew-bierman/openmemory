@@ -27,6 +27,14 @@ type RerankMetadata = {
   reason?: string;
 };
 
+type RerankFailureReason = "timeout" | "provider_error" | "invalid_output";
+
+class RerankFailure extends Error {
+  constructor(readonly reason: RerankFailureReason) {
+    super(reason);
+  }
+}
+
 type WorkersAiRerankResponse = {
   response?: unknown;
   result?: unknown;
@@ -96,7 +104,7 @@ export async function rerankSearchResults(
       timeoutMs,
     );
     if (rerankedIds.length === 0) {
-      return results.map((result) => annotateRerank(result, "empty"));
+      return results.map((result) => annotateRerank(result, "empty", model));
     }
 
     const order = new Map(rerankedIds.map((id, index) => [id, index]));
@@ -116,8 +124,12 @@ export async function rerankSearchResults(
     });
 
     return reranked.map((result) => annotateRerank(result, "applied", model));
-  } catch {
-    return results.map((result) => annotateRerank(result, "fallback", model));
+  } catch (error) {
+    const reason =
+      error instanceof RerankFailure ? error.reason : "provider_error";
+    return results.map((result) =>
+      annotateRerank(result, "fallback", model, reason),
+    );
   }
 }
 
@@ -142,29 +154,38 @@ async function runWorkersAiRerank(
     ),
   ].join("\n");
 
-  const inference = env.AI?.run(model, {
-    prompt,
-    max_tokens: 256,
-  }) as Promise<WorkersAiRerankResponse>;
-  const guardedInference = inference.catch(() => undefined);
-  const response = await raceTimeout(guardedInference, timeoutMs);
-  if (!response) {
-    return [];
-  }
+  // Normalize both synchronous throws and async rejections before the timeout race.
+  // Promise.race observes late rejections even after its timeout has settled.
+  const ai = env.AI;
+  if (!ai) throw new RerankFailure("provider_error");
+  const inference = Promise.resolve().then(async () => {
+    try {
+      return await ai.run(model, { prompt, max_tokens: 256 });
+    } catch {
+      throw new RerankFailure("provider_error");
+    }
+  });
+  const response = await raceTimeout(inference, timeoutMs);
 
   const ids = parseRerankIds(response);
   const allowed = new Set(candidates.map((candidate) => candidate.id));
   const seen = new Set<string>();
-  return ids.filter((id) => {
+  const validIds = ids.filter((id) => {
     if (!allowed.has(id) || seen.has(id)) {
       return false;
     }
     seen.add(id);
     return true;
   });
+  if (ids.length > 0 && validIds.length === 0) {
+    throw new RerankFailure("invalid_output");
+  }
+  return validIds;
 }
 
-function parseRerankIds(response: WorkersAiRerankResponse) {
+function parseRerankIds(value: unknown) {
+  if (!isRecord(value)) throw new RerankFailure("invalid_output");
+  const response = value as WorkersAiRerankResponse;
   const textCandidates = [
     response.response,
     response.result,
@@ -176,11 +197,14 @@ function parseRerankIds(response: WorkersAiRerankResponse) {
       continue;
     }
     const parsed = parseJsonObject(candidate);
-    if (Array.isArray(parsed?.ids)) {
-      return parsed.ids.filter((id): id is string => typeof id === "string");
+    if (
+      Array.isArray(parsed?.ids) &&
+      parsed.ids.every((id) => typeof id === "string")
+    ) {
+      return parsed.ids as string[];
     }
   }
-  return [];
+  throw new RerankFailure("invalid_output");
 }
 
 function parseJsonObject(text: string) {
@@ -224,6 +248,7 @@ function annotateRerank(
   result: SearchResult,
   status: "applied" | "empty" | "fallback" | "skipped",
   model?: string,
+  reason?: RerankFailureReason,
 ): SearchResult {
   return {
     ...result,
@@ -231,6 +256,7 @@ function annotateRerank(
       ...result.metadata,
       rerank: {
         status,
+        ...(reason ? { reason } : {}),
         ...(model ? { model } : {}),
       },
     },
@@ -254,7 +280,7 @@ function getRerankMetadata(memories: SearchResult[]): RerankMetadata {
     applied: status === "applied",
     model: typeof first.model === "string" ? first.model : undefined,
     candidateCount: memories.length,
-    reason: status,
+    reason: typeof first.reason === "string" ? first.reason : status,
   };
 }
 
@@ -268,8 +294,11 @@ async function raceTimeout<T>(promise: Promise<T>, timeoutMs: number) {
   try {
     return await Promise.race([
       promise,
-      new Promise<undefined>((resolve) => {
-        timeout = setTimeout(() => resolve(undefined), timeoutMs);
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new RerankFailure("timeout")),
+          timeoutMs,
+        );
       }),
     ]);
   } finally {

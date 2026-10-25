@@ -1,5 +1,11 @@
 const MCP_READ_SCOPE = "memory:read";
 const MCP_WRITE_SCOPE = "memory:write";
+const MCP_SHARED_TOOLS = new Set([
+  "shared_workspaces",
+  "shared_list",
+  "shared_read",
+  "shared_search",
+]);
 const MCP_WRITE_TOOLS = new Set(["remember", "forget"]);
 
 export async function getRequiredMcpScopesForRequest(request: Request) {
@@ -24,6 +30,12 @@ export function getRequiredMcpScopesForPayload(payload: unknown) {
     }
 
     const params = message.params;
+    if (
+      isRecord(params) &&
+      typeof params.name === "string" &&
+      MCP_SHARED_TOOLS.has(params.name)
+    )
+      requiredScopes.add("memory:shared:read");
     if (
       isRecord(params) &&
       typeof params.name === "string" &&

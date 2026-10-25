@@ -283,7 +283,7 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
     },
     rerank: {
       configured: false,
-      workersAiConfigured: true,
+      workersAiConfigured: false,
       timeoutMs: 900,
       status: "disabled",
     },
@@ -390,21 +390,21 @@ test("worker API isolates tenants and supports memory recall plus graph edges", 
   expect(repair).toMatchObject({
     attempted: 2,
     expectedVectors: 2,
-    failed: 2,
+    failed: 0,
     indexed: 0,
     purgeableMemories: 1,
-    skipped: 0,
+    skipped: 2,
     semanticIndex: {
       expectedVectors: 2,
       staleVectorCandidates: 1,
-      status: "unchecked",
+      status: "unconfigured",
     },
     staleVectors: {
       attempted: 1,
-      vectorizeConfigured: true,
+      vectorizeConfigured: false,
     },
     tenantId: tenantA,
-    vectorizeConfigured: true,
+    vectorizeConfigured: false,
   });
 
   const mismatchPurge = await worker.fetch("/v1/tenant", {
@@ -1349,19 +1349,33 @@ test("worker emits operational headers and rate limits repeated requests", async
 }, 45_000);
 
 test("worker API uses Better Auth session cookies as deployed tenant identity", async () => {
-  const worker = await startWorker({
+  const authOrigin = "http://openmemory.test";
+  const localWorker = await startWorker({
+    BETTER_AUTH_URL: authOrigin,
     BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
   });
+  const worker = {
+    ...localWorker,
+    baseUrl: authOrigin,
+    fetch(path: string, init?: RequestInit) {
+      const headers = new Headers(init?.headers);
+      headers.set("host", "openmemory.test");
+      headers.set("MF-Original-URL", `${authOrigin}${path}`);
+      headers.set("origin", authOrigin);
+      // Network destination stays loopback. Miniflare preserves this URL so
+      // the worker exercises deployed OAuth rather than its localhost bypass.
+      return localWorker.fetch(path, { ...init, headers });
+    },
+  };
   workers.push(worker);
 
   const email = `session-${crypto.randomUUID()}@example.com`;
-  const signUp = await worker.fetch("/api/auth/sign-up/email", {
+  const signUp = await worker.fetch("/api/__test/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: "Session User",
       email,
-      password: "password1234",
     }),
   });
   await expectOk(signUp);
@@ -1386,55 +1400,119 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
         token_endpoint_auth_method: "none",
         grant_types: ["authorization_code", "refresh_token"],
         response_types: ["code"],
-        scope: "openid profile memory:read memory:write",
+        scope: "openid profile offline_access memory:read memory:write",
       }),
     }),
   );
-  const codeVerifier = `openmemory-${crypto.randomUUID()}-${crypto.randomUUID()}`;
-  const codeChallenge = await pkceChallenge(codeVerifier);
-  const authorization = await getRedirectUrl(
-    await worker.fetch(
-      `/api/auth/oauth2/authorize?${new URLSearchParams({
-        response_type: "code",
-        client_id: oauthClient.client_id,
-        redirect_uri: "http://127.0.0.1/callback",
-        scope: "openid profile memory:read memory:write",
-        state: "oauth-smoke",
-        prompt: "consent",
-        code_challenge: codeChallenge,
-        code_challenge_method: "S256",
-      })}`,
-      {
-        headers: { cookie, accept: "application/json" },
-        redirect: "manual",
-      },
-    ),
-  );
-  const callback =
-    authorization.pathname === "/consent"
-      ? new URL(
-          (
-            await getJson<OAuthRedirectResponse>(
-              await worker.fetch("/api/auth/oauth2/consent", {
-                method: "POST",
-                headers: {
-                  cookie,
-                  "content-type": "application/json",
-                  accept: "application/json",
-                },
-                body: JSON.stringify({
-                  accept: true,
-                  scope: "openid profile memory:read memory:write",
-                  oauth_query: authorization.search.slice(1),
+  async function issueCode(consentingCookie = cookie) {
+    const codeVerifier = `openmemory-${crypto.randomUUID()}-${crypto.randomUUID()}`;
+    const codeChallenge = await pkceChallenge(codeVerifier);
+    const authorization = await getRedirectUrl(
+      await worker.fetch(
+        `/api/auth/oauth2/authorize?${new URLSearchParams({
+          response_type: "code",
+          resource: `${authOrigin}/mcp`,
+          client_id: oauthClient.client_id,
+          redirect_uri: "http://127.0.0.1/callback",
+          scope: "openid profile offline_access memory:read memory:write",
+          state: "oauth-smoke",
+          prompt: "consent",
+          code_challenge: codeChallenge,
+          code_challenge_method: "S256",
+        })}`,
+        {
+          headers: { cookie: consentingCookie, accept: "application/json" },
+          redirect: "manual",
+        },
+      ),
+    );
+    const callback =
+      authorization.pathname === "/consent"
+        ? new URL(
+            (
+              await getJson<OAuthRedirectResponse>(
+                await worker.fetch("/api/auth/oauth2/consent", {
+                  method: "POST",
+                  headers: {
+                    cookie: consentingCookie,
+                    "content-type": "application/json",
+                    accept: "application/json",
+                  },
+                  body: JSON.stringify({
+                    accept: true,
+                    scope:
+                      "openid profile offline_access memory:read memory:write",
+                    oauth_query: authorization.search.slice(1),
+                  }),
                 }),
-              }),
-            )
-          ).url,
-        )
-      : authorization;
-  expect(callback.searchParams.get("state")).toBe("oauth-smoke");
-  const code = callback.searchParams.get("code");
-  expect(code, callback.toString()).toBeTruthy();
+              )
+            ).url,
+          )
+        : authorization;
+    expect(callback.searchParams.get("state")).toBe("oauth-smoke");
+    const code = callback.searchParams.get("code");
+    expect(code, callback.toString()).toBeTruthy();
+
+    return () =>
+      worker.fetch("/api/auth/oauth2/token", {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          grant_type: "authorization_code",
+          client_id: oauthClient.client_id,
+          code: code ?? "",
+          redirect_uri: "http://127.0.0.1/callback",
+          code_verifier: codeVerifier,
+          resource: `${authOrigin}/mcp`,
+        }),
+      });
+  }
+  async function issueToken(consentingCookie = cookie) {
+    const exchange = await issueCode(consentingCookie);
+    const tokenResponse = await exchange();
+    expect(tokenResponse.status).toBe(200);
+    return (await tokenResponse.json()) as {
+      access_token: string;
+      refresh_token?: string;
+    };
+  }
+  const issuedToken = await issueToken();
+  const delayedExchange = await issueCode();
+  function refresh(token: string | undefined) {
+    expect(typeof token).toBe("string");
+    return worker.fetch("/api/auth/oauth2/token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        client_id: oauthClient.client_id,
+        refresh_token: token ?? "",
+        resource: `${authOrigin}/mcp`,
+      }),
+    });
+  }
+  const callWithIssuedToken = (bearer = issuedToken.access_token) =>
+    worker.fetch("/mcp", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${bearer}`,
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        "x-openmemory-user-id": "must-not-override-oauth",
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+    });
+  const headerOnlyMcp = await worker.fetch("/mcp", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      "x-openmemory-user-id": "must-not-authorize-deployed-mcp",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }),
+  });
+  expect(headerOnlyMcp.status).toBe(401);
+  expect((await callWithIssuedToken()).status).toBe(200);
 
   const connections = await getJson<OAuthConnectionResponse[]>(
     await worker.fetch("/v1/oauth/connections", {
@@ -1459,6 +1537,7 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     clientId: oauthClient.client_id,
     revoked: true,
   });
+  expect((await callWithIssuedToken()).status).toBe(401);
   const afterRevoke = await getJson<OAuthConnectionResponse[]>(
     await worker.fetch("/v1/oauth/connections", {
       headers: { cookie },
@@ -1467,6 +1546,68 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   expect(afterRevoke.map((connection) => connection.clientId)).not.toContain(
     oauthClient.client_id,
   );
+
+  expect((await refresh(issuedToken.refresh_token)).status).toBe(400);
+  const reconsented = await issueToken();
+  expect((await delayedExchange()).status).toBe(400);
+  expect((await refresh(issuedToken.refresh_token)).status).toBe(400);
+  expect((await callWithIssuedToken(reconsented.access_token)).status).toBe(
+    200,
+  );
+  expect((await callWithIssuedToken()).status).toBe(401);
+  const grants = await getJson<Array<{ id: string; clientId: string }>>(
+    await worker.fetch("/api/auth/oauth2/get-consents", {
+      headers: { cookie },
+    }),
+  );
+  const grant = grants.find((item) => item.clientId === oauthClient.client_id);
+  expect(grant).toBeDefined();
+  for (const scopes of [
+    ["memory:read"],
+    ["openid", "profile", "memory:read", "memory:write"],
+  ]) {
+    const updated = await worker.fetch("/api/auth/oauth2/update-consent", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: grant?.id, update: { scopes } }),
+    });
+    expect(updated.status).toBe(200);
+    expect((await callWithIssuedToken(reconsented.access_token)).status).toBe(
+      401,
+    );
+  }
+  expect((await refresh(reconsented.refresh_token)).status).toBe(400);
+  const afterScopeChange = await issueToken();
+  expect(
+    (await callWithIssuedToken(afterScopeChange.access_token)).status,
+  ).toBe(200);
+  const providerDeleted = await worker.fetch(
+    "/api/auth/oauth2/delete-consent",
+    {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify({ id: grant?.id }),
+    },
+  );
+  expect(providerDeleted.status).toBe(200);
+  expect(
+    (await callWithIssuedToken(afterScopeChange.access_token)).status,
+  ).toBe(401);
+  const afterProviderDelete = await issueToken();
+  expect((await refresh(afterScopeChange.refresh_token)).status).toBe(400);
+  const validRefresh = await refresh(afterProviderDelete.refresh_token);
+  expect(validRefresh.status).toBe(200);
+  const rotated = (await validRefresh.json()) as {
+    access_token: string;
+    refresh_token: string;
+  };
+  expect((await callWithIssuedToken(rotated.access_token)).status).toBe(200);
+  expect(
+    (await callWithIssuedToken(afterProviderDelete.access_token)).status,
+  ).toBe(200);
+  expect(
+    (await callWithIssuedToken(afterScopeChange.access_token)).status,
+  ).toBe(401);
 
   const unauthenticatedClients = await worker.fetch("/v1/oauth/clients");
   expect(unauthenticatedClients.status).toBe(401);
@@ -1486,6 +1627,66 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   expect(await invalidClient.json()).toMatchObject({
     error: "invalid_redirect_uri",
   });
+
+  const unauthenticatedCreate = await worker.fetch("/v1/oauth/clients", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: '{"private-marker":',
+  });
+  expect(unauthenticatedCreate.status).toBe(401);
+  expect(await unauthenticatedCreate.json()).toEqual({ error: "unauthorized" });
+
+  for (const [contentType, body, expectedStatus, expectedError] of [
+    ["application/json", '{"private-marker":', 400, "invalid_json"],
+    ["application/json", "", 400, "invalid_json"],
+    ["text/plain", "{}", 415, "unsupported_media_type"],
+    [
+      "application/x-www-form-urlencoded",
+      "name=test",
+      415,
+      "unsupported_media_type",
+    ],
+    [
+      "application/json",
+      JSON.stringify({
+        name: "Large",
+        redirectUris: ["https://example.com/callback"],
+        padding: "x".repeat(65536),
+      }),
+      413,
+      "payload_too_large",
+    ],
+  ] as const) {
+    const rejected = await worker.fetch("/v1/oauth/clients", {
+      method: "POST",
+      headers: { cookie, "content-type": contentType },
+      body,
+    });
+    expect.soft(rejected.status).toBe(expectedStatus);
+    expect
+      .soft(await rejected.text())
+      .toBe(JSON.stringify({ error: expectedError }));
+  }
+
+  for (const body of [
+    null,
+    [],
+    { name: 123 },
+    { redirectUris: "https://example.com/callback" },
+    { redirectUris: [null] },
+    { redirectUris: ["https://example.com/callback"], scopes: "memory:read" },
+    { redirectUris: ["https://example.com/callback"], scopes: [null] },
+  ]) {
+    const invalidShape = await worker.fetch("/v1/oauth/clients", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(invalidShape.status, JSON.stringify(body)).toBe(400);
+    expect(await invalidShape.json()).toMatchObject({
+      error: "invalid_client_input",
+    });
+  }
 
   const managedClient = await getJson<OAuthManagedClientResponse>(
     await worker.fetch("/v1/oauth/clients", {
@@ -1525,17 +1726,33 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     }),
   );
 
-  const secondSignUp = await worker.fetch("/api/auth/sign-up/email", {
+  const secondSignUp = await worker.fetch("/api/__test/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: "Other Session User",
       email: `other-${crypto.randomUUID()}@example.com`,
-      password: "password1234",
     }),
   });
   await expectOk(secondSignUp);
   const secondCookie = getCookieHeader(secondSignUp);
+  const otherUserToken = await issueToken(secondCookie);
+  expect((await callWithIssuedToken(otherUserToken.access_token)).status).toBe(
+    200,
+  );
+  const disconnectFirstUser = await worker.fetch(
+    `/v1/oauth/connections/${oauthClient.client_id}`,
+    {
+      method: "DELETE",
+      headers: { cookie },
+    },
+  );
+  expect(disconnectFirstUser.status).toBe(200);
+  expect((await callWithIssuedToken(rotated.access_token)).status).toBe(401);
+  expect((await callWithIssuedToken(otherUserToken.access_token)).status).toBe(
+    200,
+  );
+
   const otherUserClients = await getJson<OAuthManagedClientResponse[]>(
     await worker.fetch("/v1/oauth/clients", {
       headers: { cookie: secondCookie },
@@ -1598,6 +1815,44 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   );
   expect(memories.map((item) => item.id)).toContain(memory.id);
 
+  // Real session identities must win over caller-controlled development headers.
+  const foreignHeaders = {
+    cookie: secondCookie,
+    "x-openmemory-user-id": session.user.id,
+    "content-type": "application/json",
+  };
+  for (const method of ["GET", "PATCH", "DELETE"]) {
+    const response = await worker.fetch(`/v1/memories/${memory.id}`, {
+      method,
+      headers: foreignHeaders,
+      ...(method === "PATCH"
+        ? { body: JSON.stringify({ content: "Cross-user overwrite" }) }
+        : {}),
+    });
+    expect(response.status, `cross-user ${method}`).toBe(404);
+  }
+  const foreignSearch = await getJson<SearchResponse[]>(
+    await worker.fetch("/v1/search", {
+      method: "POST",
+      headers: foreignHeaders,
+      body: JSON.stringify({ q: "Cookie sessions identify OpenMemory tenant" }),
+    }),
+  );
+  expect(foreignSearch).toEqual([]);
+  const foreignExport = await getJson<GraphExportResponse>(
+    await worker.fetch("/v1/exports", {
+      method: "POST",
+      headers: foreignHeaders,
+    }),
+  );
+  expect(foreignExport.memoryCount).toBe(0);
+  expect(foreignExport.key).not.toContain(`${session.user.id}/exports/`);
+  const ownMemory = await getJson<MemoryResponse>(
+    await worker.fetch(`/v1/memories/${memory.id}`, { headers: { cookie } }),
+  );
+  expect(ownMemory.content).toBe(memory.content);
+  expect(ownMemory.status).toBe("active");
+
   const readiness = await getJson<ReadinessResponse>(
     await worker.fetch("/v1/readiness", {
       headers: { cookie },
@@ -1628,6 +1883,1030 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
   });
   expect(readiness.bindings.authDb).toBe(true);
   expect(readiness.rerank.status).toBe("disabled");
+  const otherSession = await getJson<SessionResponse>(
+    await worker.fetch("/api/auth/get-session", {
+      headers: { cookie: secondCookie },
+    }),
+  );
+  await expectOk(
+    await worker.fetch("/api/__test/remove-invite", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: otherSession.user.email }),
+    }),
+  );
+  expect((await callWithIssuedToken(otherUserToken.access_token)).status).toBe(
+    401,
+  );
+  expect(
+    await (
+      await worker.fetch("/api/auth/get-session", {
+        headers: { cookie: secondCookie },
+      })
+    ).json(),
+  ).toBeNull();
+  expect(
+    (await worker.fetch("/v1/memories", { headers: { cookie: secondCookie } }))
+      .status,
+  ).toBe(401);
+}, 45_000);
+
+test("shared MCP requires explicit PKCE scope and current team grants", async () => {
+  const authOrigin = "http://openmemory.test";
+  const local = await startWorker({
+    BETTER_AUTH_URL: authOrigin,
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(local);
+  const request = (
+    path: string,
+    cookie = "",
+    method = "GET",
+    body?: unknown,
+    bearer?: string,
+  ) =>
+    local.fetch(path, {
+      method,
+      headers: {
+        host: "openmemory.test",
+        "MF-Original-URL": `${authOrigin}${path}`,
+        origin: authOrigin,
+        cookie,
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        ...(bearer
+          ? {
+              authorization: `Bearer ${bearer}`,
+              "x-openmemory-user-id": "forged-owner",
+            }
+          : {}),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      redirect: "manual",
+    });
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await request("/api/__test/session", "", "POST", {
+      name,
+      email,
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const account = await getJson<AccountResponse>(
+      await request("/v1/account", cookie),
+    );
+    return { email, cookie, account };
+  };
+  const owner = await signup("SharedOwner"),
+    reader = await signup("SharedReader");
+  const workspaceId = owner.account.workspace.id,
+    team = `/v1/workspaces/${workspaceId}`;
+  const invitation = await getJson<{ invitationId: string; token: string }>(
+    await request(`${team}/invitations`, owner.cookie, "POST", {
+      email: reader.email,
+    }),
+  );
+  const accepted = await getJson<{ memberId: string }>(
+    await request(
+      `/v1/workspace-invitations/${invitation.invitationId}/accept`,
+      reader.cookie,
+      "POST",
+      { token: invitation.token },
+    ),
+  );
+  const memory = await getJson<MemoryResponse>(
+    await request("/v1/memories", owner.cookie, "POST", {
+      content: "Shared MCP architecture decision",
+      metadata: { secret: "never project" },
+    }),
+  );
+  const share = await getJson<{ shareId: string }>(
+    await request(`${team}/shares`, owner.cookie, "POST", {
+      memoryId: memory.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const scopes = "openid profile memory:read memory:shared:read";
+  const client = await getJson<OAuthManagedClientResponse>(
+    await request("/v1/oauth/clients", reader.cookie, "POST", {
+      name: "Explicit shared reader",
+      redirectUris: ["http://127.0.0.1/callback"],
+      scopes: scopes.split(" "),
+    }),
+  );
+  expect(client.scopes).toContain("memory:shared:read");
+  const token = async (scope: string) => {
+    const verifier = `openmemory-${crypto.randomUUID()}-${crypto.randomUUID()}`;
+    const params = new URLSearchParams({
+      response_type: "code",
+      client_id: client.clientId,
+      redirect_uri: "http://127.0.0.1/callback",
+      scope,
+      resource: `${authOrigin}/mcp`,
+      prompt: "consent",
+      state: "team-proof",
+      code_challenge: await pkceChallenge(verifier),
+      code_challenge_method: "S256",
+    });
+    const authorization = await getRedirectUrl(
+      await request(`/api/auth/oauth2/authorize?${params}`, reader.cookie),
+    );
+    const callback =
+      authorization.pathname === "/consent"
+        ? new URL(
+            (
+              await getJson<OAuthRedirectResponse>(
+                await request(
+                  "/api/auth/oauth2/consent",
+                  reader.cookie,
+                  "POST",
+                  {
+                    accept: true,
+                    scope,
+                    oauth_query: authorization.search.slice(1),
+                  },
+                ),
+              )
+            ).url,
+          )
+        : authorization;
+    expect(callback.searchParams.get("state")).toBe("team-proof");
+    const code = callback.searchParams.get("code");
+    expect(code).toBeTruthy();
+    const response = await local.fetch("/api/auth/oauth2/token", {
+      method: "POST",
+      headers: {
+        host: "openmemory.test",
+        "MF-Original-URL": `${authOrigin}/api/auth/oauth2/token`,
+        origin: authOrigin,
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: client.clientId,
+        code: code ?? "",
+        redirect_uri: "http://127.0.0.1/callback",
+        code_verifier: verifier,
+        resource: `${authOrigin}/mcp`,
+      }),
+    });
+    return (await getJson<{ access_token: string }>(response)).access_token;
+  };
+  const call = (bearer: string, name: string, args: Record<string, unknown>) =>
+    request(
+      "/mcp",
+      "",
+      "POST",
+      {
+        jsonrpc: "2.0",
+        id: 1,
+        method: "tools/call",
+        params: { name, arguments: args },
+      },
+      bearer,
+    );
+  const personal = await token("openid profile memory:read");
+  expect(
+    (
+      await call(personal, "shared_read", {
+        workspaceId,
+        shareId: share.shareId,
+      })
+    ).status,
+  ).toBe(403);
+  const shared = await token(scopes);
+  const discovery = await getJson<{
+    result: { content: Array<{ text: string }> };
+  }>(await call(shared, "shared_workspaces", {}));
+  const discovered = JSON.parse(
+    discovery.result.content[0]?.text ?? "[]",
+  ) as Array<{ id: string; name: string; role: string }>;
+  expect(discovered).toContainEqual({
+    id: workspaceId,
+    name: owner.account.workspace.name,
+    role: "member",
+  });
+  expect(
+    discovered.every(
+      (entry) => Object.keys(entry).sort().join(",") === "id,name,role",
+    ),
+  ).toBe(true);
+  for (const [name, args] of [
+    ["shared_list", { workspaceId }],
+    ["shared_read", { workspaceId, shareId: share.shareId }],
+    ["shared_search", { workspaceId, q: "architecture" }],
+  ] as const) {
+    const response = await call(shared, name, args);
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    const result = await getJson<JsonRpcResponse>(response);
+    expect(JSON.stringify(result.result)).toContain(memory.content);
+    expect(JSON.stringify(result.result)).not.toContain("never project");
+  }
+  const privateRecall = await getJson<JsonRpcResponse>(
+    await call(shared, "recall", { query: "Shared MCP architecture" }),
+  );
+  expect(JSON.stringify(privateRecall.result)).not.toContain(memory.content);
+  await expectOk(
+    await request(`${team}/shares/${share.shareId}`, owner.cookie, "DELETE"),
+  );
+  const revoked = await getJson<JsonRpcResponse>(
+    await call(shared, "shared_read", { workspaceId, shareId: share.shareId }),
+  );
+  expect(JSON.stringify(revoked.result)).not.toContain(memory.content);
+  const fresh = await getJson<{ shareId: string }>(
+    await request(`${team}/shares`, owner.cookie, "POST", {
+      memoryId: memory.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  await expectOk(
+    await request(
+      `${team}/members/${accepted.memberId}`,
+      owner.cookie,
+      "DELETE",
+    ),
+  );
+  const removed = await getJson<JsonRpcResponse>(
+    await call(shared, "shared_read", { workspaceId, shareId: fresh.shareId }),
+  );
+  expect(JSON.stringify(removed.result)).not.toContain(memory.content);
+  await expectOk(
+    await request(
+      `/v1/oauth/connections/${client.clientId}`,
+      reader.cookie,
+      "DELETE",
+    ),
+  );
+  expect((await call(shared, "shared_list", { workspaceId })).status).toBe(401);
+}, 45_000);
+
+test("shared pages bound results and continue without dropping authorized records", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+  const signup = await worker.fetch("/api/__test/session", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "Pagination",
+      email: `pagination-${crypto.randomUUID()}@example.com`,
+    }),
+  });
+  await expectOk(signup);
+  const cookie = getCookieHeader(signup);
+  const request = (path: string, body?: unknown) =>
+    worker.fetch(path, {
+      method: body === undefined ? "GET" : "POST",
+      headers: { cookie, "content-type": "application/json" },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    });
+  const account = await getJson<AccountResponse>(await request("/v1/account"));
+  const path = `/v1/workspaces/${account.workspace.id}/shares`;
+  const expected = new Set<string>();
+  for (let index = 0; index < 26; index++) {
+    const memory = await getJson<MemoryResponse>(
+      await request("/v1/memories", {
+        content: `Shared pagination record ${index}`,
+      }),
+    );
+    const share = await getJson<{ shareId: string }>(
+      await request(path, {
+        memoryId: memory.id,
+        requestId: crypto.randomUUID(),
+      }),
+    );
+    expected.add(share.shareId);
+  }
+  const started = performance.now();
+  const first = await getJson<{
+    items: Array<{ shareId: string }>;
+    nextCursor?: string;
+  }>(await request(path));
+  const elapsed = performance.now() - started;
+  expect(first.items).toHaveLength(25);
+  expect(first.nextCursor).toBeTruthy();
+  const next = await getJson<{
+    items: Array<{ shareId: string }>;
+    nextCursor?: string;
+  }>(
+    await request(
+      `${path}?cursor=${encodeURIComponent(first.nextCursor ?? "")}`,
+    ),
+  );
+  expect(next.items).toHaveLength(1);
+  expect(next.nextCursor).toBeUndefined();
+  expect(
+    new Set([...first.items, ...next.items].map((item) => item.shareId)),
+  ).toEqual(expected);
+  console.info(
+    JSON.stringify({
+      event: "shared_page_local_latency",
+      returned: first.items.length,
+      elapsedMs: Number(elapsed.toFixed(2)),
+      hostedEvidence: false,
+    }),
+  );
+}, 30_000);
+
+test("shared pagination crosses stale directory pages and account cleanup revokes every grant", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+    OPENMEMORY_RATE_LIMIT_PER_MINUTE: "10000",
+  });
+  workers.push(worker);
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await worker.fetch("/api/__test/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const request = (path: string, method = "GET", body?: unknown) =>
+      worker.fetch(path, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    return {
+      email,
+      request,
+      account: await getJson<AccountResponse>(await request("/v1/account")),
+    };
+  };
+  const reader = await signup("PageReader");
+  const sharer = await signup("PageSharer");
+  const outsider = await signup("PageOutsider");
+  const team = `/v1/workspaces/${reader.account.workspace.id}`;
+  const path = `${team}/shares`;
+  const directoryCount = async (owner: string, workspace: string) =>
+    getJson<{ count: number }>(
+      await worker.fetch(
+        `/api/__test/share-directory-count?${new URLSearchParams({ owner, workspace })}`,
+      ),
+    );
+
+  const invitation = await getJson<{ invitationId: string; token: string }>(
+    await reader.request(`${team}/invitations`, "POST", {
+      email: sharer.email,
+    }),
+  );
+  await expectOk(
+    await sharer.request(
+      `/v1/workspace-invitations/${invitation.invitationId}/accept`,
+      "POST",
+      { token: invitation.token },
+    ),
+  );
+  type Item = { shareId: string; memoryId: string; content: string };
+  type Page = { items: Item[]; nextCursor?: string };
+  const expected = new Set<string>();
+  for (let index = 0; index < 127; index++) {
+    const memory = await getJson<MemoryResponse>(
+      await sharer.request("/v1/memories", "POST", {
+        content: `Boundary canary ${index}`,
+      }),
+    );
+    const share = await getJson<Item>(
+      await sharer.request(path, "POST", {
+        memoryId: memory.id,
+        requestId: crypto.randomUUID(),
+      }),
+    );
+    expected.add(share.shareId);
+  }
+  const collect = async (search = false) => {
+    const items: Item[] = [];
+    const cursors = new Set<string>();
+    const sizes: number[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await getJson<Page>(
+        search
+          ? await reader.request(`${team}/search`, "POST", {
+              q: "Boundary canary",
+              ...(cursor ? { cursor } : {}),
+            })
+          : await reader.request(
+              `${path}${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+            ),
+      );
+      expect(page.items.length).toBeLessThanOrEqual(25);
+      items.push(...page.items);
+      sizes.push(page.items.length);
+      cursor = page.nextCursor;
+      if (cursor) {
+        expect(cursors.has(cursor)).toBe(false);
+        cursors.add(cursor);
+      }
+      expect(sizes.length).toBeLessThanOrEqual(10);
+    } while (cursor);
+    expect(new Set(items.map((item) => item.shareId)).size).toBe(items.length);
+    return { items, sizes };
+  };
+  // Discover the real database order; UUIDs and second-resolution timestamps
+  // must not make the stale prefix depend on creation order or wall-clock sleeps.
+  const before = await collect();
+  expect(before.items).toHaveLength(127);
+  expect(new Set(before.items.map((item) => item.shareId))).toEqual(expected);
+  expect(before.sizes).toEqual([25, 25, 25, 25, 25, 2]);
+  expect(
+    await directoryCount(sharer.account.user.id, reader.account.workspace.id),
+  ).toEqual({ count: 127 });
+  const stale = before.items.slice(0, 101);
+  const live = before.items.slice(101);
+  for (const item of stale) {
+    await expectOk(
+      await sharer.request(`/v1/memories/${item.memoryId}`, "DELETE", {}),
+    );
+    expect((await reader.request(`${path}/${item.shareId}`)).status).toBe(404);
+  }
+  expect(
+    await directoryCount(sharer.account.user.id, reader.account.workspace.id),
+  ).toEqual({ count: 127 });
+  const remaining = new Set(live.map((item) => item.shareId));
+  for (const search of [false, true]) {
+    const after = await collect(search);
+    expect(after.sizes).toEqual([0, 25, 1]);
+    expect(new Set(after.items.map((item) => item.shareId))).toEqual(remaining);
+  }
+  const survivor = await getJson<MemoryResponse>(
+    await outsider.request("/v1/memories", "POST", {
+      content: "Unrelated pagination tenant",
+    }),
+  );
+  const otherPath = `/v1/workspaces/${outsider.account.workspace.id}/shares`;
+  const otherShare = await getJson<Item>(
+    await outsider.request(otherPath, "POST", {
+      memoryId: survivor.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const oldPage = await getJson<Page>(await reader.request(path));
+  expect(oldPage.nextCursor).toBeTruthy();
+  const deleted = await getJson<AccountDeletionResponse>(
+    await sharer.request("/v1/account", "DELETE", {
+      confirmEmail: sharer.email,
+      confirmTenantId: sharer.account.workspace.tenantId,
+    }),
+  );
+  expect(deleted.controlPlane.userDeleted).toBe(true);
+  expect(
+    await directoryCount(sharer.account.user.id, reader.account.workspace.id),
+  ).toEqual({ count: 0 });
+  expect(
+    await directoryCount(
+      outsider.account.user.id,
+      outsider.account.workspace.id,
+    ),
+  ).toEqual({ count: 1 });
+  expect(deleted.graph.memoriesDeleted).toBe(127);
+  expect((await sharer.request("/v1/account")).status).toBe(401);
+  for (const item of before.items) {
+    expect((await reader.request(`${path}/${item.shareId}`)).status).toBe(404);
+  }
+  for (const search of [false, true]) {
+    expect(await collect(search)).toEqual({ items: [], sizes: [0] });
+  }
+  expect(
+    await getJson<Page>(
+      await reader.request(
+        `${path}?cursor=${encodeURIComponent(oldPage.nextCursor ?? "")}`,
+      ),
+    ),
+  ).toMatchObject({ items: [] });
+  expect(
+    (await getJson<AccountResponse>(await reader.request("/v1/account")))
+      .workspace.id,
+  ).toBe(reader.account.workspace.id);
+  expect(
+    await getJson<MemoryResponse>(
+      await outsider.request(`/v1/memories/${survivor.id}`),
+    ),
+  ).toMatchObject({ content: survivor.content, status: "active" });
+  expect(
+    (await getJson<Page>(await outsider.request(otherPath))).items,
+  ).toEqual([
+    expect.objectContaining({
+      shareId: otherShare.shareId,
+      content: survivor.content,
+    }),
+  ]);
+  expect(
+    await getJson<Item>(
+      await outsider.request(`${otherPath}/${otherShare.shareId}`),
+    ),
+  ).toMatchObject({ content: survivor.content });
+}, 90_000);
+
+test("team REST requires accepted membership and revokes selected-version access", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await worker.fetch("/api/__test/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const request = (path: string, method = "GET", body?: unknown) =>
+      worker.fetch(path, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const account = await getJson<AccountResponse>(
+      await request("/v1/account"),
+    );
+    return { email, cookie, request, account };
+  };
+  const owner = await signup("Owner"),
+    member = await signup("Member"),
+    outsider = await signup("Outsider");
+  const team = `/v1/workspaces/${owner.account.workspace.id}`;
+  expect(
+    (
+      await worker.fetch(`${team}/shares`, {
+        headers: tenantHeaders(owner.account.user.id),
+      })
+    ).status,
+  ).toBe(401);
+  expect(
+    (await owner.request(`${team}/shares`)).headers.get("cache-control"),
+  ).toContain("no-store");
+  expect(
+    (
+      await worker.fetch(`${team}/members`, {
+        headers: { cookie: owner.cookie, origin: "https://evil.example" },
+      })
+    ).status,
+  ).toBe(403);
+  const invite = async () =>
+    getJson<{ invitationId: string; token: string }>(
+      await owner.request(`${team}/invitations`, "POST", {
+        email: member.email,
+        role: "member",
+      }),
+    );
+  const ownerMemory = await getJson<MemoryResponse>(
+    await owner.request("/v1/memories", "POST", {
+      content: "Future accepted teammates may read this",
+    }),
+  );
+  const ownerShare = await getJson<{ shareId: string }>(
+    await owner.request(`${team}/shares`, "POST", {
+      memoryId: ownerMemory.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const ownerSharedPath = `${team}/shares/${ownerShare.shareId}`;
+  const first = await invite();
+  expect((await member.request(ownerSharedPath)).status).toBe(404);
+  expect((await member.request(`${team}/shares`)).status).toBe(404);
+  expect(
+    (
+      await outsider.request(
+        `/v1/workspace-invitations/${first.invitationId}/accept`,
+        "POST",
+        { token: first.token },
+      )
+    ).status,
+  ).toBeGreaterThanOrEqual(400);
+  const accepted = await getJson<{ memberId: string }>(
+    await member.request(
+      `/v1/workspace-invitations/${first.invitationId}/accept`,
+      "POST",
+      { token: first.token },
+    ),
+  );
+  expect(
+    (
+      await member.request(
+        `/v1/workspace-invitations/${first.invitationId}/accept`,
+        "POST",
+        { token: first.token },
+      )
+    ).status,
+  ).toBeGreaterThanOrEqual(400);
+  // A grant made before acceptance includes future accepted recipients.
+  expect(
+    (await getJson<{ content: string }>(await member.request(ownerSharedPath)))
+      .content,
+  ).toBe("Future accepted teammates may read this");
+  const selected = await getJson<MemoryResponse>(
+    await member.request("/v1/memories", "POST", {
+      content: "Shared architecture selected version",
+      tags: ["team"],
+      metadata: { secret: "private metadata" },
+    }),
+  );
+  const privateMemory = await getJson<MemoryResponse>(
+    await member.request("/v1/memories", "POST", {
+      content: "Private neighbor must never leak",
+    }),
+  );
+  const intent = { memoryId: selected.id, requestId: crypto.randomUUID() };
+  const shared = await getJson<{ shareId: string }>(
+    await member.request(`${team}/shares`, "POST", intent),
+  );
+  const retry = await getJson<{ shareId: string }>(
+    await member.request(`${team}/shares`, "POST", intent),
+  );
+  expect(retry.shareId).toBe(shared.shareId);
+  const read = await getJson<Record<string, unknown>>(
+    await owner.request(`${team}/shares/${shared.shareId}`),
+  );
+  expect(Object.keys(read).sort()).toEqual(
+    [
+      "shareId",
+      "workspaceId",
+      "ownerUserId",
+      "memoryId",
+      "content",
+      "type",
+      "tags",
+    ].sort(),
+  );
+  expect(read.content).toBe("Shared architecture selected version");
+  const page = await getJson<{ items: unknown[] }>(
+    await owner.request(`${team}/search`, "POST", { q: "architecture" }),
+  );
+  expect(page.items).toEqual([read]);
+  expect((await owner.request(`/v1/memories/${selected.id}`)).status).toBe(404);
+  expect((await owner.request(`/v1/memories/${privateMemory.id}`)).status).toBe(
+    404,
+  );
+  expect(
+    (await outsider.request(`${team}/shares/${shared.shareId}`)).status,
+  ).toBe(404);
+  expect(
+    (
+      await owner.request(`${team}/shares`, "POST", {
+        memoryId: selected.id,
+        requestId: crypto.randomUUID(),
+      })
+    ).status,
+  ).toBe(409);
+  await expectOk(
+    await owner.request(`${team}/shares/${shared.shareId}`, "DELETE"),
+  );
+  await expectOk(await owner.request(`${team}/shares/${shared.shareId}`)); // Team owner cannot revoke someone else's grant.
+  expect(
+    (
+      await member.request(`${team}/invitations`, "POST", {
+        email: outsider.email,
+      })
+    ).status,
+  ).toBe(403);
+  await expectOk(
+    await owner.request(`${team}/members/${accepted.memberId}`, "DELETE"),
+  );
+  expect((await owner.request(`${team}/shares/${shared.shareId}`)).status).toBe(
+    404,
+  );
+  expect((await member.request(`${team}/shares`)).status).toBe(404);
+  expect((await member.request(ownerSharedPath)).status).toBe(404);
+  const second = await invite();
+  const rejoined = await getJson<{ memberId: string }>(
+    await member.request(
+      `/v1/workspace-invitations/${second.invitationId}/accept`,
+      "POST",
+      { token: second.token },
+    ),
+  );
+  expect(rejoined.memberId).not.toBe(accepted.memberId);
+  // Fresh recipient acceptance restores access to another current member's live grant.
+  await expectOk(await member.request(ownerSharedPath));
+  expect((await owner.request(`${team}/shares/${shared.shareId}`)).status).toBe(
+    404,
+  );
+  const fresh = await getJson<{ shareId: string }>(
+    await member.request(`${team}/shares`, "POST", {
+      memoryId: selected.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  await expectOk(await owner.request(`${team}/shares/${fresh.shareId}`));
+  await expectOk(
+    await member.request(`${team}/shares/${fresh.shareId}`, "DELETE"),
+  );
+  expect((await owner.request(`${team}/shares/${fresh.shareId}`)).status).toBe(
+    404,
+  );
+  expect(
+    (
+      await owner.request(team, "DELETE", {
+        confirmWorkspaceId: owner.account.workspace.id,
+        confirmName: "wrong",
+      })
+    ).status,
+  ).toBeGreaterThanOrEqual(400);
+  await expectOk(
+    await owner.request(team, "DELETE", {
+      confirmWorkspaceId: owner.account.workspace.id,
+      confirmName: owner.account.workspace.name,
+    }),
+  );
+  expect((await member.request(`${team}/shares`)).status).toBe(404);
+  await expectOk(await member.request(`/v1/memories/${privateMemory.id}`));
+  const replacement = await getJson<AccountResponse>(
+    await owner.request("/v1/account"),
+  );
+  expect(replacement.workspace.id).not.toBe(owner.account.workspace.id);
+}, 45_000);
+
+test("accepted shared reads stay read-only and sharer account deletion preserves other tenants", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await worker.fetch("/api/__test/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const request = (path: string, method = "GET", body?: unknown) =>
+      worker.fetch(path, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    const account = await getJson<AccountResponse>(
+      await request("/v1/account"),
+    );
+    return { email, request, account };
+  };
+  const owner = await signup("SurvivingOwner");
+  const member = await signup("DepartingSharer");
+  const outsider = await signup("UnrelatedTenant");
+  const team = `/v1/workspaces/${owner.account.workspace.id}`;
+  const invitation = await getJson<{ invitationId: string; token: string }>(
+    await owner.request(`${team}/invitations`, "POST", { email: member.email }),
+  );
+  await expectOk(
+    await member.request(
+      `/v1/workspace-invitations/${invitation.invitationId}/accept`,
+      "POST",
+      { token: invitation.token },
+    ),
+  );
+  const selected = await getJson<MemoryResponse>(
+    await member.request("/v1/memories", "POST", {
+      content: "Departure canary selected memory",
+      metadata: { secret: "private-canary" },
+    }),
+  );
+  const survivor = await getJson<MemoryResponse>(
+    await outsider.request("/v1/memories", "POST", {
+      content: "Unrelated tenant survives account deletion",
+    }),
+  );
+  const shared = await getJson<{ shareId: string }>(
+    await member.request(`${team}/shares`, "POST", {
+      memoryId: selected.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const sharedPath = `${team}/shares/${shared.shareId}`;
+  expect(
+    await getJson<Record<string, unknown>>(await owner.request(sharedPath)),
+  ).toMatchObject({
+    content: selected.content,
+    ownerUserId: member.account.user.id,
+  });
+  for (const method of ["PATCH", "DELETE"]) {
+    expect(
+      (
+        await owner.request(
+          `/v1/memories/${selected.id}`,
+          method,
+          method === "PATCH" ? { content: "Unauthorized replacement" } : {},
+        )
+      ).status,
+    ).toBe(404);
+  }
+  expect(
+    await getJson<SearchResponse[]>(
+      await owner.request("/v1/search", "POST", { q: "Departure canary" }),
+    ),
+  ).toEqual([]);
+  expect(
+    await getJson<GraphExportResponse>(
+      await owner.request("/v1/exports", "POST"),
+    ),
+  ).toMatchObject({ memoryCount: 0 });
+  expect(
+    await getJson<MemoryResponse>(
+      await member.request(`/v1/memories/${selected.id}`),
+    ),
+  ).toMatchObject({ content: selected.content, status: "active" });
+  expect(
+    (
+      await getJson<{ items: Array<{ shareId: string }> }>(
+        await owner.request(`${team}/shares`),
+      )
+    ).items,
+  ).toEqual([expect.objectContaining({ shareId: shared.shareId })]);
+  expect(
+    (
+      await getJson<{ items: Array<{ shareId: string }> }>(
+        await owner.request(`${team}/search`, "POST", {
+          q: "Departure canary",
+        }),
+      )
+    ).items,
+  ).toEqual([expect.objectContaining({ shareId: shared.shareId })]);
+  const deletion = await getJson<AccountDeletionResponse>(
+    await member.request("/v1/account", "DELETE", {
+      confirmEmail: member.email,
+      confirmTenantId: member.account.workspace.tenantId,
+    }),
+  );
+  expect(deletion.controlPlane.userDeleted).toBe(true);
+  expect(deletion.graph.memoriesDeleted).toBe(1);
+  expect((await member.request("/v1/account")).status).toBe(401);
+  expect((await owner.request(sharedPath)).status).toBe(404);
+  expect(
+    (await getJson<{ items: unknown[] }>(await owner.request(`${team}/shares`)))
+      .items,
+  ).toEqual([]);
+  expect(
+    (
+      await getJson<{ items: unknown[] }>(
+        await owner.request(`${team}/search`, "POST", {
+          q: "Departure canary",
+        }),
+      )
+    ).items,
+  ).toEqual([]);
+  expect(
+    (await getJson<AccountResponse>(await owner.request("/v1/account")))
+      .workspace.id,
+  ).toBe(owner.account.workspace.id);
+  expect(
+    await getJson<MemoryResponse>(
+      await outsider.request(`/v1/memories/${survivor.id}`),
+    ),
+  ).toMatchObject({ content: survivor.content, status: "active" });
+}, 45_000);
+
+test("failed share directory cleanup denies access and a retry completes revocation", async () => {
+  const worker = await startWorker({
+    BETTER_AUTH_SECRET: "test-secret-that-is-long-enough-for-better-auth",
+  });
+  workers.push(worker);
+  const signup = async (name: string) => {
+    const email = `${name}-${crypto.randomUUID()}@example.com`;
+    const response = await worker.fetch("/api/__test/session", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    });
+    await expectOk(response);
+    const cookie = getCookieHeader(response);
+    const request = (path: string, method = "GET", body?: unknown) =>
+      worker.fetch(path, {
+        method,
+        headers: { cookie, "content-type": "application/json" },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+    return {
+      email,
+      request,
+      account: await getJson<AccountResponse>(await request("/v1/account")),
+    };
+  };
+  const owner = await signup("RetryOwner"),
+    reader = await signup("RetryReader"),
+    outsider = await signup("RetryOutsider");
+  const team = `/v1/workspaces/${owner.account.workspace.id}`;
+  const path = `${team}/shares`;
+  const invitation = await getJson<{ invitationId: string; token: string }>(
+    await owner.request(`${team}/invitations`, "POST", { email: reader.email }),
+  );
+  await expectOk(
+    await reader.request(
+      `/v1/workspace-invitations/${invitation.invitationId}/accept`,
+      "POST",
+      { token: invitation.token },
+    ),
+  );
+  const memory = await getJson<MemoryResponse>(
+    await owner.request("/v1/memories", "POST", {
+      content: "Revocation retry canary",
+    }),
+  );
+  const share = await getJson<{ shareId: string }>(
+    await owner.request(path, "POST", {
+      memoryId: memory.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const sharedPath = `${path}/${share.shareId}`;
+  const survivor = await getJson<MemoryResponse>(
+    await outsider.request("/v1/memories", "POST", {
+      content: "Unrelated retry tenant",
+    }),
+  );
+  const otherPath = `/v1/workspaces/${outsider.account.workspace.id}/shares`;
+  const otherShare = await getJson<{ shareId: string }>(
+    await outsider.request(otherPath, "POST", {
+      memoryId: survivor.id,
+      requestId: crypto.randomUUID(),
+    }),
+  );
+  const directoryCount = async () =>
+    getJson<{ count: number }>(
+      await worker.fetch(
+        `/api/__test/share-directory-count?${new URLSearchParams({ owner: owner.account.user.id, workspace: owner.account.workspace.id })}`,
+      ),
+    );
+  expect(
+    await getJson<{ content: string }>(await reader.request(sharedPath)),
+  ).toMatchObject({ content: memory.content });
+  expect(await directoryCount()).toEqual({ count: 1 });
+  await expectOk(
+    await worker.fetch("/api/__test/block-share-delete", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ shareId: share.shareId }),
+    }),
+  );
+  const failed = await owner.request(sharedPath, "DELETE");
+  expect(failed.status).toBe(503);
+  expect(await failed.json()).toEqual({ error: "workspace_unavailable" });
+  // The failure is not atomic: the authoritative DO grant is already revoked,
+  // while D1 still has the directory row. That row must never authorize reads.
+  expect(await directoryCount()).toEqual({ count: 1 });
+  const assertDenied = async () => {
+    expect((await reader.request(sharedPath)).status).toBe(404);
+    expect(
+      (await getJson<{ items: unknown[] }>(await reader.request(path))).items,
+    ).toEqual([]);
+    expect(
+      (
+        await getJson<{ items: unknown[] }>(
+          await reader.request(`${team}/search`, "POST", {
+            q: "Revocation retry",
+          }),
+        )
+      ).items,
+    ).toEqual([]);
+  };
+  await assertDenied();
+  expect(
+    await getJson<{ content: string }>(
+      await outsider.request(`${otherPath}/${otherShare.shareId}`),
+    ),
+  ).toMatchObject({ content: survivor.content });
+  await expectOk(
+    await worker.fetch("/api/__test/block-share-delete", { method: "DELETE" }),
+  );
+  expect(
+    await getJson<{ revoked: boolean }>(
+      await owner.request(sharedPath, "DELETE"),
+    ),
+  ).toEqual({ revoked: true });
+  expect(await directoryCount()).toEqual({ count: 0 });
+  await assertDenied();
+  expect(
+    await getJson<{ revoked: boolean }>(
+      await owner.request(sharedPath, "DELETE"),
+    ),
+  ).toEqual({ revoked: true });
+  await assertDenied();
+  expect(
+    await getJson<MemoryResponse>(
+      await owner.request(`/v1/memories/${memory.id}`),
+    ),
+  ).toMatchObject({ content: memory.content, status: "active" });
+  expect(
+    await getJson<MemoryResponse>(
+      await outsider.request(`/v1/memories/${survivor.id}`),
+    ),
+  ).toMatchObject({ content: survivor.content, status: "active" });
+  expect(
+    (
+      await getJson<{ items: Array<{ shareId: string }> }>(
+        await outsider.request(otherPath),
+      )
+    ).items,
+  ).toEqual([expect.objectContaining({ shareId: otherShare.shareId })]);
+  expect(
+    await getJson<{ content: string }>(
+      await outsider.request(`${otherPath}/${otherShare.shareId}`),
+    ),
+  ).toMatchObject({ content: survivor.content });
 }, 45_000);
 
 test("worker API manages account workspace and team members", async () => {
@@ -1637,13 +2916,12 @@ test("worker API manages account workspace and team members", async () => {
   workers.push(worker);
 
   const email = `workspace-${crypto.randomUUID()}@example.com`;
-  const signUp = await worker.fetch("/api/auth/sign-up/email", {
+  const signUp = await worker.fetch("/api/__test/session", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       name: "Workspace Owner",
       email,
-      password: "password1234",
     }),
   });
   await expectOk(signUp);
@@ -2527,6 +3805,7 @@ async function startWorkerOnce(env: Record<string, string>) {
     wranglerBin,
     [
       "dev",
+      "test/fixtures/session-worker.js",
       "--local",
       "--ip",
       "127.0.0.1",
@@ -2549,13 +3828,17 @@ async function startWorkerOnce(env: Record<string, string>) {
       env: {
         ...process.env,
         NO_COLOR: "1",
-        TMPDIR: existsSync("/Volumes/CrucialX10")
-          ? "/Volumes/CrucialX10/tmp/openmemory-bun-tmp"
-          : tmpdir(),
+        TMPDIR:
+          process.env.TMPDIR ??
+          (existsSync("/Volumes/CrucialX10")
+            ? "/Volumes/CrucialX10/tmp/openmemory-bun-tmp"
+            : tmpdir()),
         WRANGLER_SEND_METRICS: "false",
-        XDG_CONFIG_HOME: existsSync("/Volumes/CrucialX10")
-          ? "/Volumes/CrucialX10/tmp/openmemory-xdg"
-          : join(tmpdir(), "openmemory-xdg"),
+        XDG_CONFIG_HOME:
+          process.env.XDG_CONFIG_HOME ??
+          (existsSync("/Volumes/CrucialX10")
+            ? "/Volumes/CrucialX10/tmp/openmemory-xdg"
+            : join(tmpdir(), "openmemory-xdg")),
       },
     },
   );
