@@ -32,6 +32,51 @@
   "screenshotDirectory": ".tmp/screenshots/launch-readiness",
   "historicalEvidenceNotice": "The existing repository, runtime, benchmark and cleanup fields are historical records for their named commits/runs, not qualification of the current local candidate.",
   "currentLocalCandidate": {
+    "commit": "4b5feb2b19613f166fa61450bd5afd71b77b8621",
+    "status": "locally-qualified",
+    "hostedStatus": "not-run",
+    "releaseReady": false,
+    "qualificationManifest": "docs/cloud-integration-2026-10-25.md",
+    "pending": [
+      "Exact sender/domain and scoped sending-only key in existing selected Resend account",
+      "Approved controlled recipients, staging resources/configuration and deployment",
+      "Hosted private service-binding and real inbox/OTP qualification",
+      "Broader non-deleting harness coverage: browser, revocation/isolation, exports, PKCE and actual vendor checks",
+      "Existing-user passwordless migration proof before cutover",
+      "Real Cursor, Claude and ChatGPT OAuth/MCP evidence",
+      "Production semantic provider trace/quality and rerank posture evidence"
+    ],
+    "checks": {
+      "testFiles": 31,
+      "testsPassed": 275,
+      "liveTestsSkipped": 2,
+      "sqliteBudgetTestsPassed": 1,
+      "turboTasksPassed": 10,
+      "turboCacheHits": 0,
+      "retainedIntegrationReviewBlockers": 0
+    },
+    "browserEvidence": {
+      "candidate": "4b5feb2b19613f166fa61450bd5afd71b77b8621",
+      "passed": 3,
+      "runtime": "Linux system Chromium with synthetic mailbox",
+      "realEmail": false
+    },
+    "scaleEvidence": {
+      "graph360RecallMs": 20.41,
+      "graph1000RecallMs": 47.99,
+      "recallThresholdMs": 7500,
+      "hostedEvidence": false
+    }
+  },
+  "maintenanceEvidence": {
+    "deployedVersion": "2609bb21-b95f-4437-a668-1a08105948a9",
+    "deployedExecutableSha256": "1e510aabb9d9c6f5d80d1e004794a1754651198e404cc7fb676196a050669289",
+    "deployedGitCommit": null,
+    "closedOldBuildHttpChecksPassed": 63,
+    "productionClosureTested": false,
+    "originalDeployedAssetsRoutingVerified": false
+  },
+  "priorLocalCandidate": {
     "commit": "24fa5b659d7ea04b0e2e4fbf4372c82a0f2a393a",
     "status": "locally-qualified",
     "hostedStatus": "not-run",
@@ -58,13 +103,5 @@
       "rerun": false,
       "reason": "No UI changes; retained as prior-candidate evidence only"
     }
-  },
-  "maintenanceEvidence": {
-    "deployedVersion": "2609bb21-b95f-4437-a668-1a08105948a9",
-    "deployedExecutableSha256": "1e510aabb9d9c6f5d80d1e004794a1754651198e404cc7fb676196a050669289",
-    "deployedGitCommit": null,
-    "closedOldBuildHttpChecksPassed": 63,
-    "productionClosureTested": false,
-    "originalDeployedAssetsRoutingVerified": false
   }
 }
