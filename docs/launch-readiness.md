@@ -6,25 +6,29 @@ the current repo, CI, deployment, or runtime behavior proves them.
 
 ## Current Launch Posture
 
-**2026-10-17: not release-ready.** The passwordless source candidate is
-`24fa5b659d7ea04b0e2e4fbf4372c82a0f2a393a`, also recorded as
-`currentLocalCandidate` in `config/launch-evidence.json`. Its SSD qualification
-manifest is `../openmemory-validation-artifacts-20261017/results/next-gate-final-summary.json`.
+**2026-10-25: not release-ready.** Combined source candidate
+`4b5feb2b19613f166fa61450bd5afd71b77b8621` preserves recovered team/OTP/security work at
+`1fb356bf4c63d437f5c6e146cd5181bdc635598b` and integrates bounded OAuth client
+JSON validation. `currentLocalCandidate` in `config/launch-evidence.json` points
+to this code commit; the [combined cloud qualification](cloud-integration-2026-10-25.md)
+records actual tests and review limits. Earlier local evidence is retained under
+`priorLocalCandidate`; it is not counted as combined qualification.
+
+The combined source passed 275 TypeScript tests, two live skips, one SQLite
+email-budget concurrency test, all typecheck tasks, build/bundle budgets, local
+MCP SDK profiles and 360-/1,000-memory scale checks. All three browser cases
+were rerun successfully on Linux with a synthetic mailbox. A separate review
+found no integration-blocking findings within its documented scope.
+
 Better Auth and its MCP OAuth provider remain in place. Email OTP uses durable
 single-use hashes and throttles; password APIs and implicit signup are disabled.
 Admission is checked against current approved identities for sessions and MCP.
-Existing credential rows, IDs, memberships and grants are retained.
+Existing credential rows, IDs, memberships and grants are retained. The private
+Resend adapter and bounded non-deleting OTP harness remain local implementations
+with live sender/domain/key configuration pending. Typed rerank failures preserve
+deterministic fallback; the two-second production p95 alert is distinct from the
+12-second synthetic hosted benchmark ceiling.
 
-The current candidate passes 264 local tests, seven typechecks and the build.
-Typed rerank failures preserve deterministic fallback; the 2-second production
-p95 alert remains distinct from the 12-second synthetic benchmark ceiling.
-A private Resend adapter and bounded non-deleting OTP harness are prepared,
-with live sender/domain/key configuration still pending. Independent local
-review has no remaining findings after fixing external-source CI cache inputs.
-
-Three headless browser tests passed on prior source candidate `5afd7d6`,
-including OTP-page login with a synthetic mailbox and MCP consent; they were
-not rerun for this change.
 Synthetic transport and local client profiles are not real email or vendor proof.
 This candidate has not been deployed or tested against production. See
 [the rollout prerequisites](passwordless-auth-rollout.md) and
