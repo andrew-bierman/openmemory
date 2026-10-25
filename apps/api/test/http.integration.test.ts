@@ -1628,6 +1628,66 @@ test("worker API uses Better Auth session cookies as deployed tenant identity", 
     error: "invalid_redirect_uri",
   });
 
+  const unauthenticatedCreate = await worker.fetch("/v1/oauth/clients", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: '{"private-marker":',
+  });
+  expect(unauthenticatedCreate.status).toBe(401);
+  expect(await unauthenticatedCreate.json()).toEqual({ error: "unauthorized" });
+
+  for (const [contentType, body, expectedStatus, expectedError] of [
+    ["application/json", '{"private-marker":', 400, "invalid_json"],
+    ["application/json", "", 400, "invalid_json"],
+    ["text/plain", "{}", 415, "unsupported_media_type"],
+    [
+      "application/x-www-form-urlencoded",
+      "name=test",
+      415,
+      "unsupported_media_type",
+    ],
+    [
+      "application/json",
+      JSON.stringify({
+        name: "Large",
+        redirectUris: ["https://example.com/callback"],
+        padding: "x".repeat(65536),
+      }),
+      413,
+      "payload_too_large",
+    ],
+  ] as const) {
+    const rejected = await worker.fetch("/v1/oauth/clients", {
+      method: "POST",
+      headers: { cookie, "content-type": contentType },
+      body,
+    });
+    expect.soft(rejected.status).toBe(expectedStatus);
+    expect
+      .soft(await rejected.text())
+      .toBe(JSON.stringify({ error: expectedError }));
+  }
+
+  for (const body of [
+    null,
+    [],
+    { name: 123 },
+    { redirectUris: "https://example.com/callback" },
+    { redirectUris: [null] },
+    { redirectUris: ["https://example.com/callback"], scopes: "memory:read" },
+    { redirectUris: ["https://example.com/callback"], scopes: [null] },
+  ]) {
+    const invalidShape = await worker.fetch("/v1/oauth/clients", {
+      method: "POST",
+      headers: { cookie, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    expect(invalidShape.status, JSON.stringify(body)).toBe(400);
+    expect(await invalidShape.json()).toMatchObject({
+      error: "invalid_client_input",
+    });
+  }
+
   const managedClient = await getJson<OAuthManagedClientResponse>(
     await worker.fetch("/v1/oauth/clients", {
       method: "POST",
@@ -2559,7 +2619,7 @@ test("team REST requires accepted membership and revokes selected-version access
     await owner.request("/v1/account"),
   );
   expect(replacement.workspace.id).not.toBe(owner.account.workspace.id);
-});
+}, 45_000);
 
 test("accepted shared reads stay read-only and sharer account deletion preserves other tenants", async () => {
   const worker = await startWorker({

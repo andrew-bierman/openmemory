@@ -28,7 +28,8 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/auth-email/**",
         "$TURBO_ROOT$/scripts/staging-qualification.ts"
-      ]
+      ],
+      "passThroughEnv": ["XDG_CONFIG_HOME", "WRANGLER_SEND_METRICS"]
     },
     "@openmemory/api#check-types": {
       "dependsOn": ["^check-types"],
