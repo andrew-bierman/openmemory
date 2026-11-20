@@ -10,7 +10,7 @@
     "@elysia/eden": "^1.4.10"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
+    "check-types": "bun check --no-script",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
