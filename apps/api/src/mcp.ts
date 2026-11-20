@@ -1,3 +1,4 @@
+import type { ExecutionContext } from "@cloudflare/workers-types";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   ContextSchema,
@@ -6,7 +7,7 @@ import {
 } from "@openmemory/core";
 import { createMcpHandler } from "agents/mcp";
 import { verifyJwsAccessToken } from "better-auth/oauth2";
-import type { JSONWebKeySet } from "jose";
+import type { JSONWebKeySet, JWTPayload } from "jose";
 import * as z from "zod/v3";
 import {
   getGraph,
@@ -18,15 +19,39 @@ import { resolveAuthBaseUrl } from "./better-auth";
 import type { Env } from "./env";
 import { getRequiredMcpScopesForRequest } from "./mcp-scopes";
 import type { MemoryGraph } from "./memory-graph";
+import { isAllowedAuthUser } from "./passwordless";
 import { buildRecallContext } from "./recall";
+import { listWorkspaces } from "./workspace-access";
+import { listSharedMemories, readSharedMemory } from "./workspace-sharing";
 
-export function createOpenMemoryMcpHandler(): (
+export function createOpenMemoryMcpHandler() {
+  const handler = createAuthenticatedMcpHandler();
+  return async (request: Request, env: Env, ctx: ExecutionContext) => {
+    const response = await handler(request, env, ctx);
+    const headers = new Headers(response.headers);
+    headers.set("cache-control", "private, no-store");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  };
+}
+
+function createAuthenticatedMcpHandler(): (
   request: Request,
   env: Env,
   ctx: ExecutionContext,
 ) => Promise<Response> {
   return async (request: Request, env: Env, ctx: ExecutionContext) => {
-    if (!isLocalDevelopmentRequest(request)) {
+    const authorization = request.headers.get("authorization");
+    const localApiKey =
+      env.OPENMEMORY_API_TOKEN &&
+      authorization === `Bearer ${env.OPENMEMORY_API_TOKEN}`;
+    if (
+      !isLocalDevelopmentRequest(request) ||
+      (authorization && !localApiKey)
+    ) {
       const authBaseURL = resolveAuthBaseUrl(env, request);
       const resourceBaseURL = resolveResourceBaseUrl(authBaseURL);
       const jwt = await verifyMcpBearerToken(
@@ -55,6 +80,7 @@ export function createOpenMemoryMcpHandler(): (
 
       return handleMcpRequest(withTenantHeader(request, tenantId), env, ctx, {
         allowHeaderTenant: true,
+        authenticatedUserId: jwt.payload.sub,
       });
     }
 
@@ -68,9 +94,13 @@ async function handleMcpRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext,
-  options: { allowHeaderTenant: boolean } = { allowHeaderTenant: false },
+  options: { allowHeaderTenant: boolean; authenticatedUserId?: string } = {
+    allowHeaderTenant: false,
+  },
 ): Promise<Response> {
-  const auth = resolveAuth(env, request.headers);
+  const auth = options.authenticatedUserId
+    ? { ok: true as const }
+    : resolveAuth(env, request.headers);
   if (!auth.ok) {
     return json({ error: auth.error, message: auth.message }, 401);
   }
@@ -88,6 +118,67 @@ async function handleMcpRequest(
     name: "openmemory",
     version: "0.1.0-alpha",
   });
+
+  const workspaceId = z.string().min(1).max(128);
+  const page = {
+    limit: z.number().int().min(1).max(25).optional(),
+    cursor: z.string().max(1024).optional(),
+  };
+  async function sharedResult(read: (actorId: string) => Promise<unknown>) {
+    if (!options.authenticatedUserId)
+      return {
+        ...textTool("Shared memories require OAuth authorization."),
+        isError: true,
+      };
+    try {
+      const result = await read(options.authenticatedUserId);
+      if (!result)
+        return { ...textTool("Shared memory unavailable."), isError: true };
+      return textTool(JSON.stringify(result));
+    } catch {
+      return { ...textTool("Shared memory unavailable."), isError: true };
+    }
+  }
+  server.tool(
+    "shared_workspaces",
+    "Discover accepted workspaces for shared-memory tools. Returns workspace IDs, names, and your roles.",
+    {},
+    async () =>
+      sharedResult(async (actorId) =>
+        (await listWorkspaces(env, actorId)).map(({ id, name, role }) => ({
+          id,
+          name,
+          role,
+        })),
+      ),
+  );
+  server.tool(
+    "shared_list",
+    "List explicitly shared read-only memories in an accepted workspace. Personal memories are excluded.",
+    { workspaceId, ...page },
+    async ({ workspaceId, ...input }) =>
+      sharedResult((actorId) =>
+        listSharedMemories(env, actorId, workspaceId, input),
+      ),
+  );
+  server.tool(
+    "shared_read",
+    "Read a currently authorized shared memory by share ID.",
+    { workspaceId, shareId: z.string().min(1).max(128) },
+    async ({ workspaceId, shareId }) =>
+      sharedResult((actorId) =>
+        readSharedMemory(env, actorId, workspaceId, shareId),
+      ),
+  );
+  server.tool(
+    "shared_search",
+    "Search explicitly shared memories using page-local lexical matching. Follow nextCursor for more results.",
+    { workspaceId, q: z.string().min(1).max(500), ...page },
+    async ({ workspaceId, ...input }) =>
+      sharedResult((actorId) =>
+        listSharedMemories(env, actorId, workspaceId, input),
+      ),
+  );
 
   server.tool(
     "remember",
@@ -310,6 +401,13 @@ async function verifyMcpBearerToken(
         audience: `${resourceBaseURL}/mcp`,
       },
     });
+    // JWT access tokens are stateless in Better Auth. Signature validation alone
+    // cannot observe a disconnected client or deleted account.
+    if (!(await hasCurrentMcpGrant(env, payload))) {
+      return {
+        response: mcpUnauthorized(resourceBaseURL, "inactive OAuth grant"),
+      };
+    }
     const scopes = new Set(String(payload.scope ?? "").split(" "));
     const requiredScopes = await getRequiredMcpScopesForRequest(
       request.clone(),
@@ -337,6 +435,64 @@ async function verifyMcpBearerToken(
       ),
     };
   }
+}
+
+async function hasCurrentMcpGrant(env: Env, payload: JWTPayload) {
+  if (
+    !env.AUTH_DB ||
+    typeof payload.sub !== "string" ||
+    typeof payload.azp !== "string" ||
+    typeof payload.grantId !== "string" ||
+    typeof payload.grantVersion !== "string" ||
+    !payload.grantVersion ||
+    typeof payload.iat !== "number" ||
+    !Number.isFinite(payload.iat) ||
+    (payload.tenantId !== undefined && payload.tenantId !== payload.sub)
+  ) {
+    return false;
+  }
+
+  if (!(await isAllowedAuthUser(env, payload.sub))) return false;
+
+  // Check the consenting user, not the client owner: public OAuth clients can
+  // legitimately be used by multiple users. Do not cache this revocation check.
+  const grant = await env.AUTH_DB.prepare(
+    `select g.id, g.grant_version, c.disabled, g.scopes, g.created_at
+     from oauth_consent g
+     inner join oauth_client c on c.client_id = g.client_id
+     inner join user u on u.id = g.user_id
+     where g.user_id = ? and g.client_id = ? limit 1`,
+  )
+    .bind(payload.sub, payload.azp)
+    .first<{
+      id: string;
+      grant_version: string;
+      disabled: number | null;
+      scopes: string;
+      created_at: number;
+    }>();
+  if (
+    !grant ||
+    grant.disabled ||
+    grant.id !== payload.grantId ||
+    grant.grant_version !== payload.grantVersion ||
+    grant.created_at > payload.iat
+  ) {
+    return false;
+  }
+
+  let grantedScopes: unknown;
+  try {
+    grantedScopes = JSON.parse(grant.scopes);
+  } catch {
+    grantedScopes = grant.scopes.split(/\s+/);
+  }
+  if (!Array.isArray(grantedScopes)) return false;
+  const scopes = new Set(grantedScopes);
+  return String(payload.scope ?? "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((scope) => scopes.has(scope));
 }
 
 async function readJwks(env: Env, issuer: string): Promise<JSONWebKeySet> {

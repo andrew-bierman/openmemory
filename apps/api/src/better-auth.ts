@@ -5,8 +5,10 @@ import {
   oauthProviderAuthServerMetadata,
   oauthProviderOpenIdConfigMetadata,
 } from "@better-auth/oauth-provider";
+import { APIError } from "better-auth/api";
 import { type BetterAuthOptions, betterAuth } from "better-auth/minimal";
 import { jwt } from "better-auth/plugins";
+import { github, google } from "better-auth/social-providers";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import {
@@ -21,6 +23,17 @@ import {
   oauthRefreshToken,
 } from "./db/schema";
 import type { Env } from "./env";
+import {
+  bindAuthorizationCode,
+  createGrantClaimsResolver,
+} from "./oauth-grant";
+import {
+  isAllowedAuthEmail,
+  isAllowedAuthUser,
+  passwordlessGuard,
+  passwordlessPlugin,
+  passwordlessReady,
+} from "./passwordless";
 
 const AUTH_BASE_PATH = "/api/auth";
 const DEFAULT_LOCAL_AUTH_URL = "http://127.0.0.1:8787";
@@ -29,16 +42,55 @@ const memoryDb: MemoryDB = {};
 export function createOpenMemoryAuth(env: Env, request: Request) {
   const baseURL = resolveAuthBaseUrl(env, request);
   const socialProviders = createSocialProviders(env);
+  const resolveGrantClaims = createGrantClaimsResolver(env, request);
 
-  return betterAuth({
+  const auth = betterAuth({
     appName: "OpenMemory",
     basePath: AUTH_BASE_PATH,
     baseURL,
     secret: env.BETTER_AUTH_SECRET ?? "openmemory-local-dev-secret-change-me",
     database: createAuthDatabase(env),
     trustedOrigins: [baseURL],
+    hooks: { before: passwordlessGuard(env) },
+    session: { cookieCache: { enabled: false } },
+    account: {
+      accountLinking: {
+        enabled: true,
+        disableImplicitLinking: true,
+        requireLocalEmailVerified: true,
+        allowDifferentEmails: false,
+        trustedProviders: [],
+      },
+    },
+    databaseHooks: {
+      user: { create: { before: async () => false } },
+      session: {
+        create: {
+          before: async (session) => {
+            if (
+              !env.BETTER_AUTH_SECRET ||
+              !(await isAllowedAuthUser(env, session.userId))
+            )
+              throw new APIError("FORBIDDEN", {
+                message: "Sign-in is unavailable.",
+              });
+            return { data: session };
+          },
+        },
+      },
+      verification: {
+        create: {
+          before: async (verification) => ({
+            data: {
+              ...verification,
+              value: await bindAuthorizationCode(env, verification.value),
+            },
+          }),
+        },
+      },
+    },
     emailAndPassword: {
-      enabled: true,
+      enabled: false,
     },
     socialProviders,
     advanced: {
@@ -48,6 +100,7 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
       },
     },
     plugins: [
+      passwordlessPlugin(env),
       jwt(),
       oauthProvider({
         scopes: [
@@ -57,6 +110,7 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
           "offline_access",
           "memory:read",
           "memory:write",
+          "memory:shared:read",
         ],
         validAudiences: [baseURL, `${baseURL}/mcp`],
         allowDynamicClientRegistration: true,
@@ -68,9 +122,31 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
           refreshToken: "om_rt_",
           clientSecret: "om_cs_",
         },
-        customAccessTokenClaims: ({ user }) => ({
-          tenantId: user?.id,
-        }),
+        customAccessTokenClaims: async ({ user }) => {
+          if (!user?.id || !(await isAllowedAuthUser(env, user.id)))
+            throw new APIError("FORBIDDEN", {
+              message: "Sign-in is unavailable.",
+            });
+          return new URL(request.url).pathname.endsWith("/oauth2/token")
+            ? resolveGrantClaims.claims(user.id)
+            : { tenantId: user.id };
+        },
+        customTokenResponseFields: async ({
+          user,
+          grantType,
+          verificationValue,
+        }) => {
+          if (!user?.id || !(await isAllowedAuthUser(env, user.id)))
+            throw new APIError("FORBIDDEN", {
+              message: "Sign-in is unavailable.",
+            });
+          return resolveGrantClaims.prepare(
+            user.id,
+            grantType,
+            verificationValue,
+          );
+        },
+        generateRefreshToken: () => resolveGrantClaims.generateRefreshToken(),
         customIdTokenClaims: ({ user }) => ({
           "https://openmemory.dev/tenant_id": user.id,
         }),
@@ -81,9 +157,31 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
       }),
     ],
   } satisfies BetterAuthOptions);
+  // Better Auth 1.6.14 exposes setPassword only through auth.api, without a
+  // route path. A path-based before hook therefore cannot block this method.
+  return {
+    ...auth,
+    api: {
+      ...auth.api,
+      setPassword: Object.assign(
+        async (..._args: Parameters<typeof auth.api.setPassword>) => {
+          throw new APIError("FORBIDDEN", {
+            message: "This authentication method is disabled.",
+          });
+        },
+        auth.api.setPassword,
+      ),
+    },
+  };
 }
 
 export function handleOpenMemoryAuthRequest(env: Env, request: Request) {
+  if (new URL(request.url).pathname === `${AUTH_BASE_PATH}/capabilities`) {
+    return json({
+      emailOTP: passwordlessReady(env),
+      socialProviders: Object.keys(createSocialProviders(env)),
+    });
+  }
   const auth = createOpenMemoryAuth(env, request);
   const pathname = new URL(request.url).pathname;
 
@@ -108,7 +206,13 @@ export function handleOpenMemoryAuthRequest(env: Env, request: Request) {
         authorization_servers: [
           `${authBaseUrl}/.well-known/oauth-authorization-server/api/auth`,
         ],
-        scopes_supported: ["openid", "profile", "memory:read", "memory:write"],
+        scopes_supported: [
+          "openid",
+          "profile",
+          "memory:read",
+          "memory:write",
+          "memory:shared:read",
+        ],
         bearer_methods_supported: ["header"],
       },
       200,
@@ -143,6 +247,8 @@ export async function resolveOpenMemorySession(env: Env, request: Request) {
     return undefined;
   }
 
+  if (!row.user.emailVerified || !isAllowedAuthEmail(env, row.user.email))
+    return undefined;
   return row;
 }
 
@@ -206,20 +312,55 @@ function createAuthDatabase(env: Env): BetterAuthOptions["database"] {
 }
 
 function createSocialProviders(env: Env) {
+  if (!env.AUTH_DB || !env.BETTER_AUTH_SECRET) return {};
+  const {
+    GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+  } = env;
   return {
-    ...(env.GITHUB_CLIENT_ID && env.GITHUB_CLIENT_SECRET
+    ...(GITHUB_CLIENT_ID && GITHUB_CLIENT_SECRET
       ? {
           github: {
-            clientId: env.GITHUB_CLIENT_ID,
-            clientSecret: env.GITHUB_CLIENT_SECRET,
+            disableSignUp: true,
+            clientId: GITHUB_CLIENT_ID,
+            clientSecret: GITHUB_CLIENT_SECRET,
+            getUserInfo: async (
+              token: Parameters<ReturnType<typeof github>["getUserInfo"]>[0],
+            ) => {
+              const info = await github({
+                clientId: GITHUB_CLIENT_ID,
+                clientSecret: GITHUB_CLIENT_SECRET,
+              }).getUserInfo(token);
+              return info?.user.emailVerified &&
+                info.user.email &&
+                isAllowedAuthEmail(env, info.user.email)
+                ? info
+                : null;
+            },
           },
         }
       : {}),
-    ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    ...(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET
       ? {
           google: {
-            clientId: env.GOOGLE_CLIENT_ID,
-            clientSecret: env.GOOGLE_CLIENT_SECRET,
+            disableSignUp: true,
+            clientId: GOOGLE_CLIENT_ID,
+            clientSecret: GOOGLE_CLIENT_SECRET,
+            getUserInfo: async (
+              token: Parameters<ReturnType<typeof google>["getUserInfo"]>[0],
+            ) => {
+              const info = await google({
+                clientId: GOOGLE_CLIENT_ID,
+                clientSecret: GOOGLE_CLIENT_SECRET,
+              }).getUserInfo(token);
+              return info?.user.emailVerified &&
+                info.user.email &&
+                isAllowedAuthEmail(env, info.user.email)
+                ? info
+                : null;
+            },
           },
         }
       : {}),

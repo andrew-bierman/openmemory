@@ -86,3 +86,19 @@ describe("MCP OAuth scope requirements", () => {
     ]);
   });
 });
+
+test("unions shared scope across mixed batches", () => {
+  for (const name of [
+    "shared_workspaces",
+    "shared_list",
+    "shared_read",
+    "shared_search",
+  ]) {
+    expect([
+      ...getRequiredMcpScopesForPayload([
+        { method: "tools/call", params: { name: "remember" } },
+        { method: "tools/call", params: { name } },
+      ]),
+    ]).toEqual(["memory:read", "memory:write", "memory:shared:read"]);
+  }
+});

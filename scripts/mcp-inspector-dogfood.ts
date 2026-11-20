@@ -7,31 +7,15 @@ const origin = baseUrl;
 const callbackUrl = "http://127.0.0.1:6276/oauth/callback";
 const scope = "openid profile memory:read memory:write";
 
-let cookie = "";
+const fixture = approvedFixture("OPENMEMORY_LIVE_INSPECTOR");
+const cookie = fixture.cookie;
 let cleanup: { confirmEmail: string; confirmTenantId: string } | undefined;
 let oauthClientId = "";
 
 try {
-  const email = `mcp-inspector-${crypto.randomUUID()}@example.com`;
-  const password = "password1234";
-
-  const signUp = await fetchLive("/api/auth/sign-up/email", {
-    method: "POST",
-    headers: jsonHeaders(),
-    body: JSON.stringify({
-      name: "MCP Inspector Dogfood",
-      email,
-      password,
-    }),
-  });
-  cookie = cookieHeader(signUp);
-  await expectOk(signUp);
-
   const account = await authedJson<AccountResponse>(cookie, "/v1/account");
-  cleanup = {
-    confirmEmail: account.user.email,
-    confirmTenantId: account.workspace.tenantId,
-  };
+  assertFixtureAccount(account, fixture);
+  cleanup = { confirmEmail: fixture.email, confirmTenantId: fixture.tenantId };
 
   const oauthClient = await getJson<OAuthClientResponse>(
     fetchLive("/api/auth/oauth2/register", {
@@ -338,7 +322,7 @@ async function run(command: string, args: string[]) {
   });
   if (code !== 0) {
     throw new Error(
-      `${command} ${args.join(" ")} failed with exit ${code}:\n${stderr.join("")}`,
+      `${command} failed with exit ${code}; output withheld to avoid exposing credentials`,
     );
   }
 
@@ -350,6 +334,13 @@ async function cleanupLiveAccount(
   account: { confirmEmail: string; confirmTenantId: string },
   label: string,
 ) {
+  const current = await authedJson<AccountResponse>(cookieValue, "/v1/account");
+  if (
+    current.user.email !== account.confirmEmail ||
+    current.workspace.tenantId !== account.confirmTenantId
+  ) {
+    throw new Error("Fixture identity changed; refusing cleanup");
+  }
   const response = await fetchLive("/v1/account", {
     method: "DELETE",
     headers: {
@@ -385,7 +376,7 @@ async function authedJson<T>(
 }
 
 function fetchLive(path: string, init?: RequestInit) {
-  return fetch(new URL(path, baseUrl), init);
+  return fetch(new URL(path, baseUrl), { redirect: "manual", ...init });
 }
 
 function jsonHeaders() {
@@ -419,25 +410,6 @@ async function redirectUrl(responsePromise: Promise<Response>) {
 
   const body = await getJson<OAuthRedirectResponse>(Promise.resolve(response));
   return new URL(body.url, baseUrl);
-}
-
-function cookieHeader(response: Response) {
-  const headers = response.headers as Headers & {
-    getSetCookie?: () => string[];
-  };
-  const setCookie = headers.getSetCookie?.() ?? [];
-  return (
-    setCookie.length > 0
-      ? setCookie
-      : splitSetCookieHeader(response.headers.get("set-cookie") ?? "")
-  )
-    .map((value) => value.split(";")[0])
-    .filter(Boolean)
-    .join("; ");
-}
-
-function splitSetCookieHeader(value: string) {
-  return value ? value.split(/,(?=\s*[^;,]+=)/) : [];
 }
 
 async function pkceChallenge(verifier: string) {
@@ -519,3 +491,52 @@ type ToolCallResponse = {
 type ResourceReadResponse = Record<string, unknown>;
 
 type PromptGetResponse = Record<string, unknown>;
+
+// Provision these disposable identities outside the runner after approval.
+// Never infer deletion authority from the account returned by the server.
+function approvedFixture(prefix: string) {
+  const email = process.env[`${prefix}_EMAIL`];
+  const tenantId = process.env[`${prefix}_TENANT_ID`];
+  const cookie = process.env[`${prefix}_SESSION_COOKIE`];
+  const target = process.env.OPENMEMORY_LIVE_BASE_URL;
+  if (
+    !email ||
+    !tenantId ||
+    !cookie ||
+    !target ||
+    process.env[`${prefix}_DISPOSABLE_APPROVAL`] !== `${email}:${tenantId}`
+  ) {
+    throw new Error(
+      `Missing approved disposable fixture for ${prefix}; see docs/passwordless-live-qualification.md`,
+    );
+  }
+  const url = new URL(target);
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash ||
+    /[\r\n]/.test(cookie)
+  ) {
+    throw new Error(
+      "Live fixture requires an explicit HTTPS origin and valid session cookie",
+    );
+  }
+  return { email, tenantId, cookie, origin: url.origin };
+}
+
+function assertFixtureAccount(
+  account: { user: { email: string }; workspace: { tenantId: string } },
+  fixture: ReturnType<typeof approvedFixture>,
+) {
+  if (
+    account.user.email !== fixture.email ||
+    account.workspace.tenantId !== fixture.tenantId
+  ) {
+    throw new Error(
+      "Fixture identity mismatch; refusing mutations and cleanup",
+    );
+  }
+}
