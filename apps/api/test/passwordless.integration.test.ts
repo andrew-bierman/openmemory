@@ -734,26 +734,30 @@ describe("private Resend adapter with real D1 and passwordless auth", () => {
 });
 
 describe("open signup gate over the auth API", () => {
-  test.each(["1", "yes", "false", " true"])(
-    "non-exact flag value %s keeps the gate closed",
-    async (value) => {
-      const env = { OPENMEMORY_ALLOW_SIGN_UP: value };
-      expect(
-        (await send("newuser@example.test", { env })).status,
-      ).toBe(200);
-      expect(deliveries).toHaveLength(0);
-      expect((await verify("123456", "newuser@example.test", { env })).status).toBe(
-        400,
-      );
-    },
-  );
+  test.each([
+    "1",
+    "yes",
+    "false",
+    " true",
+  ])("non-exact flag value %s keeps the gate closed", async (value) => {
+    const env = { OPENMEMORY_ALLOW_SIGN_UP: value };
+    expect((await send("newuser@example.test", { env })).status).toBe(200);
+    expect(deliveries).toHaveLength(0);
+    expect(
+      (await verify("123456", "newuser@example.test", { env })).status,
+    ).toBe(400);
+  });
   test("exact true registers an unknown address end to end", async () => {
     const env = { OPENMEMORY_ALLOW_SIGN_UP: "true" };
     expect((await send("newuser@example.test", { env })).status).toBe(200);
     expect(deliveries).toHaveLength(1);
-    const login = await verify(required(deliveries[0]).otp, "newuser@example.test", {
-      env,
-    });
+    const login = await verify(
+      required(deliveries[0]).otp,
+      "newuser@example.test",
+      {
+        env,
+      },
+    );
     expect(login.status).toBe(200);
     expect(login.headers.get("set-cookie")).toBeTruthy();
     expect(
@@ -763,7 +767,9 @@ describe("open signup gate over the auth API", () => {
     ).toEqual({ email_verified: 1 });
     const session = new Request(`${origin}/api/auth/get-session`, {
       headers: {
-        cookie: required(required(login.headers.get("set-cookie")).split(";")[0]),
+        cookie: required(
+          required(login.headers.get("set-cookie")).split(";")[0],
+        ),
       },
     });
     const sessionResponse = await handleOpenMemoryAuthRequest(
