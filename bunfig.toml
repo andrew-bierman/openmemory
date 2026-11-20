@@ -1,2 +1,6 @@
 [install]
 linker = "hoisted"
+
+[fmt]
+# Markdown was never formatter-owned under Biome; keep CE plan artifacts stable.
+ignorePatterns = ["**/*.md", "apps/web/src/routeTree.gen.ts"]
