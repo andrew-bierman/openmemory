@@ -61,26 +61,26 @@ describe("recall reranking", () => {
     });
   });
 
-  test.each([
-    "async rejection",
-    "sync throw",
-  ])("classifies %s without leaking provider details", async (mode) => {
-    const memories = makeResults(["mem_a", "mem_b"]);
-    const env = makeEnv({ response: {} });
-    env.AI.run = (() => {
-      const error = new Error("private provider prompt");
-      if (mode === "sync throw") throw error;
-      return Promise.reject(error);
-    }) as NonNullable<Env["AI"]>["run"];
-    const results = await rerankSearchResults(env, "private query", memories);
-    expect(results.map((result) => result.id)).toEqual(["mem_a", "mem_b"]);
-    expect(results[0]?.metadata.rerank).toEqual({
-      status: "fallback",
-      reason: "provider_error",
-      model: "@cf/test/reranker",
-    });
-    expect(JSON.stringify(results)).not.toContain("private");
-  });
+  test.each(["async rejection", "sync throw"])(
+    "classifies %s without leaking provider details",
+    async (mode) => {
+      const memories = makeResults(["mem_a", "mem_b"]);
+      const env = makeEnv({ response: {} });
+      env.AI.run = (() => {
+        const error = new Error("private provider prompt");
+        if (mode === "sync throw") throw error;
+        return Promise.reject(error);
+      }) as NonNullable<Env["AI"]>["run"];
+      const results = await rerankSearchResults(env, "private query", memories);
+      expect(results.map((result) => result.id)).toEqual(["mem_a", "mem_b"]);
+      expect(results[0]?.metadata.rerank).toEqual({
+        status: "fallback",
+        reason: "provider_error",
+        model: "@cf/test/reranker",
+      });
+      expect(JSON.stringify(results)).not.toContain("private");
+    },
+  );
 
   test("times out and safely observes a later provider rejection", async () => {
     vi.useFakeTimers();
@@ -130,23 +130,22 @@ describe("recall reranking", () => {
       status: "fallback",
       reason: "invalid_output",
     },
-  ])("distinguishes empty output from invalid output: $response", async ({
-    response,
-    status,
-    reason,
-  }) => {
-    const results = await rerankSearchResults(
-      makeEnv({ response }),
-      "query",
-      makeResults(["mem_a", "mem_b"]),
-    );
-    expect(results.map((result) => result.id)).toEqual(["mem_a", "mem_b"]);
-    expect(results[0]?.metadata.rerank).toEqual({
-      status,
-      model: "@cf/test/reranker",
-      ...(reason ? { reason } : {}),
-    });
-  });
+  ])(
+    "distinguishes empty output from invalid output: $response",
+    async ({ response, status, reason }) => {
+      const results = await rerankSearchResults(
+        makeEnv({ response }),
+        "query",
+        makeResults(["mem_a", "mem_b"]),
+      );
+      expect(results.map((result) => result.id)).toEqual(["mem_a", "mem_b"]);
+      expect(results[0]?.metadata.rerank).toEqual({
+        status,
+        model: "@cf/test/reranker",
+        ...(reason ? { reason } : {}),
+      });
+    },
+  );
 
   test("exposes the bounded failure reason in recall context metadata", async () => {
     const result = await buildRecallContext(

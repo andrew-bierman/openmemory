@@ -57,8 +57,7 @@ export function createGrantClaimsResolver(env: Env, request: Request) {
       if (grantType === "authorization_code") {
         const prior = (
           verificationValue as
-            | { openMemoryGrant?: Partial<GrantClaims> }
-            | undefined
+            { openMemoryGrant?: Partial<GrantClaims> } | undefined
         )?.openMemoryGrant;
         if (
           !prior ||

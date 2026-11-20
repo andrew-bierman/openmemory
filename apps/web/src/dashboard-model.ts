@@ -725,11 +725,7 @@ export type GraphImportPreviewSummary = {
 export type ReadinessSummary = {
   configuredBindings: number;
   graphStatus:
-    | "Basic graph"
-    | "Empty"
-    | "Needs edges"
-    | "Typed graph"
-    | "Unknown";
+    "Basic graph" | "Empty" | "Needs edges" | "Typed graph" | "Unknown";
   mcpStatus: "Discoverable" | "Incomplete" | "Unknown";
   productionReady: boolean;
   rerankStatus: "AI rerank" | "Deterministic" | "Needs AI" | "Unknown";
