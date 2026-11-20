@@ -17,6 +17,7 @@
     "packages/*"
   ],
   "scripts": {
+    "tool-versions:check": "bun run scripts/tool-versions-check.ts",
     "dev": "turbo dev",
     "dev:api": "bun run web:ensure-assets && bun run --cwd apps/api dev",
     "dev:web": "bun run --cwd apps/web dev",
