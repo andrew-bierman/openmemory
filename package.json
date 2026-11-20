@@ -30,7 +30,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --local --config wrangler.jsonc",
     "db:migrate:remote": "bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --remote --config wrangler.jsonc",
-    "check": "bun run security:secrets && bun run security:secrets:self-test && bun run observability:alerts:self-test && bun run live-benchmark:workflow:check && bun run mcp:profiles:check && bun run mcp:vendor-dogfood:status && bun run social-oauth:status && bun run rag:production-review:status && bun run benchmark:trend:self-test && bun run launch:evidence:check && turbo run check-types test",
+    "verify": "bun run security:secrets && bun run security:secrets:self-test && bun run observability:alerts:self-test && bun run live-benchmark:workflow:check && bun run mcp:profiles:check && bun run mcp:vendor-dogfood:status && bun run social-oauth:status && bun run rag:production-review:status && bun run benchmark:trend:self-test && bun run launch:evidence:check && turbo run check-types test",
     "check-types": "turbo run check-types",
     "format": "bun fmt",
     "format:check": "bun fmt --check",

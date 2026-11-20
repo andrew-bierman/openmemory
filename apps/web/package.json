@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite dev --host 127.0.0.1 --port 54152",
     "build": "vite build",
-    "check-types": "tsc --noEmit",
+    "check-types": "bun check --no-script",
     "test": "vitest run src --passWithNoTests"
   },
   "dependencies": {
