@@ -187,7 +187,7 @@ member tables used by `/v1/account` and the hosted admin panel.
 The default CI workflow runs:
 
 ```sh
-bun run check
+bun run verify
 bun run build
 ```
 
