@@ -12,6 +12,10 @@ bun run dev:api
 bun run dev:web
 ```
 
+Tool versions are pinned in `mise.toml` (Node 24.22.1, Bun 1.4.4). Do not
+commit a `.tool-versions` file: Cloudflare Workers Builds reads it and fails
+provisioning the build from it.
+
 Use non-default ports already configured in the repo. Several agents and local
 projects may run on this machine, so avoid assuming default ports are free.
 
