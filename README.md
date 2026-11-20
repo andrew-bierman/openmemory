@@ -439,7 +439,7 @@ remaining implementation tracks.
 
 ## Contributing
 
-OpenMemory is MIT licensed. See [CONTRIBUTING.md](CONTRIBUTING.md),
+OpenMemory is AGPL-3.0 licensed. Forks snapshot under the license they forked from: copies taken while the project was MIT licensed keep their MIT terms, and new upstream versions are AGPL-3.0. See [CONTRIBUTING.md](CONTRIBUTING.md),
 [SECURITY.md](SECURITY.md), [PRIVACY.md](PRIVACY.md),
 [SUPPORT.md](SUPPORT.md), and
 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before opening issues or PRs.

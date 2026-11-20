@@ -3,7 +3,7 @@
 ## Current Working Baseline
 
 - Public GitHub repo is live at `andrew-bierman/openmemory`.
-- Open-source launch scaffolding exists: MIT license, contribution guide,
+- Open-source launch scaffolding exists: AGPL-3.0 license, contribution guide,
   security policy, support policy, code of conduct, changelog, issue templates,
   PR template, and launch-readiness checklist.
 - `apps/api` runs as a Cloudflare Worker with Elysia.
