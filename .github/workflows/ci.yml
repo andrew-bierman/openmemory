@@ -43,6 +43,26 @@ jobs:
       - name: Build
         run: bun run build
 
+  lint:
+    name: Lint (canary Bun)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read canary pin
+        id: pin
+        run: echo "version=$(cat .bun-canary-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Install pinned canary Bun
+        run: |
+          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ steps.pin.outputs.version }}"
+          echo "${HOME}/.bun/bin" >> "$GITHUB_PATH"
+
+      - name: Lint
+        run: bun lint
+
   local-wrangler-integration:
     name: Local Wrangler integration
     runs-on: ubuntu-latest
@@ -65,6 +85,9 @@ jobs:
 
       - name: Run local Wrangler integration tests
         run: bun run test:integration:local
+
+      - name: Vitest sweep (integration, live, budget)
+        run: bun run --cwd apps/api test:vitest
 
   mcp-sdk-smoke:
     name: MCP SDK smoke
