@@ -18,9 +18,9 @@ const liveRecallThresholdMs = 12_000;
 
 describe.runIf(runLiveE2E)("live production e2e", () => {
   test("supports hosted UI, session auth, graph recall, OAuth, and MCP bearer access", async () => {
-    const email = `live-e2e-${crypto.randomUUID()}@example.com`;
-    const password = "password1234";
-    let cookie = "";
+    const fixture = approvedFixture("OPENMEMORY_LIVE_E2E");
+    const email = fixture.email;
+    const cookie = fixture.cookie;
     let cleanup: { confirmEmail: string; confirmTenantId: string } | undefined;
 
     try {
@@ -37,17 +37,6 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       expect(dashboardHtml).toContain("Operations");
       expect(dashboardHtml).toContain("/assets/");
 
-      const signUp = await fetchLive("/api/auth/sign-up/email", {
-        method: "POST",
-        headers: jsonHeaders(),
-        body: JSON.stringify({
-          name: "Live E2E",
-          email,
-          password,
-        }),
-      });
-      cookie = cookieHeader(signUp);
-      await expectOk(signUp);
       expect(cookie).toContain("better-auth");
 
       const session = await getJson<SessionResponse>(
@@ -58,9 +47,10 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       expect(session.user.email).toBe(email);
 
       const account = await authedJson<AccountResponse>(cookie, "/v1/account");
+      assertFixtureAccount(account, fixture);
       cleanup = {
-        confirmEmail: account.user.email,
-        confirmTenantId: account.workspace.tenantId,
+        confirmEmail: fixture.email,
+        confirmTenantId: fixture.tenantId,
       };
 
       const anchor = await authedJson<MemoryResponse>(cookie, "/v1/memories", {
@@ -356,7 +346,7 @@ describe.runIf(runLiveE2E)("live production e2e", () => {
       );
       expect(readiness.semanticIndex.status).not.toBe("unconfigured");
       const serializedReadiness = JSON.stringify(readiness);
-      expect(serializedReadiness).not.toContain(password);
+      expect(serializedReadiness).not.toContain(cookie);
       expect(serializedReadiness).not.toContain(token.access_token);
       expect(serializedReadiness).not.toContain(
         "Boris maintains Graph Indexing",
@@ -512,28 +502,16 @@ describe.skipIf(runLiveE2E)("live production e2e", () => {
 
 describe.runIf(runLiveBenchmark)("live production graph benchmark", () => {
   test("keeps hosted graph recall bounded on a synthetic tenant", async () => {
-    const email = `live-benchmark-${crypto.randomUUID()}@example.com`;
-    const password = "password1234";
-    let cookie = "";
+    const fixture = approvedFixture("OPENMEMORY_LIVE_BENCHMARK");
+    const cookie = fixture.cookie;
     let cleanup: { confirmEmail: string; confirmTenantId: string } | undefined;
 
     try {
-      const signUp = await fetchLive("/api/auth/sign-up/email", {
-        method: "POST",
-        headers: jsonHeaders(),
-        body: JSON.stringify({
-          name: "Live Benchmark",
-          email,
-          password,
-        }),
-      });
-      cookie = cookieHeader(signUp);
-      await expectOk(signUp);
-
       const account = await authedJson<AccountResponse>(cookie, "/v1/account");
+      assertFixtureAccount(account, fixture);
       cleanup = {
-        confirmEmail: account.user.email,
-        confirmTenantId: account.workspace.tenantId,
+        confirmEmail: fixture.email,
+        confirmTenantId: fixture.tenantId,
       };
 
       const graphExport = createBenchmarkGraphExport(liveGraphSize);
@@ -756,6 +734,13 @@ async function cleanupLiveAccount(
   cleanup: { confirmEmail: string; confirmTenantId: string },
   label: string,
 ) {
+  const current = await authedJson<AccountResponse>(cookie, "/v1/account");
+  if (
+    current.user.email !== cleanup.confirmEmail ||
+    current.workspace.tenantId !== cleanup.confirmTenantId
+  ) {
+    throw new Error("Fixture identity changed; refusing cleanup");
+  }
   const response = await fetchLive("/v1/account", {
     method: "DELETE",
     headers: {
@@ -818,25 +803,6 @@ async function redirectUrl(responsePromise: Promise<Response>) {
 
   const body = await getJson<OAuthRedirectResponse>(Promise.resolve(response));
   return new URL(body.url, baseUrl);
-}
-
-function cookieHeader(response: Response) {
-  const headers = response.headers as Headers & {
-    getSetCookie?: () => string[];
-  };
-  const setCookie = headers.getSetCookie?.() ?? [];
-  return (
-    setCookie.length > 0
-      ? setCookie
-      : splitSetCookieHeader(response.headers.get("set-cookie") ?? "")
-  )
-    .map((cookie) => cookie.split(";")[0])
-    .filter(Boolean)
-    .join("; ");
-}
-
-function splitSetCookieHeader(value: string) {
-  return value ? value.split(/,(?=\s*[^;,]+=)/) : [];
 }
 
 async function appendBenchmarkReport(entry: Record<string, unknown>) {
@@ -1072,3 +1038,52 @@ type TokenResponse = {
   access_token: string;
   token_type: string;
 };
+
+// Provision these disposable identities outside the runner after approval.
+// Never infer deletion authority from the account returned by the server.
+function approvedFixture(prefix: string) {
+  const email = process.env[`${prefix}_EMAIL`];
+  const tenantId = process.env[`${prefix}_TENANT_ID`];
+  const cookie = process.env[`${prefix}_SESSION_COOKIE`];
+  const target = process.env.OPENMEMORY_LIVE_BASE_URL;
+  if (
+    !email ||
+    !tenantId ||
+    !cookie ||
+    !target ||
+    process.env[`${prefix}_DISPOSABLE_APPROVAL`] !== `${email}:${tenantId}`
+  ) {
+    throw new Error(
+      `Missing approved disposable fixture for ${prefix}; see docs/passwordless-live-qualification.md`,
+    );
+  }
+  const url = new URL(target);
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.pathname !== "/" ||
+    url.search ||
+    url.hash ||
+    /[\r\n]/.test(cookie)
+  ) {
+    throw new Error(
+      "Live fixture requires an explicit HTTPS origin and valid session cookie",
+    );
+  }
+  return { email, tenantId, cookie, origin: url.origin };
+}
+
+function assertFixtureAccount(
+  account: { user: { email: string }; workspace: { tenantId: string } },
+  fixture: ReturnType<typeof approvedFixture>,
+) {
+  if (
+    account.user.email !== fixture.email ||
+    account.workspace.tenantId !== fixture.tenantId
+  ) {
+    throw new Error(
+      "Fixture identity mismatch; refusing mutations and cleanup",
+    );
+  }
+}

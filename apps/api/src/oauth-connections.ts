@@ -1,5 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
+import { z } from "zod";
 import { resolveOpenMemorySession } from "./better-auth";
 import {
   oauthAccessToken,
@@ -8,17 +9,19 @@ import {
   oauthRefreshToken,
 } from "./db/schema";
 import type { Env } from "./env";
+import { readOAuthClientRequest } from "./oauth-client-request";
 
 const DEFAULT_MCP_SCOPES = ["openid", "profile", "memory:read", "memory:write"];
+const ALLOWED_MCP_SCOPES = [...DEFAULT_MCP_SCOPES, "memory:shared:read"];
 const MAX_REDIRECT_URIS = 10;
 const MAX_CLIENT_NAME_LENGTH = 120;
 const CLIENT_ID_PREFIX = "om_mcp";
 
-export type CreateOAuthClientInput = {
-  name?: string;
-  redirectUris?: string[];
-  scopes?: string[];
-};
+const OAuthClientInputSchema = z.object({
+  name: z.string().optional(),
+  redirectUris: z.array(z.string()).optional(),
+  scopes: z.array(z.string()).optional(),
+});
 
 export async function listOAuthClients(env: Env, request: Request) {
   const session = await resolveOpenMemorySession(env, request);
@@ -54,11 +57,7 @@ export async function listOAuthClients(env: Env, request: Request) {
   };
 }
 
-export async function createOAuthClient(
-  env: Env,
-  request: Request,
-  input: CreateOAuthClientInput,
-) {
+export async function createOAuthClient(env: Env, request: Request) {
   const session = await resolveOpenMemorySession(env, request);
   if (!session) {
     return { status: 401, body: { error: "unauthorized" as const } };
@@ -70,7 +69,10 @@ export async function createOAuthClient(
     };
   }
 
-  const parsed = parseOAuthClientInput(input);
+  const result = await readOAuthClientRequest(request);
+  if ("status" in result) return result;
+
+  const parsed = parseOAuthClientInput(result.input);
   if ("error" in parsed) {
     return { status: 400, body: parsed };
   }
@@ -269,7 +271,16 @@ async function revokeOAuthTokens(
     );
 }
 
-function parseOAuthClientInput(input: CreateOAuthClientInput) {
+function parseOAuthClientInput(value: unknown) {
+  const result = OAuthClientInputSchema.safeParse(value);
+  if (!result.success) {
+    return {
+      error: "invalid_client_input" as const,
+      message:
+        "Provide an object with an optional string name and arrays of strings for redirectUris and scopes.",
+    };
+  }
+  const input = result.data;
   const name = (input.name ?? "OpenMemory MCP Client").trim();
   if (!name || name.length > MAX_CLIENT_NAME_LENGTH) {
     return {
@@ -303,10 +314,10 @@ function parseOAuthClientInput(input: CreateOAuthClientInput) {
   const scopes = Array.from(
     new Set(requestedScopes.map((scope) => scope.trim()).filter(Boolean)),
   );
-  if (!scopes.every((scope) => DEFAULT_MCP_SCOPES.includes(scope))) {
+  if (!scopes.every((scope) => ALLOWED_MCP_SCOPES.includes(scope))) {
     return {
       error: "invalid_scope" as const,
-      message: `Scopes must be limited to: ${DEFAULT_MCP_SCOPES.join(" ")}.`,
+      message: `Scopes must be limited to: ${ALLOWED_MCP_SCOPES.join(" ")}.`,
     };
   }
 

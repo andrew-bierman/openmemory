@@ -81,6 +81,7 @@ import {
   getSourceIngestSummary,
   getTypeDistribution,
 } from "../dashboard-model";
+import { TeamPanel } from "../team-components";
 import { Route as rootRoute } from "./__root";
 
 const INITIAL_ACTIVITY_NOW = new Date("2026-01-07T00:00:00.000Z");
@@ -182,9 +183,6 @@ function Home() {
     "openmemory:token",
     "",
   );
-  const [email, setEmail] = useLocalStorage("openmemory:email", "");
-  const [name, setName] = useLocalStorage("openmemory:name", "");
-  const [password, setPassword] = useState("");
   const [content, setContent] = useState("");
   const [ingestContent, setIngestContent] = useState("");
   const [ingestMode, setIngestMode] = useState<"document" | "conversation">(
@@ -198,8 +196,7 @@ function Home() {
   const [profileName, setProfileName] = useState("");
   const [deleteConfirmEmail, setDeleteConfirmEmail] = useState("");
   const [deleteConfirmTenantId, setDeleteConfirmTenantId] = useState("");
-  const [memberEmail, setMemberEmail] = useState("");
-  const [memberRole, setMemberRole] = useState<"admin" | "member">("member");
+  const [sharedReadAccess, setSharedReadAccess] = useState(false);
   const [oauthClientName, setOauthClientName] = useState(
     "OpenMemory MCP Client",
   );
@@ -243,10 +240,6 @@ function Home() {
     !isResolvingProductionApiUrl;
   const queryClient = useQueryClient();
   const apiBaseUrl = cleanBaseUrl(apiUrl);
-  const queryScope = useMemo(
-    () => [apiBaseUrl, usesLocalTenant ? tenantId : "session", token] as const,
-    [apiBaseUrl, tenantId, token, usesLocalTenant],
-  );
 
   const api = useMemo(
     () =>
@@ -263,6 +256,41 @@ function Home() {
     queryFn: () => getSession(apiBaseUrl),
   });
   const sessionUser = sessionQuery.data ?? null;
+  const identityScope = JSON.stringify([
+    apiBaseUrl,
+    sessionUser?.id ?? null,
+    usesLocalTenant ? tenantId : "session",
+    token,
+  ]);
+  const queryScope = useMemo(
+    () => [{ dashboardScope: identityScope }] as const,
+    [identityScope],
+  );
+  useEffect(() => {
+    // Queries have different prefixes (memory ID, recall query), so identify
+    // their common scope by its marker rather than a positional key index.
+    return () => {
+      const previousScope = {
+        predicate: (query: { queryKey: readonly unknown[] }) =>
+          query.queryKey[0] === "openmemory" &&
+          query.queryKey.some(
+            (part) =>
+              typeof part === "object" &&
+              part !== null &&
+              "dashboardScope" in part &&
+              part.dashboardScope === identityScope,
+          ),
+      };
+      // A cookie change may have started a new user's request under the old
+      // key. Discard that in-flight result and the old cache on identity change.
+      void queryClient.cancelQueries(previousScope);
+      queryClient.removeQueries(previousScope);
+    };
+  }, [identityScope, queryClient]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: A different signed-in identity must explicitly opt in again.
+  useEffect(() => {
+    setSharedReadAccess(false);
+  }, [sessionUser?.id]);
   const memoriesQuery = useQuery({
     enabled: hasLoadedConnection,
     queryKey: ["openmemory", "memories", ...queryScope],
@@ -294,12 +322,12 @@ function Home() {
     queryFn: () => api.getNeighbors(memoryId ?? ""),
   });
   const oauthConnectionsQuery = useQuery({
-    enabled: hasLoadedConnection && !usesLocalTenant && Boolean(sessionUser),
+    enabled: hasLoadedConnection && Boolean(sessionUser),
     queryKey: ["openmemory", "oauth-connections", ...queryScope],
     queryFn: () => api.listOAuthConnections().catch(() => []),
   });
   const oauthClientsQuery = useQuery({
-    enabled: hasLoadedConnection && !usesLocalTenant && Boolean(sessionUser),
+    enabled: hasLoadedConnection && Boolean(sessionUser),
     queryKey: ["openmemory", "oauth-clients", ...queryScope],
     queryFn: () => api.listOAuthClients().catch(() => []),
   });
@@ -309,7 +337,7 @@ function Home() {
     queryFn: () => api.getReadiness().catch(() => null),
   });
   const accountQuery = useQuery<Account | null>({
-    enabled: hasLoadedConnection && !usesLocalTenant,
+    enabled: hasLoadedConnection && Boolean(sessionUser),
     queryKey: ["openmemory", "account", ...queryScope],
     queryFn: () => api.getAccount().catch(() => null),
   });
@@ -627,21 +655,6 @@ function Home() {
     onMutate: () => setError(null),
     onSuccess: invalidateDashboard,
   });
-  const inviteMemberMutation = useMutation({
-    mutationFn: api.inviteWorkspaceMember,
-    onError: (caught) => setError(formatError(caught)),
-    onMutate: () => setError(null),
-    onSuccess: async () => {
-      setMemberEmail("");
-      await invalidateDashboard();
-    },
-  });
-  const removeMemberMutation = useMutation({
-    mutationFn: api.removeWorkspaceMember,
-    onError: (caught) => setError(formatError(caught)),
-    onMutate: () => setError(null),
-    onSuccess: invalidateDashboard,
-  });
   const deleteAccountMutation = useMutation({
     mutationFn: api.deleteAccount,
     onError: (caught) => setError(formatError(caught)),
@@ -723,8 +736,6 @@ function Home() {
     deleteOAuthClientMutation.isPending ||
     renameWorkspaceMutation.isPending ||
     updateProfileMutation.isPending ||
-    inviteMemberMutation.isPending ||
-    removeMemberMutation.isPending ||
     deleteAccountMutation.isPending ||
     exportGraphMutation.isPending ||
     importPreviewMutation.isPending ||
@@ -771,31 +782,6 @@ function Home() {
     await forgetMemoryMutation.mutateAsync(id);
   }
 
-  async function signIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    await authMutation.mutateAsync({
-      path: "/api/auth/sign-in/email",
-      body: {
-        email,
-        password,
-        rememberMe: true,
-      },
-    });
-    setPassword("");
-  }
-
-  async function signUp() {
-    await authMutation.mutateAsync({
-      path: "/api/auth/sign-up/email",
-      body: {
-        email,
-        password,
-        name: name || email,
-      },
-    });
-    setPassword("");
-  }
-
   async function signOut() {
     await authMutation.mutateAsync({
       path: "/api/auth/sign-out",
@@ -827,6 +813,13 @@ function Home() {
     await createOAuthClientMutation.mutateAsync({
       name: oauthClientName.trim() || "OpenMemory MCP Client",
       redirectUris: parseRedirectUris(oauthRedirectUris),
+      scopes: [
+        "openid",
+        "profile",
+        "memory:read",
+        "memory:write",
+        ...(sharedReadAccess ? ["memory:shared:read"] : []),
+      ],
     });
   }
 
@@ -852,23 +845,6 @@ function Home() {
     }
 
     await updateProfileMutation.mutateAsync(nextName);
-  }
-
-  async function inviteCurrentMember(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const emailToInvite = memberEmail.trim();
-    if (!emailToInvite) {
-      return;
-    }
-
-    await inviteMemberMutation.mutateAsync({
-      email: emailToInvite,
-      role: memberRole,
-    });
-  }
-
-  async function removeCurrentMember(memberId: string) {
-    await removeMemberMutation.mutateAsync(memberId);
   }
 
   async function deleteCurrentAccount(event: FormEvent<HTMLFormElement>) {
@@ -1287,7 +1263,9 @@ function Home() {
             ) : view === "mcp" ? (
               <McpSetup
                 apiUrl={apiUrl}
-                canManageClients={!usesLocalTenant && Boolean(sessionUser)}
+                canManageClients={Boolean(sessionUser)}
+                sharedReadAccess={sharedReadAccess}
+                onSharedReadAccessChange={setSharedReadAccess}
                 clientName={oauthClientName}
                 clients={oauthClients}
                 connections={oauthConnections}
@@ -1310,37 +1288,33 @@ function Home() {
               />
             ) : view === "admin" ? (
               <AdminWorkspace
+                teamPanel={
+                  account && sessionUser ? (
+                    <TeamPanel
+                      key={`${apiBaseUrl}:${sessionUser.id}`}
+                      api={api}
+                      userId={sessionUser.id}
+                      memories={memories}
+                    />
+                  ) : null
+                }
                 account={account}
                 apiUrl={apiUrl}
                 connections={oauthConnections}
                 deleteConfirmEmail={deleteConfirmEmail}
                 deleteConfirmTenantId={deleteConfirmTenantId}
-                email={email}
                 isLoading={isLoading}
                 lastAccountDeletion={lastAccountDeletion}
-                memberEmail={memberEmail}
-                memberRole={memberRole}
-                name={name}
                 onDeleteAccount={deleteCurrentAccount}
-                onInviteMember={inviteCurrentMember}
                 onRevoke={revokeOAuthConnection}
-                onRemoveMember={removeCurrentMember}
                 onSaveProfile={saveCurrentProfile}
                 onRenameWorkspace={renameCurrentWorkspace}
-                onSignIn={signIn}
                 onSignOut={signOut}
-                onSignUp={signUp}
-                password={password}
-                profileName={profileName || account?.user.name || name}
+                profileName={profileName || account?.user.name || ""}
                 sessionUser={sessionUser}
                 setApiUrl={setApiUrl}
                 setDeleteConfirmEmail={setDeleteConfirmEmail}
                 setDeleteConfirmTenantId={setDeleteConfirmTenantId}
-                setEmail={setEmail}
-                setMemberEmail={setMemberEmail}
-                setMemberRole={setMemberRole}
-                setName={setName}
-                setPassword={setPassword}
                 setProfileName={setProfileName}
                 setTenantId={setTenantId}
                 setToken={setToken}
@@ -2302,6 +2276,8 @@ function MemoryMeta({ memory }: Readonly<{ memory: Memory }>) {
 }
 
 function McpSetup({
+  sharedReadAccess,
+  onSharedReadAccessChange,
   apiUrl,
   canManageClients,
   clientName,
@@ -2317,6 +2293,8 @@ function McpSetup({
   redirectUris,
 }: Readonly<{
   apiUrl: string;
+  sharedReadAccess: boolean;
+  onSharedReadAccessChange: (value: boolean) => void;
   canManageClients: boolean;
   clientName: string;
   clients: OAuthClientRegistration[];
@@ -2340,7 +2318,13 @@ function McpSetup({
     url: mcpUrl,
     authorizationServer: authServerMetadataUrl,
     protectedResource: protectedResourceMetadataUrl,
-    scopes: ["openid", "profile", "memory:read", "memory:write"],
+    scopes: [
+      "openid",
+      "profile",
+      "memory:read",
+      "memory:write",
+      ...(sharedReadAccess ? ["memory:shared:read"] : []),
+    ],
   };
   return (
     <div className="stack">
@@ -2384,6 +2368,22 @@ function McpSetup({
         </div>
       </div>
       <form className="settings-grid" onSubmit={onCreateClient}>
+        <label className="field settings-grid-wide">
+          <span>
+            <input
+              type="checkbox"
+              checked={sharedReadAccess}
+              onChange={(event) =>
+                onSharedReadAccessChange(event.target.checked)
+              }
+            />{" "}
+            Allow reading accepted teams’ shared memories
+          </span>
+          <small>
+            Optional memory:shared:read scope. The client still needs your OAuth
+            consent; membership and share revocation remain enforced.
+          </small>
+        </label>
         <div className="field">
           <Label htmlFor="oauthClientName">Client name</Label>
           <Input
