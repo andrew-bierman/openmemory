@@ -38,8 +38,7 @@ export type ConversationIngestionMessage = {
 };
 
 export type IngestionQueueMessage =
-  | SourceIngestionMessage
-  | ConversationIngestionMessage;
+  SourceIngestionMessage | ConversationIngestionMessage;
 
 export type SourceIngestionResult = {
   sourceId: string;

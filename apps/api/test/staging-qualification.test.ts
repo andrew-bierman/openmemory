@@ -115,26 +115,24 @@ describe("bounded staging qualification", () => {
       /123456|private|secret-token|example.test/,
     );
   });
-  it.each([
-    "approval",
-    "origin",
-    "window",
-    "fixtures",
-  ])("rejects invalid %s before traffic", async (kind) => {
-    const config = approval();
-    if (kind === "approval") config.approved = false;
-    if (kind === "origin") config.origin = "https://evil.test";
-    if (kind === "window") config.cutoffAt = now + 46 * 60_000;
-    if (kind === "fixtures")
-      config.fixtures[1] = {
-        email: "a@example.test",
-        userId: "a",
-        tenantId: "tenant-a",
-      };
-    const { calls, dependencies } = setup();
-    expect((await qualifyStaging(config, dependencies)).ok).toBe(false);
-    expect(calls).toHaveLength(0);
-  });
+  it.each(["approval", "origin", "window", "fixtures"])(
+    "rejects invalid %s before traffic",
+    async (kind) => {
+      const config = approval();
+      if (kind === "approval") config.approved = false;
+      if (kind === "origin") config.origin = "https://evil.test";
+      if (kind === "window") config.cutoffAt = now + 46 * 60_000;
+      if (kind === "fixtures")
+        config.fixtures[1] = {
+          email: "a@example.test",
+          userId: "a",
+          tenantId: "tenant-a",
+        };
+      const { calls, dependencies } = setup();
+      expect((await qualifyStaging(config, dependencies)).ok).toBe(false);
+      expect(calls).toHaveLength(0);
+    },
+  );
   it("stops on identity mismatch before readiness or subsequent sends", async () => {
     const { calls, dependencies } = setup({ mismatch: true });
     expect(await qualifyStaging(approval(), dependencies)).toMatchObject({
@@ -193,16 +191,16 @@ describe("bounded staging qualification", () => {
     });
     expect(calls).toHaveLength(1);
   });
-  it.each([
-    { maxRequests: 241 },
-    { maxSends: 13 },
-  ])("rejects enlarged budgets", async (budget) => {
-    const { calls, dependencies } = setup();
-    expect(
-      await qualifyStaging({ ...approval(), ...budget }, dependencies),
-    ).toMatchObject({ error: "invalid_approval" });
-    expect(calls).toHaveLength(0);
-  });
+  it.each([{ maxRequests: 241 }, { maxSends: 13 }])(
+    "rejects enlarged budgets",
+    async (budget) => {
+      const { calls, dependencies } = setup();
+      expect(
+        await qualifyStaging({ ...approval(), ...budget }, dependencies),
+      ).toMatchObject({ error: "invalid_approval" });
+      expect(calls).toHaveLength(0);
+    },
+  );
   it("does not submit malformed OTPs or echo their contents", async () => {
     const { calls, dependencies } = setup();
     dependencies.readOtp = async () => "private-code";

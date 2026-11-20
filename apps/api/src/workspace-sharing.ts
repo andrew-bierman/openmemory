@@ -107,9 +107,11 @@ export async function createSharedMemory(
   if (current.memberId !== access.memberId)
     throw new WorkspaceAccessError(409, "membership_changed");
   await database(env)
-    .prepare(`INSERT INTO workspace_share_directory(share_id,owner_user_id,workspace_id,memory_id,created_at)
+    .prepare(
+      `INSERT INTO workspace_share_directory(share_id,owner_user_id,workspace_id,memory_id,created_at)
     SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM workspace_member WHERE id=? AND workspace_id=? AND user_id=? AND status='active' AND accepted_at IS NOT NULL)
-    ON CONFLICT(share_id) DO NOTHING`)
+    ON CONFLICT(share_id) DO NOTHING`,
+    )
     .bind(
       grant.shareId,
       actorId,
@@ -197,8 +199,10 @@ export async function listSharedMemories(
   }
   const rows = (
     await database(env)
-      .prepare(`SELECT share_id,owner_user_id,workspace_id,memory_id,created_at FROM workspace_share_directory
-    WHERE workspace_id=? AND (created_at>? OR (created_at=? AND share_id>?)) ORDER BY created_at,share_id LIMIT 101`)
+      .prepare(
+        `SELECT share_id,owner_user_id,workspace_id,memory_id,created_at FROM workspace_share_directory
+    WHERE workspace_id=? AND (created_at>? OR (created_at=? AND share_id>?)) ORDER BY created_at,share_id LIMIT 101`,
+      )
       .bind(workspaceId, after, after, afterId)
       .all<DirectoryRow>()
   ).results;

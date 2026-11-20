@@ -594,46 +594,47 @@ describe("private Resend adapter with real D1 and passwordless auth", () => {
       SEND_BUDGET_DB: db,
     };
   }
-  test.each([
-    200, 503,
-  ])("real OTP boundary handles provider status %s", async (status) => {
-    let capturedCode = "";
-    const mail = createAuthEmailWorker({
-      fetch: async (_url, init) => {
-        const payload = JSON.parse(String(init?.body)) as {
-          text: string;
-          to: string[];
-        };
-        expect(payload.to).toEqual(["alice@example.test"]);
-        capturedCode = required(payload.text.match(/\b\d{6}\b/)?.[0]);
-        return Response.json(
-          { id: "00000000-0000-4000-8000-000000000001" },
-          { status },
-        );
-      },
-    });
-    const env = mailEnv();
-    const authOverrides = {
-      AUTH_EMAIL: { fetch: (req: Request) => mail.fetch(req, env) },
-    };
-    expect(
-      (await send("alice@example.test", { env: authOverrides })).status,
-    ).toBe(200);
-    expect(capturedCode).toHaveLength(6);
-    const login = await verify(capturedCode, "alice@example.test", {
-      env: authOverrides,
-    });
-    expect(login.status).toBe(status === 200 ? 200 : 400);
-    expect(
-      await scalar(
-        "SELECT attempts FROM send_budget WHERE run_id='integration-run'",
-      ),
-    ).toEqual({ attempts: 1 });
-    if (status !== 200)
+  test.each([200, 503])(
+    "real OTP boundary handles provider status %s",
+    async (status) => {
+      let capturedCode = "";
+      const mail = createAuthEmailWorker({
+        fetch: async (_url, init) => {
+          const payload = JSON.parse(String(init?.body)) as {
+            text: string;
+            to: string[];
+          };
+          expect(payload.to).toEqual(["alice@example.test"]);
+          capturedCode = required(payload.text.match(/\b\d{6}\b/)?.[0]);
+          return Response.json(
+            { id: "00000000-0000-4000-8000-000000000001" },
+            { status },
+          );
+        },
+      });
+      const env = mailEnv();
+      const authOverrides = {
+        AUTH_EMAIL: { fetch: (req: Request) => mail.fetch(req, env) },
+      };
       expect(
-        await scalar("SELECT count(*) AS n FROM passwordless_otp"),
-      ).toEqual({ n: 0 });
-  });
+        (await send("alice@example.test", { env: authOverrides })).status,
+      ).toBe(200);
+      expect(capturedCode).toHaveLength(6);
+      const login = await verify(capturedCode, "alice@example.test", {
+        env: authOverrides,
+      });
+      expect(login.status).toBe(status === 200 ? 200 : 400);
+      expect(
+        await scalar(
+          "SELECT attempts FROM send_budget WHERE run_id='integration-run'",
+        ),
+      ).toEqual({ attempts: 1 });
+      if (status !== 200)
+        expect(
+          await scalar("SELECT count(*) AS n FROM passwordless_otp"),
+        ).toEqual({ n: 0 });
+    },
+  );
   test("D1 reserves at most twelve sends across concurrent adapter instances", async () => {
     let sends = 0;
     const env = mailEnv();
@@ -738,22 +739,24 @@ describe("open signup gate over the auth API", () => {
     "non-exact flag value %s keeps the gate closed",
     async (value) => {
       const env = { OPENMEMORY_ALLOW_SIGN_UP: value };
-      expect(
-        (await send("newuser@example.test", { env })).status,
-      ).toBe(200);
+      expect((await send("newuser@example.test", { env })).status).toBe(200);
       expect(deliveries).toHaveLength(0);
-      expect((await verify("123456", "newuser@example.test", { env })).status).toBe(
-        400,
-      );
+      expect(
+        (await verify("123456", "newuser@example.test", { env })).status,
+      ).toBe(400);
     },
   );
   test("exact true registers an unknown address end to end", async () => {
     const env = { OPENMEMORY_ALLOW_SIGN_UP: "true" };
     expect((await send("newuser@example.test", { env })).status).toBe(200);
     expect(deliveries).toHaveLength(1);
-    const login = await verify(required(deliveries[0]).otp, "newuser@example.test", {
-      env,
-    });
+    const login = await verify(
+      required(deliveries[0]).otp,
+      "newuser@example.test",
+      {
+        env,
+      },
+    );
     expect(login.status).toBe(200);
     expect(login.headers.get("set-cookie")).toBeTruthy();
     expect(
@@ -763,7 +766,9 @@ describe("open signup gate over the auth API", () => {
     ).toEqual({ email_verified: 1 });
     const session = new Request(`${origin}/api/auth/get-session`, {
       headers: {
-        cookie: required(required(login.headers.get("set-cookie")).split(";")[0]),
+        cookie: required(
+          required(login.headers.get("set-cookie")).split(";")[0],
+        ),
       },
     });
     expect(

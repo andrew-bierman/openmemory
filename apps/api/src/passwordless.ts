@@ -96,10 +96,12 @@ async function throttle(
   ] as const) {
     const key = await digest(env, `throttle:${action}:${kind}:${value}`);
     const row = await db
-      .prepare(`INSERT INTO passwordless_throttle (key, count, expires_at) VALUES (?, 1, ?)
+      .prepare(
+        `INSERT INTO passwordless_throttle (key, count, expires_at) VALUES (?, 1, ?)
       ON CONFLICT(key) DO UPDATE SET count = CASE WHEN expires_at <= ? THEN 1 ELSE count + 1 END,
       expires_at = CASE WHEN expires_at <= ? THEN excluded.expires_at ELSE expires_at END
-      RETURNING count`)
+      RETURNING count`,
+      )
       .bind(key, now + window, now, now)
       .first<{ count: number }>();
     if (!row || row.count > maximum)
@@ -177,10 +179,7 @@ export function passwordlessPlugin(env: Env) {
             "send",
           );
           const user = await ctx.context.internalAdapter.findUserByEmail(email);
-          if (
-            !signUpAllowed(env) &&
-            (!isAllowedAuthEmail(env, email) || !user)
-          )
+          if (!signUpAllowed(env) && (!isAllowedAuthEmail(env, email) || !user))
             return ctx.json({ success: true });
           const bytes = new Uint32Array(1);
           // Rejection sampling avoids modulo bias in six-digit codes.
@@ -190,8 +189,10 @@ export function passwordlessPlugin(env: Env) {
           const otp = String((bytes[0] ?? 0) % 1_000_000).padStart(6, "0");
           const hash = await digest(env, `otp:${email}:${otp}`);
           await db
-            .prepare(`INSERT INTO passwordless_otp(email, hash, expires_at, attempts) VALUES (?, ?, ?, 0)
-        ON CONFLICT(email) DO UPDATE SET hash=excluded.hash, expires_at=excluded.expires_at, attempts=0`)
+            .prepare(
+              `INSERT INTO passwordless_otp(email, hash, expires_at, attempts) VALUES (?, ?, ?, 0)
+        ON CONFLICT(email) DO UPDATE SET hash=excluded.hash, expires_at=excluded.expires_at, attempts=0`,
+            )
             .bind(email, hash, Date.now() + 300_000)
             .run();
           try {

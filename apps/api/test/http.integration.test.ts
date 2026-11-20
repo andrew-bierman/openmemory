@@ -3992,8 +3992,7 @@ async function waitForExtractedMemory(
       }),
     );
     const extraction = latest.metadata.extraction as
-      | Record<string, unknown>
-      | undefined;
+      Record<string, unknown> | undefined;
     if (
       typeof extraction === "object" &&
       extraction !== null &&
