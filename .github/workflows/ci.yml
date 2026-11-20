@@ -51,17 +51,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Read canary pin
-        id: pin
-        run: echo "version=$(cat .bun-canary-version)" >> "$GITHUB_OUTPUT"
-
-      - name: Install pinned canary Bun
-        run: |
-          curl -fsSL https://bun.sh/install | bash -s "bun-v${{ steps.pin.outputs.version }}"
-          echo "${HOME}/.bun/bin" >> "$GITHUB_PATH"
-
-      - name: Lint
-        run: bun lint
+      - name: Lint on the pinned canary
+        # Canaries ship to npm, not GitHub releases, so the pin resolves
+        # through bunx rather than the bun.sh installer.
+        run: bunx bun@$(cat .bun-canary-version) lint
 
   local-wrangler-integration:
     name: Local Wrangler integration
