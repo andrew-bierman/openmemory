@@ -16,7 +16,8 @@
   discovery routes remain Worker-first.
 - `packages/client` exposes the Eden Treaty client foundation.
 - `packages/ui` contains shadcn-style shared UI primitives.
-- `bun run check` passes across Biome, Turbo, TypeScript, Vitest, and Wrangler-backed API integration tests.
+- `bun run verify` passes across Bun fmt, Bun check, canary Bun lint, Turbo,
+  Vitest, and Wrangler-backed API integration tests.
 - `bun run --cwd apps/web build` produces a production TanStack Start build.
 - CI, manual deploy, manual live-smoke, and manual release-qualification
   workflows are defined in `.github/workflows`.
