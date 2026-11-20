@@ -77,6 +77,14 @@ Use focused PRs with:
 
 Gitmoji commit messages are preferred for this repository.
 
+## License
+
+OpenMemory is licensed under the GNU Affero General Public License v3.0. By
+contributing, you agree that your contributions are licensed under AGPL-3.0,
+and you confirm you have the right to submit them under those terms. Forks and
+deployments of OpenMemory must publish their corresponding source under
+AGPL-3.0, including when they offer it as a network service.
+
 ## Secrets
 
 Never commit `.dev.vars`, `.env`, OAuth client secrets, API tokens, private
