@@ -34,6 +34,10 @@ For Cloudflare deployment changes, also run:
 CLOUDFLARE_ACCOUNT_ID=<account-id> bunx wrangler versions upload --dry-run
 ```
 
+Unit suites run under `bun test` through the pinned canary declared in
+`.bun-canary-version`; plain `bun test` on a stable Bun install fails some
+suites, so run tests through `bun run test` / `bun run verify`.
+
 For production smoke testing after deploys:
 
 ```sh
