@@ -7,6 +7,7 @@ export interface EmailEnv {
   AUTH_EMAIL_FROM?: string;
   AUTH_EMAIL_MODE?: "staging" | "production";
   AUTH_EMAIL_ALLOWED_RECIPIENTS?: string;
+  OPENMEMORY_ALLOW_SIGN_UP?: string;
   AUTH_EMAIL_RUN_ID?: string;
   AUTH_EMAIL_RUN_EXPIRES_AT?: string;
   SEND_BUDGET_DB?: { prepare(query: string): BudgetStatement };
@@ -87,20 +88,22 @@ export function createAuthEmailWorker(
         });
       if (new URL(request.url).pathname !== "/send") return fail(404);
       if (request.method !== "POST") return fail(405);
+      // Open registration overrides the recipient allowlist; the budget
+      // still bounds every send in that mode.
+      const gateOpen = env.OPENMEMORY_ALLOW_SIGN_UP === "true";
       const recipients = (env.AUTH_EMAIL_ALLOWED_RECIPIENTS ?? "")
         .split(",")
         .map((value) => value.trim().toLowerCase());
       if (
         !env.RESEND_API_KEY?.trim() ||
         !isEmail(env.AUTH_EMAIL_FROM) ||
-        !recipients.length ||
-        !recipients.every(isEmail) ||
+        (!gateOpen && (!recipients.length || !recipients.every(isEmail))) ||
         !["staging", "production"].includes(env.AUTH_EMAIL_MODE ?? "")
       )
         return fail(503);
       const expiry = Date.parse(env.AUTH_EMAIL_RUN_EXPIRES_AT ?? "");
       if (
-        env.AUTH_EMAIL_MODE === "staging" &&
+        (env.AUTH_EMAIL_MODE === "staging" || gateOpen) &&
         (!env.SEND_BUDGET_DB ||
           !/^[a-zA-Z0-9_-]{1,80}$/.test(env.AUTH_EMAIL_RUN_ID ?? "") ||
           !Number.isFinite(expiry) ||
@@ -129,7 +132,7 @@ export function createAuthEmailWorker(
           typeof input !== "object" ||
           Object.keys(input).sort().join(",") !== "email,expiresIn,otp,type" ||
           !isEmail(input.email) ||
-          !recipients.includes(input.email.toLowerCase()) ||
+          (!gateOpen && !recipients.includes(input.email.toLowerCase())) ||
           typeof input.otp !== "string" ||
           !/^\d{6}$/.test(input.otp) ||
           input.type !== "sign-in" ||
@@ -141,7 +144,7 @@ export function createAuthEmailWorker(
       }
       try {
         return await withinDeadline(async (signal) => {
-          if (env.AUTH_EMAIL_MODE === "staging") {
+          if (env.AUTH_EMAIL_MODE === "staging" || gateOpen) {
             const time = now();
             const reserved = await env.SEND_BUDGET_DB?.prepare(
               RESERVE_ATTEMPT_SQL,

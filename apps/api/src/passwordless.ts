@@ -28,12 +28,18 @@ export async function isAllowedAuthUser(env: Env, userId: string) {
   return !!user?.email_verified && isAllowedAuthEmail(env, user.email);
 }
 
+// Only the exact string opens registration; the repo's boolean convention
+// (`!== "false"`) is default-on, the opposite polarity of this gate.
+export function signUpAllowed(env: Env) {
+  return env.OPENMEMORY_ALLOW_SIGN_UP === "true";
+}
+
 export function passwordlessReady(env: Env) {
   return !!(
     env.AUTH_DB &&
     env.AUTH_EMAIL &&
     env.BETTER_AUTH_SECRET &&
-    (env.OPENMEMORY_AUTH_ALLOWED_EMAILS ?? "").trim()
+    (signUpAllowed(env) || (env.OPENMEMORY_AUTH_ALLOWED_EMAILS ?? "").trim())
   );
 }
 
@@ -116,7 +122,11 @@ export function passwordlessGuard(env: Env) {
       const session = await getSessionFromCtx(ctx, {
         disableCookieCache: true,
       });
-      if (session && !(await isAllowedAuthUser(env, session.user.id))) {
+      if (
+        session &&
+        !signUpAllowed(env) &&
+        !(await isAllowedAuthUser(env, session.user.id))
+      ) {
         throw new APIError("FORBIDDEN", { message: "Sign-in is unavailable." });
       }
     }
@@ -167,7 +177,10 @@ export function passwordlessPlugin(env: Env) {
             "send",
           );
           const user = await ctx.context.internalAdapter.findUserByEmail(email);
-          if (!isAllowedAuthEmail(env, email) || !user)
+          if (
+            !signUpAllowed(env) &&
+            (!isAllowedAuthEmail(env, email) || !user)
+          )
             return ctx.json({ success: true });
           const bytes = new Uint32Array(1);
           // Rejection sampling avoids modulo bias in six-digit codes.
@@ -239,14 +252,22 @@ export function passwordlessPlugin(env: Env) {
               )
               .bind(email, hash, now),
           ]);
-          if (!result[1]?.results.length || !isAllowedAuthEmail(env, email))
+          if (
+            !result[1]?.results.length ||
+            (!signUpAllowed(env) && !isAllowedAuthEmail(env, email))
+          )
             throw invalid();
           const found =
             await ctx.context.internalAdapter.findUserByEmail(email);
-          if (!found) throw invalid();
-          const user = found.user.emailVerified
-            ? found.user
-            : await ctx.context.internalAdapter.updateUser(found.user.id, {
+          const user = found
+            ? found.user.emailVerified
+              ? found.user
+              : await ctx.context.internalAdapter.updateUser(found.user.id, {
+                  emailVerified: true,
+                })
+            : await ctx.context.internalAdapter.createUser({
+                email,
+                name: email.split("@")[0],
                 emailVerified: true,
               });
           const session = await ctx.context.internalAdapter.createSession(
