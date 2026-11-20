@@ -172,45 +172,43 @@ function harness(stage: "create" | "embedding" | "upsert" | "complete") {
 
 describe("ingestion purge barriers", () => {
   for (const kind of ["source", "conversation"] as const) {
-    test.each([
-      "create",
-      "embedding",
-      "upsert",
-      "complete",
-    ] as const)(`${kind}: purge during %s fences stale work and permits fresh ingestion`, async (stage) => {
-      const h = harness(stage);
-      const pending = processSourceIngestionMessage(h.env, message(kind));
-      await h.gate.reached;
-      h.purge();
-      // A new job with the same identifier must not be completed by old work.
-      h.recreateJob();
-      h.gate.resume();
-      await expect(pending).resolves.toMatchObject({
-        chunkCount: 0,
-        memories: [],
-        edges: [],
-      });
-      expect(h.memories.size).toBe(0);
-      expect(h.vectors.size).toBe(0);
-      expect(h.status()).toBe("queued");
-      expect(h.graph.failIngestionJob).not.toHaveBeenCalled();
-      expect([...h.otherTenant]).toEqual([["other-memory", "unaffected"]]);
-      if (stage === "embedding" || stage === "upsert")
-        expect(h.deleteByIds).toHaveBeenCalledTimes(1);
-      await expect(
-        processSourceIngestionMessage(h.env, message(kind)),
-      ).resolves.toMatchObject({ chunkCount: 0 });
-      await expect(
-        processSourceIngestionMessage(h.env, message(kind, 1)),
-      ).resolves.toMatchObject({ chunkCount: 1 });
-      expect(h.memories.size).toBe(1);
-      expect(h.vectors.size).toBe(1);
-      expect(h.status()).toBe("completed");
-      await expect(
-        processSourceIngestionMessage(h.env, message(kind, 1)),
-      ).resolves.toMatchObject({ chunkCount: 0 });
-      expect(h.memories.size).toBe(1);
-    });
+    test.each(["create", "embedding", "upsert", "complete"] as const)(
+      `${kind}: purge during %s fences stale work and permits fresh ingestion`,
+      async (stage) => {
+        const h = harness(stage);
+        const pending = processSourceIngestionMessage(h.env, message(kind));
+        await h.gate.reached;
+        h.purge();
+        // A new job with the same identifier must not be completed by old work.
+        h.recreateJob();
+        h.gate.resume();
+        await expect(pending).resolves.toMatchObject({
+          chunkCount: 0,
+          memories: [],
+          edges: [],
+        });
+        expect(h.memories.size).toBe(0);
+        expect(h.vectors.size).toBe(0);
+        expect(h.status()).toBe("queued");
+        expect(h.graph.failIngestionJob).not.toHaveBeenCalled();
+        expect([...h.otherTenant]).toEqual([["other-memory", "unaffected"]]);
+        if (stage === "embedding" || stage === "upsert")
+          expect(h.deleteByIds).toHaveBeenCalledTimes(1);
+        await expect(
+          processSourceIngestionMessage(h.env, message(kind)),
+        ).resolves.toMatchObject({ chunkCount: 0 });
+        await expect(
+          processSourceIngestionMessage(h.env, message(kind, 1)),
+        ).resolves.toMatchObject({ chunkCount: 1 });
+        expect(h.memories.size).toBe(1);
+        expect(h.vectors.size).toBe(1);
+        expect(h.status()).toBe("completed");
+        await expect(
+          processSourceIngestionMessage(h.env, message(kind, 1)),
+        ).resolves.toMatchObject({ chunkCount: 0 });
+        expect(h.memories.size).toBe(1);
+      },
+    );
   }
 
   test("a pre-write transient failure is retryable within the same generation", async () => {

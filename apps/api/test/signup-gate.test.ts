@@ -7,16 +7,10 @@ describe("signup gate polarity", () => {
   test("only the exact string true opens the gate", () => {
     expect(signUpAllowed(env("true"))).toBe(true);
   });
-  test.each([
-    undefined,
-    "",
-    "false",
-    "1",
-    "yes",
-    "True",
-    " true",
-    "true ",
-  ])("%s keeps the gate closed", (value) => {
-    expect(signUpAllowed(env(value))).toBe(false);
-  });
+  test.each([undefined, "", "false", "1", "yes", "True", " true", "true "])(
+    "%s keeps the gate closed",
+    (value) => {
+      expect(signUpAllowed(env(value))).toBe(false);
+    },
+  );
 });
