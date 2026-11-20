@@ -38,7 +38,7 @@ flows, data-write errors, or unacceptable latency.
 
    ```sh
    git revert <bad-merge-sha>
-   bun run check
+   bun run verify
    bun run build
    ```
 

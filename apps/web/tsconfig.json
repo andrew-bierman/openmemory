@@ -1,8 +1,14 @@
 {
   "extends": "@openmemory/typescript-config/react-library",
   "compilerOptions": {
-    "baseUrl": ".",
-    "types": ["node", "vite/client"]
+    "types": [
+      "node",
+      "vite/client"
+    ]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "vite.config.ts"
+  ]
 }

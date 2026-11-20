@@ -5,7 +5,7 @@
 ## Validation
 
 - [ ] `bun run format`
-- [ ] `bun run check`
+- [ ] `bun run verify`
 - [ ] `bun run build`
 - [ ] `bun run test:integration:local`
 - [ ] `bun run test:e2e:local`

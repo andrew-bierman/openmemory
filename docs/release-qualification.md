@@ -54,7 +54,7 @@ For a faster pull-request loop, run the same checks individually:
 
 ```sh
 bun run format
-bun run check
+bun run verify
 bun run build
 bun run test:mcp:sdk
 bun run test:integration:local

@@ -7,7 +7,7 @@ so protocol behavior can run in CI without external OAuth fixtures.
 
 Named client request profiles live in
 [`config/mcp-client-profiles.json`](../config/mcp-client-profiles.json). The
-root `bun run check` gate validates that profile artifact, required OAuth
+root `bun run verify` gate validates that profile artifact, required OAuth
 scopes, expected tools, and this compatibility matrix stay in sync.
 
 Real external-client dogfooding evidence lives in

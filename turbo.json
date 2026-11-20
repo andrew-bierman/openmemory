@@ -2,7 +2,6 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "check-types": {
-      "dependsOn": ["^check-types"],
       "outputs": []
     },
     "test": {
@@ -32,7 +31,6 @@
       "passThroughEnv": ["XDG_CONFIG_HOME", "WRANGLER_SEND_METRICS"]
     },
     "@openmemory/api#check-types": {
-      "dependsOn": ["^check-types"],
       "outputs": [],
       "inputs": [
         "$TURBO_DEFAULT$",
