@@ -766,10 +766,14 @@ describe("open signup gate over the auth API", () => {
         cookie: required(required(login.headers.get("set-cookie")).split(";")[0]),
       },
     });
-    expect(
-      (await createOpenMemoryAuth(environment(env), session).handler(session))
-        .status,
-    ).toBe(200);
+    const sessionResponse = await handleOpenMemoryAuthRequest(
+      environment(env),
+      session,
+    );
+    expect(sessionResponse.status).toBe(200);
+    expect(await sessionResponse.json()).toMatchObject({
+      user: { email: "newuser@example.test" },
+    });
   });
   test("open gate keeps the per-address send throttle", async () => {
     const env = { OPENMEMORY_ALLOW_SIGN_UP: "true" };

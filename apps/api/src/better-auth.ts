@@ -129,7 +129,10 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
           clientSecret: "om_cs_",
         },
         customAccessTokenClaims: async ({ user }) => {
-          if (!user?.id || !(await isAllowedAuthUser(env, user.id)))
+          if (
+            !user?.id ||
+            (!signUpAllowed(env) && !(await isAllowedAuthUser(env, user.id)))
+          )
             throw new APIError("FORBIDDEN", {
               message: "Sign-in is unavailable.",
             });
@@ -142,7 +145,10 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
           grantType,
           verificationValue,
         }) => {
-          if (!user?.id || !(await isAllowedAuthUser(env, user.id)))
+          if (
+            !user?.id ||
+            (!signUpAllowed(env) && !(await isAllowedAuthUser(env, user.id)))
+          )
             throw new APIError("FORBIDDEN", {
               message: "Sign-in is unavailable.",
             });
@@ -253,7 +259,10 @@ export async function resolveOpenMemorySession(env: Env, request: Request) {
     return undefined;
   }
 
-  if (!row.user.emailVerified || !isAllowedAuthEmail(env, row.user.email))
+  if (
+    !row.user.emailVerified ||
+    (!signUpAllowed(env) && !isAllowedAuthEmail(env, row.user.email))
+  )
     return undefined;
   return row;
 }
