@@ -33,6 +33,7 @@ import {
   passwordlessGuard,
   passwordlessPlugin,
   passwordlessReady,
+  signUpAllowed,
 } from "./passwordless";
 
 const AUTH_BASE_PATH = "/api/auth";
@@ -63,13 +64,18 @@ export function createOpenMemoryAuth(env: Env, request: Request) {
       },
     },
     databaseHooks: {
-      user: { create: { before: async () => false } },
+      user: {
+        create: {
+          before: async () => (signUpAllowed(env) ? undefined : false),
+        },
+      },
       session: {
         create: {
           before: async (session) => {
             if (
               !env.BETTER_AUTH_SECRET ||
-              !(await isAllowedAuthUser(env, session.userId))
+              (!signUpAllowed(env) &&
+                !(await isAllowedAuthUser(env, session.userId)))
             )
               throw new APIError("FORBIDDEN", {
                 message: "Sign-in is unavailable.",
