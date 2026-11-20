@@ -7,6 +7,15 @@ releases begin.
 
 ## Unreleased
 
+- Remove password sign-in/sign-up endpoints: hosted authentication is
+  invitation-only passwordless (email OTP), and signup opens only when the
+  operator sets `OPENMEMORY_ALLOW_SIGN_UP` to the exact string `true`.
+- Every pre-cutover MCP access and refresh token fails closed at first use;
+  each live MCP client must re-authorize once via OTP plus consent.
+- `DELETE /v1/account/members/:memberId` now returns `403
+  owner_member_required` for unknown members where it previously returned
+  `404 not_found`, and `/v1/account` routes enforce a same-origin check on
+  all methods including GET.
 - Relicense from MIT to AGPL-3.0: forks snapshot under the license they
   forked from, new versions require publishing source including for hosted
   use, and CONTRIBUTING records the inbound AGPL grant for contributions.
