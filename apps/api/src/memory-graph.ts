@@ -87,7 +87,7 @@ type DurableObjectRuntimeState = ConstructorParameters<
   SqlState;
 
 export class MemoryGraph extends DurableObject<MemoryGraphEnv, unknown> {
-  protected declare ctx: DurableObjectRuntimeState;
+  declare protected ctx: DurableObjectRuntimeState;
 
   constructor(ctx: DurableObjectRuntimeState, env: MemoryGraphEnv) {
     super(ctx, env);

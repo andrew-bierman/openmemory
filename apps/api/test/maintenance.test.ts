@@ -25,42 +25,40 @@ const controller = {} as never;
 const assets = { fetch: vi.fn(() => new Response("asset")) };
 const batch = { retryAll: vi.fn(), ackAll: vi.fn() };
 beforeEach(() => vi.clearAllMocks());
-test.each([
-  undefined,
-  "closed",
-  "OPEN",
-  " open",
-  "open ",
-  "",
-])("fails closed for mode %s across HTTP, queues, cron", async (mode) => {
-  const env = { OPENMEMORY_TRAFFIC_MODE: mode, ASSETS: assets } as never;
-  for (const path of [
-    "/",
-    "/assets/main.js",
-    "/health",
-    "/v1/memories",
-    "/mcp",
-    "/api/auth/sign-in/email",
-    "/arbitrary/spa",
-  ]) {
-    const response = await maintenance.fetch(
-      new Request(`https://example.test${path}`, { method: "POST" }),
-      env,
-      context,
-    );
-    expect(response.status).toBe(503);
-    expect(response.headers.get("cache-control")).toBe("no-store");
-    expect(response.headers.get("retry-after")).toBe("300");
-  }
-  await maintenance.queue(batch as never, env);
-  maintenance.scheduled(controller, env, context);
-  expect(batch.retryAll).toHaveBeenCalledExactlyOnceWith({ delaySeconds: 300 });
-  expect(batch.ackAll).not.toHaveBeenCalled();
-  expect(core.fetch).not.toHaveBeenCalled();
-  expect(core.queue).not.toHaveBeenCalled();
-  expect(core.scheduled).not.toHaveBeenCalled();
-  expect(assets.fetch).not.toHaveBeenCalled();
-});
+test.each([undefined, "closed", "OPEN", " open", "open ", ""])(
+  "fails closed for mode %s across HTTP, queues, cron",
+  async (mode) => {
+    const env = { OPENMEMORY_TRAFFIC_MODE: mode, ASSETS: assets } as never;
+    for (const path of [
+      "/",
+      "/assets/main.js",
+      "/health",
+      "/v1/memories",
+      "/mcp",
+      "/api/auth/sign-in/email",
+      "/arbitrary/spa",
+    ]) {
+      const response = await maintenance.fetch(
+        new Request(`https://example.test${path}`, { method: "POST" }),
+        env,
+        context,
+      );
+      expect(response.status).toBe(503);
+      expect(response.headers.get("cache-control")).toBe("no-store");
+      expect(response.headers.get("retry-after")).toBe("300");
+    }
+    await maintenance.queue(batch as never, env);
+    maintenance.scheduled(controller, env, context);
+    expect(batch.retryAll).toHaveBeenCalledExactlyOnceWith({
+      delaySeconds: 300,
+    });
+    expect(batch.ackAll).not.toHaveBeenCalled();
+    expect(core.fetch).not.toHaveBeenCalled();
+    expect(core.queue).not.toHaveBeenCalled();
+    expect(core.scheduled).not.toHaveBeenCalled();
+    expect(assets.fetch).not.toHaveBeenCalled();
+  },
+);
 test("exact open preserves application routes, asset routes and event handlers", async () => {
   const env = { OPENMEMORY_TRAFFIC_MODE: "open", ASSETS: assets } as never;
   const config = JSON.parse(
