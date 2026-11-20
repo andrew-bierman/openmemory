@@ -675,4 +675,106 @@ describe("private Resend adapter with real D1 and passwordless auth", () => {
       ),
     ).toEqual({ attempts: 12 });
   });
+  test("open signup gate bypasses recipients and enforces the budget in production mode", async () => {
+    const env: EmailEnv = {
+      ...mailEnv(),
+      AUTH_EMAIL_MODE: "production",
+      AUTH_EMAIL_ALLOWED_RECIPIENTS: "",
+      OPENMEMORY_ALLOW_SIGN_UP: "true",
+    };
+    const mail = createAuthEmailWorker({
+      fetch: async () =>
+        Response.json({ id: "00000000-0000-4000-8000-000000000001" }),
+    });
+    const response = await mail.fetch(
+      new Request("https://auth-email.internal/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: "newuser@example.test",
+          otp: "123456",
+          type: "sign-in",
+          expiresIn: 300,
+        }),
+      }),
+      env,
+    );
+    expect(response.status).toBe(204);
+    expect(
+      await scalar(
+        "SELECT attempts FROM send_budget WHERE run_id='integration-run'",
+      ),
+    ).toEqual({ attempts: 1 });
+  });
+  test("closed gate in production mode still requires an allowlisted recipient", async () => {
+    const env: EmailEnv = {
+      ...mailEnv(),
+      AUTH_EMAIL_MODE: "production",
+      AUTH_EMAIL_ALLOWED_RECIPIENTS: "",
+    };
+    const mail = createAuthEmailWorker({
+      fetch: async () =>
+        Response.json({ id: "00000000-0000-4000-8000-000000000001" }),
+    });
+    const response = await mail.fetch(
+      new Request("https://auth-email.internal/send", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: "newuser@example.test",
+          otp: "123456",
+          type: "sign-in",
+          expiresIn: 300,
+        }),
+      }),
+      env,
+    );
+    expect(response.status).toBe(503);
+  });
+});
+
+describe("open signup gate over the auth API", () => {
+  test.each(["1", "yes", "false", " true"])(
+    "non-exact flag value %s keeps the gate closed",
+    async (value) => {
+      const env = { OPENMEMORY_ALLOW_SIGN_UP: value };
+      expect(
+        (await send("newuser@example.test", { env })).status,
+      ).toBe(200);
+      expect(deliveries).toHaveLength(0);
+      expect((await verify("123456", "newuser@example.test", { env })).status).toBe(
+        400,
+      );
+    },
+  );
+  test("exact true registers an unknown address end to end", async () => {
+    const env = { OPENMEMORY_ALLOW_SIGN_UP: "true" };
+    expect((await send("newuser@example.test", { env })).status).toBe(200);
+    expect(deliveries).toHaveLength(1);
+    const login = await verify(required(deliveries[0]).otp, "newuser@example.test", {
+      env,
+    });
+    expect(login.status).toBe(200);
+    expect(login.headers.get("set-cookie")).toBeTruthy();
+    expect(
+      await scalar(
+        "SELECT email_verified FROM \"user\" WHERE email = 'newuser@example.test'",
+      ),
+    ).toEqual({ email_verified: 1 });
+    const session = new Request(`${origin}/api/auth/get-session`, {
+      headers: {
+        cookie: required(required(login.headers.get("set-cookie")).split(";")[0]),
+      },
+    });
+    expect(
+      (await createOpenMemoryAuth(environment(env), session).handler(session))
+        .status,
+    ).toBe(200);
+  });
+  test("open gate keeps the per-address send throttle", async () => {
+    const env = { OPENMEMORY_ALLOW_SIGN_UP: "true" };
+    for (let i = 0; i < 3; i++)
+      expect((await send("newuser@example.test", { env })).status).toBe(200);
+    expect((await send("newuser@example.test", { env })).status).toBe(429);
+  });
 });

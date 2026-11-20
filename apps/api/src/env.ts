@@ -13,6 +13,7 @@ export type Env = {
   MEMORY_GRAPHS: MemoryGraphNamespace;
   AUTH_DB?: D1Database;
   OPENMEMORY_AUTH_ALLOWED_EMAILS?: string;
+  OPENMEMORY_ALLOW_SIGN_UP?: string;
   AUTH_EMAIL?: { fetch(request: Request): Promise<Response> };
   MEMORY_VECTORS?: VectorizeIndex;
   AI?: Ai;
