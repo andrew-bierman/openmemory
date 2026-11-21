@@ -7,6 +7,9 @@ releases begin.
 
 ## Unreleased
 
+- Relicense from MIT to AGPL-3.0: forks snapshot under the license they
+  forked from, new versions require publishing source including for hosted
+  use, and CONTRIBUTING records the inbound AGPL grant for contributions.
 - Prepare open-source launch scaffolding: license, contribution guide, security
   policy, support docs, issue templates, PR template, and launch checklist.
 
