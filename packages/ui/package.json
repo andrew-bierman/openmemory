@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
+    "check-types": "bun check --no-script",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {

@@ -26,7 +26,7 @@ Run the baseline checks:
 ```sh
 bun run format
 bun run security:secrets
-bun run check
+bun run verify
 bun run build
 bun run test:integration:local
 bun run test:e2e:local
