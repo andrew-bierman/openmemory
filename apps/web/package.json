@@ -7,7 +7,7 @@
     "dev": "vite dev --host 127.0.0.1 --port 54152",
     "build": "vite build",
     "check-types": "bun check --no-script",
-    "test": "vitest run src --passWithNoTests"
+    "test": "cd ../.. && bunx bun@$(cat .bun-canary-version) test apps/web/src"
   },
   "dependencies": {
     "@openmemory/client": "workspace:*",
