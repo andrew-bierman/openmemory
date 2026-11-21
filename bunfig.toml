@@ -1,2 +1,9 @@
 [install]
 linker = "hoisted"
+
+[fmt]
+# Markdown was never formatter-owned under Biome; keep CE plan artifacts stable.
+# jsonc keeps its Biome style: bun fmt's trailing commas break the strict
+# JSON parsers in the maintenance and live-ui tests, and one trailingComma
+# knob cannot separate jsonc from TS.
+ignorePatterns = ["**/*.md", "**/*.jsonc", "apps/web/src/routeTree.gen.ts"]

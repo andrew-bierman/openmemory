@@ -77,10 +77,12 @@ export function assertWorkspaceRequestOrigin(env: Env, request: Request) {
 }
 export async function listWorkspaces(env: Env, actorId: string) {
   const result = await primary(env)
-    .prepare(`SELECT w.id,w.name,w.owner_user_id AS ownerUserId,m.id AS memberId,
+    .prepare(
+      `SELECT w.id,w.name,w.owner_user_id AS ownerUserId,m.id AS memberId,
  CASE WHEN w.owner_user_id=m.user_id THEN 'owner' ELSE m.role END AS role
  FROM workspace w JOIN user owner ON owner.id=w.owner_user_id JOIN workspace_member m ON m.workspace_id=w.id JOIN user u ON u.id=m.user_id
- WHERE m.user_id=? AND m.status='active' AND m.accepted_at IS NOT NULL AND (m.user_id=w.owner_user_id OR m.role IN ('admin','member')) ORDER BY w.id`)
+ WHERE m.user_id=? AND m.status='active' AND m.accepted_at IS NOT NULL AND (m.user_id=w.owner_user_id OR m.role IN ('admin','member')) ORDER BY w.id`,
+    )
     .bind(actorId)
     .all<{
       id: string;
@@ -178,8 +180,10 @@ export async function createWorkspaceInvitation(
       )
       .bind(workspaceId, email, ...args),
     db
-      .prepare(`INSERT INTO workspace_invitation(id,workspace_id,email,role,token_hash,inviter_user_id,inviter_member_id,target_user_id,expires_at,created_at)
- SELECT ?,?,?,?,?,?,?,(SELECT id FROM user WHERE lower(email)=?),?,? WHERE ${guards} RETURNING id`)
+      .prepare(
+        `INSERT INTO workspace_invitation(id,workspace_id,email,role,token_hash,inviter_user_id,inviter_member_id,target_user_id,expires_at,created_at)
+ SELECT ?,?,?,?,?,?,?,(SELECT id FROM user WHERE lower(email)=?),?,? WHERE ${guards} RETURNING id`,
+      )
       .bind(
         invitationId,
         workspaceId,
@@ -220,14 +224,16 @@ export async function acceptWorkspaceInvitation(
     memberId = crypto.randomUUID(),
     now = Math.floor(Date.now() / 1000);
   const row = await primary(env)
-    .prepare(`UPDATE workspace_invitation SET accepted_at=?,accepted_user_id=?,accepted_member_id=?
+    .prepare(
+      `UPDATE workspace_invitation SET accepted_at=?,accepted_user_id=?,accepted_member_id=?
  WHERE id=? AND token_hash=? AND accepted_at IS NULL AND expires_at>?
  AND EXISTS(SELECT 1 FROM user u WHERE u.id=? AND lower(u.email)=workspace_invitation.email AND (target_user_id IS NULL OR target_user_id=u.id))
  AND EXISTS(SELECT 1 FROM workspace w JOIN user owner ON owner.id=w.owner_user_id JOIN workspace_member a ON a.workspace_id=w.id JOIN user au ON au.id=a.user_id
  WHERE w.id=workspace_invitation.workspace_id AND a.id=inviter_member_id AND a.user_id=inviter_user_id AND a.accepted_at IS NOT NULL AND a.status='active'
  AND (w.owner_user_id=a.user_id OR (a.role='admin' AND workspace_invitation.role='member')))
  AND NOT EXISTS(SELECT 1 FROM workspace_member m WHERE m.workspace_id=workspace_invitation.workspace_id AND m.user_id=? AND m.accepted_at IS NOT NULL)
- RETURNING workspace_id AS workspaceId`)
+ RETURNING workspace_id AS workspaceId`,
+    )
     .bind(now, actorId, memberId, invitationId, hash, now, actorId, actorId)
     .first<{ workspaceId: string }>();
   if (!row) throw new WorkspaceAccessError(404, "not_found");
@@ -263,8 +269,10 @@ export async function changeWorkspaceMemberRole(
   const access = await requireAccess(env, actorId, workspaceId);
   if (access.role !== "owner") throw new WorkspaceAccessError(403, "forbidden");
   const row = await primary(env)
-    .prepare(`UPDATE workspace_member SET role=?,updated_at=unixepoch() WHERE id=? AND workspace_id=? AND accepted_at IS NOT NULL
- AND user_id<>(SELECT owner_user_id FROM workspace WHERE id=?) AND ${authority}`)
+    .prepare(
+      `UPDATE workspace_member SET role=?,updated_at=unixepoch() WHERE id=? AND workspace_id=? AND accepted_at IS NOT NULL
+ AND user_id<>(SELECT owner_user_id FROM workspace WHERE id=?) AND ${authority}`,
+    )
     .bind(
       role,
       memberId,
@@ -288,9 +296,11 @@ export async function removeWorkspaceMembership(
 ) {
   const access = await requireAccess(env, actorId, workspaceId);
   const row = await primary(env)
-    .prepare(`DELETE FROM workspace_member WHERE id=? AND workspace_id=?
+    .prepare(
+      `DELETE FROM workspace_member WHERE id=? AND workspace_id=?
  AND COALESCE(user_id,'')<>(SELECT owner_user_id FROM workspace WHERE id=?)
- AND (${authority.replace("?='member'", "workspace_member.role='member'")} OR (id=? AND user_id=? AND ${authority.replace("(a.role='admin' AND ?='member')", "a.role IN ('admin','member')")})) RETURNING id`)
+ AND (${authority.replace("?='member'", "workspace_member.role='member'")} OR (id=? AND user_id=? AND ${authority.replace("(a.role='admin' AND ?='member')", "a.role IN ('admin','member')")})) RETURNING id`,
+    )
     .bind(
       memberId,
       workspaceId,
