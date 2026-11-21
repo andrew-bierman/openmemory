@@ -87,6 +87,53 @@ jobs:
       - name: Vitest sweep (integration, live, budget)
         run: bun run --cwd apps/api test:vitest
 
+  d1-migrations:
+    name: D1 migrations (production)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Back up production D1
+        run: bun run --cwd apps/api wrangler d1 export openmemory-auth --remote --output ../d1-backup-${{ github.sha }}.sql
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: d1-backup-${{ github.sha }}
+          path: d1-backup-${{ github.sha }}.sql
+          retention-days: 30
+
+      - name: Verify no diverged migration state
+        run: |
+          pending="$(bun run --cwd apps/api wrangler d1 migrations list openmemory-auth --remote)"
+          echo "$pending"
+          if echo "$pending" | grep -q "0006_team_accounts" && ! echo "$pending" | grep -q "0004_oauth_consent_lookup"; then
+            echo "::error::0006_team_accounts is recorded applied while 0004_oauth_consent_lookup is still pending — an earlier 0006 revision diverged. Do not apply; follow docs/validation-2026-10-17.md."
+            exit 1
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Apply migrations
+        run: bun run --cwd apps/api wrangler d1 migrations apply openmemory-auth --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
   mcp-sdk-smoke:
     name: MCP SDK smoke
     runs-on: ubuntu-latest
