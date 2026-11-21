@@ -210,6 +210,18 @@ supportability. Configure the per-isolate safety valve with
 Set `OPENMEMORY_RERANK_MODEL` to opt into a bounded Workers AI rerank pass over
 recall candidates; leave it unset for deterministic-only recall.
 
+## Teams and private memories
+
+A user owns a private memory graph. A workspace is a separate team/account with owner, admin and member roles; selecting a team does not switch or merge personal graphs. Existing personal data remains private. Legacy non-owner memberships require a fresh invitation and explicit acceptance before shared access is allowed.
+
+In the dashboard's Admin view, an owner or admin creates an invitation and manually delivers its one-time secret to the intended person. The recipient signs in and explicitly accepts. Owners manage administrator roles; admins manage ordinary members; non-owners can leave. Deleting a team removes its membership and shared directory without deleting users or personal memories. Account deletion remains a separate operation.
+
+Any accepted member can explicitly share one of their active memory versions read-only with all current and future accepted members of that team. Shared results contain content, type, tags and owner/version attribution; they exclude private metadata, sources, profile and graph neighbors. New versions stay private. Only the memory owner revokes their share. Removal, revocation, forget, supersession, purge and restore prevent old references from authorizing new reads. Data already delivered cannot be retracted.
+
+Shared REST routes under `/v1/workspaces` require a browser session. MCP tools `shared_workspaces`, `shared_list`, `shared_read` and `shared_search` additionally require explicit `memory:shared:read` consent alongside `memory:read`; existing personal scopes gain no team access. Shared search is bounded lexical search with page-local ranking and an explicit continuation cursor. Personal search, semantic retrieval, exports and ingestion do not incorporate team data.
+
+Deployment requires reviewed D1 migrations `0004`, `0005`, then `0006_team_accounts.sql` before compatible code. Owner Durable Objects initialize grant tables lazily. Minimal consumed request identifiers remain as replay-prevention tombstones across graph purge; share content and grant audit details are purged and never exported. Old OAuth artifacts require fresh consent. Roll back through a compatible forward fix or disable sharing; old code does not enforce the new lifecycle and authorization boundaries. This branch has not been deployed.
+
 ## MCP
 
 OpenMemory exposes a streamable HTTP MCP endpoint at:

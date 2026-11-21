@@ -6,6 +6,63 @@ the current repo, CI, deployment, or runtime behavior proves them.
 
 ## Current Launch Posture
 
+**2026-10-25: not release-ready.** Combined source candidate
+`4b5feb2b19613f166fa61450bd5afd71b77b8621` preserves recovered team/OTP/security work at
+`1fb356bf4c63d437f5c6e146cd5181bdc635598b` and integrates bounded OAuth client
+JSON validation. `currentLocalCandidate` in `config/launch-evidence.json` points
+to this code commit; the [combined cloud qualification](cloud-integration-2026-10-25.md)
+records actual tests and review limits. Earlier local evidence is retained under
+`priorLocalCandidate`; it is not counted as combined qualification.
+
+The combined source passed 275 TypeScript tests, two live skips, one SQLite
+email-budget concurrency test, all typecheck tasks, build/bundle budgets, local
+MCP SDK profiles and 360-/1,000-memory scale checks. All three browser cases
+were rerun successfully on Linux with a synthetic mailbox. A separate review
+found no integration-blocking findings within its documented scope.
+
+Better Auth and its MCP OAuth provider remain in place. Email OTP uses durable
+single-use hashes and throttles; password APIs and implicit signup are disabled.
+Admission is checked against current approved identities for sessions and MCP.
+Existing credential rows, IDs, memberships and grants are retained. The private
+Resend adapter and bounded non-deleting OTP harness remain local implementations
+with live sender/domain/key configuration pending. Typed rerank failures preserve
+deterministic fallback; the two-second production p95 alert is distinct from the
+12-second synthetic hosted benchmark ceiling.
+
+Synthetic transport and local client profiles are not real email or vendor proof.
+This candidate has not been deployed or tested against production. See
+[the rollout prerequisites](passwordless-auth-rollout.md) and
+[live fixture requirements](passwordless-live-qualification.md).
+
+Before cutover, configure and prove real email delivery and prove existing users
+can access their preserved accounts using the alternative login. Customer access
+uses application admission; Cloudflare Access is optional for internal operations
+and imposes no customer user-count cap. Scheduled live jobs require approved
+passwordless fixtures before they can provide new qualification evidence.
+
+The opt-in maintenance integration remains included. A separate closed bridge
+built from the recovered production executable passed 63 local HTTP checks and
+a dry-run bundle; this does not prove hosted closure.
+
+The proposed minimal synthetic staging target is
+`om-qual-20261017-api.abbierman101.workers.dev`. Billing-plan/usage and Access
+organization read requests returned 403 with existing authentication; account
+headroom remains unverified. Access is not a customer-auth prerequisite. Resource creation,
+staging credentials/grants and the bounded run require separate approval;
+permanent teardown requires later action-time approval against actual resource
+IDs. No staging resources or credentials were created.
+
+The historical CI/runtime/cleanup entries below remain evidence only for their
+named commits and runs. They must not be attributed to this candidate. Real
+Cursor, Claude and ChatGPT dogfood and production semantic-RAG/rerank reviews
+remain pending. Request-profile simulation is not vendor evidence.
+
+Read-only production inspection found migrations 0004–0006 unapplied, one
+missing-owner-membership workspace (not one total workspace), and two
+extraction DLQ messages. Primary queue backlog was zero at the snapshot; DLQ
+message age, original deployed asset bytes/routing and the deployed Git commit remain unknown. The exact deployed executable is verified by matching pinned/current downloads and active-version ETag; its migration tag and compatibility settings match the local bridge.
+No production mutation was performed.
+
 OpenMemory is close to an alpha open-source release aimed at technical early
 adopters who are comfortable with Cloudflare Workers, Durable Objects, D1,
 Vectorize, Workers AI, R2, OAuth, and MCP.
@@ -15,7 +72,7 @@ benchmarks, and alpha telemetry are covered; higher-volume production
 operations and vendor-specific MCP client dogfooding still need work before a
 larger hosted push.
 
-## Proven Today
+## Previously recorded capabilities and evidence
 
 - GitHub repo exists and CI runs on PRs and `main`.
 - Cloudflare Workers Builds deploys the monolithic Worker from root
@@ -163,20 +220,20 @@ larger hosted push.
   `3e4b35fa57c0dfb2d7cc45359858145dbf272813` has a green Cloudflare Workers
   Build:
   `https://dash.cloudflare.com/a0adf59e1ef3edc3d2bbc2ff272474bc/workers/services/view/openmemory-api/production/builds/9f6dc277-e53e-4b23-97d7-adbeb425518e`.
-- [x] Latest verified runtime candidate
+- [x] Historical verified runtime candidate
   `3e4b35fa57c0dfb2d7cc45359858145dbf272813` has green live smoke proving
   hosted auth, graph recall, readiness, R2 export, OAuth/MCP, hosted UI, remote
   Workers AI, Vectorize semantic recall, and conversation transcript ingestion:
   `https://github.com/andrew-bierman/openmemory/actions/runs/29666897021`.
-- [x] Remote D1 cleanup counters after current live smoke are zero:
+- [x] Remote D1 cleanup counters after the named historical live smoke are zero:
   `oauth_client=0`, `live_users=0`, `live_benchmark_users=0`.
-- [x] Latest full local release validation evidence passed on
+- [x] Historical full release validation evidence passed on
   `3e4b35fa57c0dfb2d7cc45359858145dbf272813` in
   `https://github.com/andrew-bierman/openmemory/actions/runs/29666687105`
   with `bun run release:validate`, including local recall MRR `1.0`, hit@3
   `1.0`, 220-memory graph recall `18.82ms`, 360-memory graph recall
   `21.28ms`, and 1,000-memory graph recall `39.67ms`.
-- [x] Latest hosted production graph benchmark evidence passed in
+- [x] Recorded hosted production graph benchmark evidence passed in
   `https://github.com/andrew-bierman/openmemory/actions/runs/33231544217`:
   trend summary analyzed 10 runs, latest recall latency `2895.96ms`, average
   recall latency `1221.60ms`, and a `12000ms` threshold. The artifact is 956

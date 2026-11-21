@@ -1,5 +1,5 @@
 import { normalizeTenantId } from "@openmemory/core";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { resolveOpenMemorySession } from "./better-auth";
 import {
@@ -14,6 +14,12 @@ import {
   workspaceMember,
 } from "./db/schema";
 import type { Env } from "./env";
+import {
+  assertWorkspaceRequestOrigin,
+  createWorkspaceInvitation,
+  removeWorkspaceMembership,
+  WorkspaceAccessError,
+} from "./workspace-access";
 
 type AccountResult =
   | { status: 200; body: AccountResponse }
@@ -165,60 +171,22 @@ export async function inviteWorkspaceMember(
     return context.result;
   }
 
-  const email = normalizeEmail(input.email);
-  const role = input.role === "admin" ? "admin" : "member";
-  const now = new Date();
-  const [existingUser] = await context.db
-    .select({ id: authUser.id })
-    .from(authUser)
-    .where(eq(authUser.email, email))
-    .limit(1);
-  const [existingMember] = await context.db
-    .select()
-    .from(workspaceMember)
-    .where(
-      and(
-        eq(workspaceMember.workspaceId, context.workspace.id),
-        eq(workspaceMember.email, email),
-      ),
-    )
-    .limit(1);
-
-  if (existingMember) {
-    const [updated] = await context.db
-      .update(workspaceMember)
-      .set({
-        role,
-        status: existingUser ? "active" : "invited",
-        userId: existingUser?.id,
-        updatedAt: now,
-      })
-      .where(eq(workspaceMember.id, existingMember.id))
-      .returning();
+  try {
+    assertWorkspaceRequestOrigin(env, request);
     return {
-      status: 201,
-      body: serializeMember(updated),
-    } satisfies AccountResult;
+      status: 201 as const,
+      body: await createWorkspaceInvitation(
+        env,
+        context.user.id,
+        context.workspace.id,
+        input,
+      ),
+    };
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError)
+      return { status: error.status, body: { error: error.error } };
+    throw error;
   }
-
-  const [created] = await context.db
-    .insert(workspaceMember)
-    .values({
-      id: crypto.randomUUID(),
-      workspaceId: context.workspace.id,
-      userId: existingUser?.id,
-      email,
-      role,
-      status: existingUser ? "active" : "invited",
-      createdAt: now,
-      updatedAt: now,
-    })
-    .returning();
-
-  return {
-    status: 201,
-    body: serializeMember(created),
-  } satisfies AccountResult;
 }
 
 export async function removeWorkspaceMember(
@@ -227,41 +195,21 @@ export async function removeWorkspaceMember(
   memberId: string,
 ) {
   const context = await getAccountContext(env, request);
-  if (!context.ok) {
-    return context.result;
+  if (!context.ok) return context.result;
+  try {
+    assertWorkspaceRequestOrigin(env, request);
+    await removeWorkspaceMembership(
+      env,
+      context.user.id,
+      context.workspace.id,
+      memberId,
+    );
+    return { status: 200 as const, body: await readAccount(context) };
+  } catch (error) {
+    if (error instanceof WorkspaceAccessError)
+      return { status: error.status, body: { error: error.error } };
+    throw error;
   }
-
-  const [member] = await context.db
-    .select()
-    .from(workspaceMember)
-    .where(
-      and(
-        eq(workspaceMember.id, memberId),
-        eq(workspaceMember.workspaceId, context.workspace.id),
-      ),
-    )
-    .limit(1);
-  if (!member) {
-    return {
-      status: 404,
-      body: { error: "not_found" },
-    } satisfies AccountResult;
-  }
-  if (member.role === "owner") {
-    return {
-      status: 403,
-      body: { error: "owner_member_required" },
-    } satisfies AccountResult;
-  }
-
-  await context.db
-    .delete(workspaceMember)
-    .where(eq(workspaceMember.id, memberId));
-
-  return {
-    status: 200,
-    body: await readAccount(context),
-  } satisfies AccountResult;
 }
 
 export async function deleteAccountControlPlane(
@@ -447,7 +395,6 @@ async function ensureOwnerMember(
   workspaceId: string,
   user: { email: string; name: string; userId: string },
 ) {
-  const email = normalizeEmail(user.email);
   const now = new Date();
   const [existing] = await db
     .select()
@@ -455,8 +402,13 @@ async function ensureOwnerMember(
     .where(
       and(
         eq(workspaceMember.workspaceId, workspaceId),
-        eq(workspaceMember.email, email),
+        eq(workspaceMember.userId, user.userId),
       ),
+    )
+    // Preserve the accepted membership instance; historical duplicates stay inactive.
+    .orderBy(
+      sql`${workspaceMember.acceptedAt} IS NULL`,
+      asc(workspaceMember.id),
     )
     .limit(1);
 
@@ -466,6 +418,7 @@ async function ensureOwnerMember(
       .set({
         role: "owner",
         status: "active",
+        acceptedAt: existing.acceptedAt ?? now,
         userId: user.userId,
         updatedAt: now,
       })
@@ -473,16 +426,19 @@ async function ensureOwnerMember(
     return;
   }
 
-  await db.insert(workspaceMember).values({
-    id: crypto.randomUUID(),
-    workspaceId,
-    userId: user.userId,
-    email,
-    role: "owner",
-    status: "active",
-    createdAt: now,
-    updatedAt: now,
-  });
+  // Match migration repair atomically: never bypass a historical email collision.
+  const inserted = await db.run(sql`
+    INSERT INTO workspace_member
+      (id,workspace_id,user_id,email,role,status,created_at,updated_at,accepted_at)
+    SELECT ${crypto.randomUUID()},w.id,u.id,lower(u.email),'owner','active',unixepoch(),unixepoch(),unixepoch()
+    FROM workspace w JOIN user u ON u.id=w.owner_user_id
+    WHERE w.id=${workspaceId} AND u.id=${user.userId}
+      AND NOT EXISTS(SELECT 1 FROM workspace_member m WHERE m.workspace_id=w.id AND m.user_id=u.id)
+      AND NOT EXISTS(SELECT 1 FROM workspace_member m WHERE m.workspace_id=w.id AND lower(m.email)=lower(u.email))
+  `);
+  if (!inserted.meta.changes) {
+    throw new WorkspaceAccessError(409, "owner_membership_conflict");
+  }
 }
 
 async function readAccount(context: Extract<AccountContext, { ok: true }>) {

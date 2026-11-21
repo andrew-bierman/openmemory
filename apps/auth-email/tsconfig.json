@@ -1,0 +1,5 @@
+{
+  "extends": "../../packages/typescript-config/base.json",
+  "compilerOptions": { "lib": ["ES2022", "DOM"], "types": [] },
+  "include": ["src/**/*.ts", "test/**/*.ts"]
+}
