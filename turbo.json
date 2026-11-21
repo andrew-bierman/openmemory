@@ -26,9 +26,15 @@
       "inputs": [
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/apps/auth-email/**",
-        "$TURBO_ROOT$/scripts/staging-qualification.ts"
+        "$TURBO_ROOT$/scripts/staging-qualification.ts",
+        "$TURBO_ROOT$/.bun-canary-version",
+        "$TURBO_ROOT$/package.json",
+        "$TURBO_ROOT$/apps/web/**"
       ],
       "passThroughEnv": ["XDG_CONFIG_HOME", "WRANGLER_SEND_METRICS"]
+    },
+    "@openmemory/web#test": {
+      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/.bun-canary-version"]
     },
     "@openmemory/api#check-types": {
       "outputs": [],

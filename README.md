@@ -303,7 +303,7 @@ trend, semantic RAG trace review, and rerank threshold review.
 For the faster pull-request loop:
 
 ```sh
-bun run check
+bun run verify
 bun run build
 bun run test:integration:local
 bun run test:mcp:sdk
